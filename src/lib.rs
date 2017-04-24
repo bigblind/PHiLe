@@ -10,6 +10,8 @@
 
 // #![deny(missing_docs)]
 
+extern crate regex;
+
 pub mod lexer;
 pub mod ast;
 pub mod parser;
