@@ -1,4 +1,9 @@
 use regex::Regex;
+use unicode_segmentation::UnicodeSegmentation;
+
+fn grapheme_count(lexeme: &str) -> usize {
+    UnicodeSegmentation::graphemes(lexeme, true).count()
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Location {
@@ -8,16 +13,16 @@ pub struct Location {
 
 impl Location {
     fn advance_by(&self, lexeme: &str) -> Location {
-        // - 1 because index is in [0, len())
-        // + 1 because humans start counting at 1
         match lexeme.rfind('\n') {
             Some(index) => Location {
                 line:   self.line + lexeme.matches('\n').count(),
-                column: lexeme.len() - index - 1 + 1,
+                // -1 because the \n itself doesn't count,
+                // +1 because humans start counting at 1.
+                column: grapheme_count(&lexeme[index..]) - 1 + 1,
             },
             None => Location {
                 line:   self.line,
-                column: self.column + lexeme.len(),
+                column: self.column + grapheme_count(lexeme),
             },
         }
     }
@@ -48,9 +53,9 @@ pub struct Token<'a> {
 
 #[allow(missing_debug_implementations)]
 pub struct Lexer<'a> {
-    source:  &'a str,
+    source:   &'a str,
     location: Location,
-    regexes: [(TokenKind, Regex); 6],
+    regexes:  [(TokenKind, Regex); 6],
 }
 
 impl<'a> Lexer<'a> {

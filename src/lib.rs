@@ -11,6 +11,7 @@
 // #![deny(missing_docs)]
 
 extern crate regex;
+extern crate unicode_segmentation;
 
 pub mod lexer;
 pub mod ast;
