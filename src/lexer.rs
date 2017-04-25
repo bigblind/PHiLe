@@ -40,12 +40,16 @@ pub struct Token<'a> {
 }
 
 #[allow(missing_debug_implementations)]
-pub struct Lexer<'a> {
+struct Lexer<'a> {
     source:   &'a str,
     location: Location,
     regexes:  [(TokenKind, Regex); 6],
 }
 
+
+pub fn lex(source: &str) -> Result<Vec<Token>, Location> {
+    Lexer::new(source).lex()
+}
 
 fn grapheme_count(lexeme: &str) -> usize {
     UnicodeSegmentation::graphemes(lexeme, true).count()
@@ -69,7 +73,7 @@ impl Location {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(source: &str) -> Lexer {
+    fn new(source: &str) -> Lexer {
         Lexer {
             source: source,
             location: Location { line: 1, column: 1 },
@@ -84,7 +88,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn lex(mut self) -> Result<Vec<Token<'a>>, Location> {
+    fn lex(mut self) -> Result<Vec<Token<'a>>, Location> {
         let mut tokens = Vec::with_capacity(self.source.len());
 
         loop {

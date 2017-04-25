@@ -9,8 +9,9 @@
 use lexer::Token;
 
 
-#[derive(Debug, Clone, Copy)]
-enum NodeValue {
+#[derive(Debug)]
+pub enum NodeValue<'a> {
+    Program(Vec<Node<'a>>),
     StructDecl,
     ClassDecl,
     EnumDecl,
@@ -18,8 +19,8 @@ enum NodeValue {
 }
 
 #[derive(Debug)]
-struct Node<'a> {
-    begin: &'a Token<'a>,
-    end:   &'a Token<'a>,
-    value: NodeValue,
+pub struct Node<'a> {
+    pub begin: Option<&'a Token<'a>>,
+    pub end:   Option<&'a Token<'a>>,
+    pub value: NodeValue<'a>,
 }

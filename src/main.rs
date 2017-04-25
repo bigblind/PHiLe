@@ -16,7 +16,8 @@ use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use std::io::prelude::*;
-use phile::lexer::{Lexer, TokenKind};
+use phile::lexer::*;
+use phile::parser::*;
 
 
 #[derive(Debug)]
@@ -102,10 +103,10 @@ fn main() {
     }
 
     let source = read_file(&args.schemas[0]).unwrap_or_else(
-        |err| panic!("could not read file '{}': {}", args.schemas[0], err.description())
+        |error| panic!("could not read file '{}': {}", args.schemas[0], error.description())
     );
 
-    let mut tokens = Lexer::new(&source).lex().unwrap_or_else(
+    let mut tokens = lex(&source).unwrap_or_else(
         |location| panic!("Lexer error at {:?}", location)
     );
 
@@ -117,7 +118,9 @@ fn main() {
         }
     );
 
-    for token in tokens {
-        println!("{:?}", token);
-    }
+    let program = parse(&tokens).unwrap_or_else(
+        |error| panic!("Parse error: {:?}", error)
+    );
+
+    println!("{:?}", program);
 }
