@@ -14,7 +14,6 @@ class User {
   handle_name: String!, # '!' means unique
   legal_name: String?,
   auth_method: AuthMethod,
-  // posts: [&Post] <->* Post::creator,
   posts <->* Post::creator,
   followers *<->* User::followed_by,
   followed_by *<->* User::followers,
@@ -24,6 +23,5 @@ class Post {
   text: String,
   date: Date,
   visibility: Visibility,
-  // creator: [&User] *<-> User::posts,
   creator *<-> User::posts,
 }

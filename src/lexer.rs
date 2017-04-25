@@ -74,7 +74,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn lex(&mut self) -> Result<Vec<Token<'a>>, Location> {
+    pub fn lex(mut self) -> Result<Vec<Token<'a>>, Location> {
         let mut tokens = vec![];
 
         loop {
