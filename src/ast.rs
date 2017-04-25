@@ -6,9 +6,10 @@
 // on 07/04/2017
 //
 
-use lexer::Range;
+use lexer::Token;
 
 
+#[derive(Debug, Clone, Copy)]
 enum NodeValue {
     StructDecl,
     ClassDecl,
@@ -16,7 +17,8 @@ enum NodeValue {
     FunctionDecl,
 }
 
-struct Node {
-    range: Range,
+struct Node<'a> {
+    begin: &'a Token<'a>,
+    end:   &'a Token<'a>,
     value: NodeValue,
 }

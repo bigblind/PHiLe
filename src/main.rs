@@ -10,11 +10,13 @@
 extern crate clap;
 extern crate phile;
 
+use std::str;
+use std::slice;
 use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use std::io::prelude::*;
-use phile::lexer::{Lexer, TokenKind, Token};
+use phile::lexer::{Lexer, TokenKind};
 
 
 #[derive(Debug)]
@@ -52,6 +54,40 @@ fn read_file(path: &str) -> Result<String, std::io::Error> {
     let mut buf = String::new();
     try!(file.read_to_string(&mut buf));
     Ok(buf)
+}
+
+fn is_subslice(haystack: &str, needle: &str) -> bool {
+    let haystack_begin = haystack.as_ptr();
+    let haystack_end   = unsafe { haystack.as_ptr().offset(haystack.len() as isize) };
+    let needle_begin   = needle.as_ptr();
+    let needle_end     = unsafe { needle.as_ptr().offset(needle.len() as isize) };
+
+    haystack_begin <= needle_begin && needle_end <= haystack_end
+}
+
+fn slice_between<'a>(haystack: &'a str, first: &'a str, last: &'a str) -> Option<&'a str> {
+    if !is_subslice(haystack, first) || !is_subslice(haystack, last) {
+        return None;
+    }
+
+    let first_begin = first.as_ptr();
+    let first_end   = unsafe { first.as_ptr().offset(first.len() as isize) };
+    let last_begin  = last.as_ptr();
+    let last_end    = unsafe { last.as_ptr().offset(last.len() as isize) };
+
+    // first and last can overlap, the only criterion is
+    // that the beginning of first cannot be higher than
+    // the beginning of the last, and the end of the last
+    // cannot be lower than the end of the first.
+    if last_begin < first_begin || last_end < first_end {
+        return None;
+    }
+
+    unsafe {
+        let length = last_end as usize - first_begin as usize;
+        let bytes = slice::from_raw_parts(first_begin, length);
+        str::from_utf8(bytes).ok()
+    }
 }
 
 fn main() {
