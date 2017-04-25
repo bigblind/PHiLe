@@ -17,6 +17,7 @@ enum NodeValue {
     FunctionDecl,
 }
 
+#[derive(Debug)]
 struct Node<'a> {
     begin: &'a Token<'a>,
     end:   &'a Token<'a>,
