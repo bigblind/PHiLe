@@ -56,21 +56,19 @@ fn main() {
         panic!("currently, only compiling one single file is supported");
     }
 
-    match read_file(&args.schemas[0]) {
-        Err(err) => panic!("could not read file '{}': {}", args.schemas[0], err.description()),
-        Ok(source) => {
-            let mut lexer = Lexer::new(&source);
+    let source = read_file(
+        &args.schemas[0]
+    ).unwrap_or_else(
+        |err| panic!("could not read file '{}': {}", args.schemas[0], err.description())
+    );
 
-            match lexer.lex() {
-                Err(location) => {
-                    panic!("Lexer error at {:?}", location);
-                },
-                Ok(tokens) => {
-                    for token in tokens {
-                        println!("{:?}", token);
-                    }
-                },
-            }
-        },
+    let mut lexer = Lexer::new(&source);
+
+    let tokens = lexer.lex().unwrap_or_else(
+        |location| panic!("Lexer error at {:?}", location)
+    );
+
+    for token in tokens {
+        println!("{:?}", token);
     }
 }
