@@ -38,8 +38,8 @@ impl<'a> Parser<'a> {
         self.tokens.len() > 0
     }
 
-    fn parse(&mut self) -> ParseResult<'a> {
-        let mut children = Vec::new();
+    fn parse(mut self) -> ParseResult<'a> {
+        let mut children = vec![];
         let first_token = self.tokens.first();
         let last_token = self.tokens.last();
 
