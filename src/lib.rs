@@ -1,3 +1,11 @@
+//
+// lib.rs
+// The PHiLe Compiler
+//
+// Created by Arpad Goretity (H2CO3)
+// on 07/04/2017
+//
+
 #![crate_name="phile"]
 #![crate_type="rlib"]
 #![crate_type="dylib"]
@@ -6,9 +14,8 @@
         trivial_casts, trivial_numeric_casts,
         unsafe_code,
         unstable_features,
-        unused_import_braces, unused_qualifications)]
-
-// #![deny(missing_docs)]
+        unused_import_braces, unused_qualifications
+        /*, missing_docs */)]
 
 extern crate regex;
 extern crate unicode_segmentation;

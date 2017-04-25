@@ -1,13 +1,21 @@
+//
+// main.rs
+// The PHiLe Compiler
+//
+// Created by Arpad Goretity (H2CO3)
+// on 07/04/2017
+//
+
 #[macro_use]
 extern crate clap;
 extern crate phile;
 
-// use phile::{lexer, ast, parser, semanal, qir, qirgen, qiropt, querygen, wrapgen};
 use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use std::io::prelude::*;
 use phile::lexer::Lexer;
+
 
 #[derive(Debug)]
 struct ProgramArgs {
@@ -16,12 +24,6 @@ struct ProgramArgs {
     schemas:  Vec<String>,
 }
 
-fn read_file(path: &str) -> Result<String, std::io::Error> {
-    let mut file = try!(File::open(&Path::new(path)));
-    let mut buf = String::new();
-    try!(file.read_to_string(&mut buf));
-    Ok(buf)
-}
 
 fn get_args() -> ProgramArgs {
     let args = clap_app!(app =>
@@ -43,6 +45,13 @@ fn get_args() -> ProgramArgs {
         wrapper:  wrapper.to_string(),
         schemas:  schemas.map(str::to_string).collect(),
     }
+}
+
+fn read_file(path: &str) -> Result<String, std::io::Error> {
+    let mut file = try!(File::open(&Path::new(path)));
+    let mut buf = String::new();
+    try!(file.read_to_string(&mut buf));
+    Ok(buf)
 }
 
 fn main() {

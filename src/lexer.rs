@@ -1,31 +1,19 @@
+//
+// lexer.rs
+// The PHiLe Compiler
+//
+// Created by Arpad Goretity (H2CO3)
+// on 07/04/2017
+//
+
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
-fn grapheme_count(lexeme: &str) -> usize {
-    UnicodeSegmentation::graphemes(lexeme, true).count()
-}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Location {
     line:   usize,
     column: usize,
-}
-
-impl Location {
-    fn advance_by(&self, lexeme: &str) -> Location {
-        match lexeme.rfind('\n') {
-            Some(index) => Location {
-                line:   self.line + lexeme.matches('\n').count(),
-                // -1 because the \n itself doesn't count,
-                // +1 because humans start counting at 1.
-                column: grapheme_count(&lexeme[index..]) - 1 + 1,
-            },
-            None => Location {
-                line:   self.line,
-                column: self.column + grapheme_count(lexeme),
-            },
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +46,28 @@ pub struct Lexer<'a> {
     regexes:  [(TokenKind, Regex); 6],
 }
 
+
+fn grapheme_count(lexeme: &str) -> usize {
+    UnicodeSegmentation::graphemes(lexeme, true).count()
+}
+
+impl Location {
+    fn advance_by(&self, lexeme: &str) -> Location {
+        match lexeme.rfind('\n') {
+            Some(index) => Location {
+                line:   self.line + lexeme.matches('\n').count(),
+                // -1 because the \n itself doesn't count,
+                // +1 because humans start counting at 1.
+                column: grapheme_count(&lexeme[index..]) - 1 + 1,
+            },
+            None => Location {
+                line:   self.line,
+                column: self.column + grapheme_count(lexeme),
+            },
+        }
+    }
+}
+
 impl<'a> Lexer<'a> {
     pub fn new(source: &str) -> Lexer {
         Lexer {
@@ -75,7 +85,7 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn lex(mut self) -> Result<Vec<Token<'a>>, Location> {
-        let mut tokens = vec![];
+        let mut tokens = Vec::with_capacity(self.source.len());
 
         loop {
             match self.next() {

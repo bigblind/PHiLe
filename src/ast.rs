@@ -1,14 +1,13 @@
-#[derive(Clone, Copy, Debug)]
-struct Location {
-    line: usize,
-    col: usize,
-}
+//
+// ast.rs
+// The PHiLe Compiler
+//
+// Created by Arpad Goretity (H2CO3)
+// on 07/04/2017
+//
 
-#[derive(Clone, Copy, Debug)]
-struct Range {
-    begin: Location,
-    end: Location,
-}
+use lexer::Range;
+
 
 enum NodeValue {
     StructDecl,
