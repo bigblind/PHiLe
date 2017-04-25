@@ -12,14 +12,14 @@ use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Location {
-    line:   usize,
-    column: usize,
+    pub line:   usize,
+    pub column: usize,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Range {
-    begin: Location,
-    end:   Location,
+    pub begin: Location,
+    pub end:   Location,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -34,9 +34,9 @@ pub enum TokenKind {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Token<'a> {
-    kind:  TokenKind,
-    value: &'a str,
-    range: Range,
+    pub kind:  TokenKind,
+    pub value: &'a str,
+    pub range: Range,
 }
 
 #[allow(missing_debug_implementations)]
