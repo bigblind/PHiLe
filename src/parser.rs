@@ -79,8 +79,7 @@ impl<'a> Parser<'a> {
             _        => error_result(
                 token,
                 token,
-                format!(
-                    "expected struct, class, enum or function declaration; found '{}'", token.value)
+                format!("expected struct, class, enum or function declaration; found '{}'", token.value)
             ),
         }
     }
