@@ -44,9 +44,9 @@ fn get_args() -> ProgramArgs {
     let schemas  = args.values_of("schemas").unwrap();
 
     ProgramArgs {
-        database: database.to_string(),
-        wrapper:  wrapper.to_string(),
-        schemas:  schemas.map(str::to_string).collect(),
+        database: database.to_owned(),
+        wrapper:  wrapper.to_owned(),
+        schemas:  schemas.map(str::to_owned).collect(),
     }
 }
 
@@ -107,7 +107,7 @@ fn main() {
     );
 
     let mut tokens = lex(&source).unwrap_or_else(
-        |location| panic!("Lexer error at {:?}", location)
+        |location| panic!("Lexer error at {:#?}", location)
     );
 
     tokens.retain(
@@ -119,8 +119,8 @@ fn main() {
     );
 
     let program = parse(&tokens).unwrap_or_else(
-        |error| panic!("Parse error: {:?}", error)
+        |error| panic!("Parse error: {:#?}", error)
     );
 
-    println!("{:?}", program);
+    println!("{:#?}", program);
 }

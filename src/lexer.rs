@@ -22,7 +22,7 @@ pub struct Range {
     pub end:   Location,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Whitespace,
     Comment,
