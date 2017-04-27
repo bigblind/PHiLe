@@ -57,7 +57,7 @@ impl<'a> Parser<'a> {
 
     fn expectation_error<T: ?Sized + Debug>(&self, expected: &T) -> ParseError<'a> {
         let token = self.next_token();
-        let actual = token.map_or("end of input".to_owned(), |t| format!("{:#?}", t));
+        let actual = token.map_or("end of input", |t| t.value);
 
         ParseError {
             message: format!("expected {:#?}; found {}", expected, actual),
@@ -342,6 +342,26 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type(&mut self) -> ParseResult<'a> {
+        self.parse_prefix_type()
+    }
+
+    fn parse_prefix_type(&mut self) -> ParseResult<'a> {
+        // currently, & is the only prefix type operator
+        match self.accept_lexeme("&") {
+            Some(token) => {
+                let child = try!(self.parse_prefix_type());
+                let node = Node {
+                    begin: Some(token),
+                    end:   child.end,
+                    value: NodeValue::Pointer(Box::new(child)),
+                };
+                Ok(node)
+            },
+            None => self.parse_postfix_type(),
+        }
+    }
+
+    fn parse_postfix_type(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 }

@@ -11,6 +11,7 @@ use lexer::Token;
 
 #[derive(Debug)]
 pub enum NodeValue<'a> {
+    // Declarations / Definitions
     Program(Vec<Node<'a>>),
     Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
@@ -18,6 +19,9 @@ pub enum NodeValue<'a> {
     Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
     FunctionDecl,
+
+    // Types
+    Pointer(Box<Node<'a>>),
 }
 
 #[derive(Debug)]
