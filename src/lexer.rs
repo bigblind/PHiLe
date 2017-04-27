@@ -26,7 +26,7 @@ pub struct Range {
 pub enum TokenKind {
     Whitespace,
     Comment,
-    Identifier,
+    Word, // identifier or keyword
     Punctuation,
     StringLiteral,
     NumericLiteral,
@@ -80,7 +80,7 @@ impl<'a> Lexer<'a> {
             regexes: [
                 (TokenKind::Whitespace,     Regex::new(r"^\s+").unwrap()),
                 (TokenKind::Comment,        Regex::new(r"^#[^\n]*\n?").unwrap()),
-                (TokenKind::Identifier,     Regex::new(r"^[\w_][\w\d_]*").unwrap()),
+                (TokenKind::Word,           Regex::new(r"^[\w_][\w\d_]*").unwrap()),
                 (TokenKind::NumericLiteral, Regex::new(r"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|(\d+(\.\d+([eE][+-]?\d+)?)?))").unwrap()),
                 (TokenKind::Punctuation,    Regex::new(r"^(\(|\)|\[|\]|\{|\}|[\?\*\+]?<\->[\?\*\+]?|([<>\+\-\*/%&\|\^!=]=?)|&&|\|\||~|\.|,|\?|::?|;)").unwrap()),
                 (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\]|\\["'nrtb]|\\x[[:xdigit:]]{2}|\\U[[:xdigit:]]{8})*""#).unwrap()),

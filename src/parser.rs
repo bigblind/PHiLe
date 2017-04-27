@@ -9,7 +9,7 @@
 use std::slice;
 use std::fmt::Debug;
 use lexer::{ Token, TokenKind };
-use ast::{ Node, NodeValue };
+use ast::*;
 
 
 #[allow(missing_debug_implementations)]
@@ -37,11 +37,25 @@ impl<'a> Parser<'a> {
         Parser { tokens: tokens.iter() }
     }
 
+    // Lexer helpers
+
+    fn is_keyword(lexeme: &str) -> bool {
+        #[allow(non_upper_case_globals)]
+        static keywords: &'static [&'static str] = &[
+            "struct",
+            "class",
+            "enum",
+            "fn",
+        ];
+
+        keywords.contains(&lexeme)
+    }
+
     fn has_tokens(&self) -> bool {
         self.tokens.len() > 0
     }
 
-    fn expect_error<T: ?Sized + Debug>(&self, expected: &T) -> ParseError<'a> {
+    fn expectation_error<T: ?Sized + Debug>(&self, expected: &T) -> ParseError<'a> {
         let token = self.next_token();
         let actual = token.map_or("end of input".to_owned(), |t| format!("{:#?}", t));
 
@@ -78,12 +92,38 @@ impl<'a> Parser<'a> {
     }
 
     fn expect(&mut self, kind: TokenKind) -> LexResult<'a> {
-        self.accept(kind).ok_or(self.expect_error(&kind))
+        self.accept(kind).ok_or(self.expectation_error(&kind))
     }
 
     fn expect_lexeme(&mut self, lexeme: &str) -> LexResult<'a> {
-        self.accept_lexeme(lexeme).ok_or(self.expect_error(lexeme))
+        self.accept_lexeme(lexeme).ok_or(self.expectation_error(lexeme))
     }
+
+    fn accept_identifier(&mut self) -> Option<&'a Token<'a>> {
+        self.accept_by(
+            |token| token.kind == TokenKind::Word && !Self::is_keyword(token.value)
+        )
+    }
+
+    fn expect_identifier(&mut self) -> LexResult<'a> {
+        self.accept_identifier().ok_or(self.expectation_error("identifier"))
+    }
+
+    fn is_at(&self, kind: TokenKind) -> bool {
+        match self.next_token() {
+            Some(token) => token.kind == kind,
+            None        => false,
+        }
+    }
+
+    fn is_at_lexeme(&self, lexeme: &str) -> bool {
+        match self.next_token() {
+            Some(token) => token.value == lexeme,
+            None        => false,
+        }
+    }
+
+    // Actual parser methods
 
     fn parse(mut self) -> ParseResult<'a> {
         let mut children = vec![];
@@ -104,7 +144,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_toplevel(&mut self) -> ParseResult<'a> {
-        let error = self.expect_error("struct, class, enum or fn");
+        let error = self.expectation_error("struct, class, enum or fn");
         let token = try!(self.next_token().ok_or_else(|| error.clone()));
 
         match token.value {
@@ -117,21 +157,45 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_struct(&mut self) -> ParseResult<'a> {
-        // let struct_keyword = try!(self.expect_lexeme("struct"));
-        self.expect_lexeme("struct").map(
-            |token| Node {
-                begin: Some(token),
-                end:   Some(token),
-                value: NodeValue::StructDecl
-            }
-        )
+        let mut fields = vec![];
+
+        let struct_keyword = try!(self.expect_lexeme("struct"));
+        let struct_name = try!(self.expect_identifier());
+
+        try!(self.expect_lexeme("{"));
+
+        while self.has_tokens() && !self.is_at_lexeme("}") {
+            fields.push(try!(self.parse_field()));
+        }
+
+        let close_brace = try!(self.expect_lexeme("}"));
+
+        let decl = StructDecl {
+            name:   struct_name.value,
+            fields: fields,
+        };
+        let node = Node {
+            begin: Some(struct_keyword),
+            end:   Some(close_brace),
+            value: NodeValue::StructDecl(decl),
+        };
+
+        Ok(node)
     }
 
     fn parse_class(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 
+    fn parse_field(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
     fn parse_enum(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_variant(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 
