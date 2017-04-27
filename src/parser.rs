@@ -284,11 +284,57 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_enum(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let mut variants = vec![];
+
+        let enum_keyword = try!(self.expect_lexeme("enum"));
+        let enum_name = try!(self.expect_identifier());
+
+        try!(self.expect_lexeme("{"));
+
+        while self.has_tokens() && !self.is_at_lexeme("}") {
+            variants.push(try!(self.parse_variant()));
+        }
+
+        let close_brace = try!(self.expect_lexeme("}"));
+
+        let decl = EnumDecl {
+            name:     enum_name.value,
+            variants: variants,
+        };
+        let node = Node {
+            begin: Some(enum_keyword),
+            end:   Some(close_brace),
+            value: NodeValue::EnumDecl(decl),
+        };
+
+        Ok(node)
     }
 
     fn parse_variant(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let name = try!(self.expect_identifier());
+
+        let (value_type, close_paren) = match self.accept_lexeme("(") {
+            Some(_) => {
+                let value_type = try!(self.parse_type());
+                let close_paren = try!(self.expect_lexeme(")"));
+                (Some(value_type), Some(close_paren))
+            },
+            None => (None, None),
+        };
+
+        try!(self.expect_lexeme(","));
+
+        let variant = Variant {
+            name:       name.value,
+            value_type: value_type,
+        };
+        let node = Node {
+            begin: Some(name),
+            end:   close_paren.or(Some(name)),
+            value: NodeValue::Variant(Box::new(variant)),
+        };
+
+        Ok(node)
     }
 
     fn parse_function(&mut self) -> ParseResult<'a> {

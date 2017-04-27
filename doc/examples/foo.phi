@@ -10,7 +10,12 @@ struct Post {
 }
 
 struct User {
-  posts <->* Post::creator
+  posts <->* Post::creator,
+}
+
+enum Bool {
+  False,
+  True,
 }
 
 # enum AuthMethod {
