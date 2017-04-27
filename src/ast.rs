@@ -12,6 +12,7 @@ use lexer::Token;
 #[derive(Debug)]
 pub enum NodeValue<'a> {
     Program(Vec<Node<'a>>),
+    Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
     ClassDecl,
     EnumDecl,
@@ -29,4 +30,18 @@ pub struct Node<'a> {
 pub struct StructDecl<'a> {
     pub name:   &'a str,
     pub fields: Vec<Node<'a>>,
+}
+
+#[derive(Debug)]
+pub struct Relation<'a> {
+    pub cardinality: &'a str,
+    pub entity:      &'a str,
+    pub field:       &'a str,
+}
+
+#[derive(Debug)]
+pub struct Field<'a> {
+    pub name:      &'a str,
+    pub type_decl: Option<Node<'a>>,
+    pub relation:  Option<Relation<'a>>,
 }

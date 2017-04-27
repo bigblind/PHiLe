@@ -1,27 +1,42 @@
-enum AuthMethod {
-  Email(String),
-  PhoneNumber(String),
-}
-	
-enum Visibility {
-  Private,
-  Friends,
-  Followers,
-  Public,
-}
-	
-class User {
-  handle_name: String!, # '!' means unique
-  legal_name: String?,
-  auth_method: AuthMethod,
-  posts <->* Post::creator,
-  followers *<->* User::followed_by,
-  followed_by *<->* User::followers,
-}
-	
-class Post {
-  text: String,
-  date: Date,
-  visibility: Visibility,
+# struct Attachment {
+#   url:           String!, # '!' means unique
+#   thumbnail_url: String?, # '?' means optional
+#   kind:          AttachmentKind,
+#   hashtags:      [String],
+# }
+
+struct Post {
   creator *<-> User::posts,
 }
+
+struct User {
+  posts <->* Post::creator
+}
+
+# enum AuthMethod {
+#   Email(String),
+#   PhoneNumber(String),
+# }
+#
+# enum Visibility {
+#   Private,
+#   Friends,
+#   Followers,
+#   Public,
+# }
+#
+# class User {
+#   handle_name: String!, # '!' means unique
+#   legal_name: String?,
+#   auth_method: AuthMethod,
+#   posts <->* Post::creator,
+#   followers *<->* User::followed_by,
+#   followed_by *<->* User::followers,
+# }
+#
+# class Post {
+#   text: String,
+#   date: Date,
+#   visibility: Visibility,
+#   creator *<-> User::posts,
+# }

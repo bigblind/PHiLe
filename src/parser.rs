@@ -91,6 +91,10 @@ impl<'a> Parser<'a> {
         self.accept_by(|token| token.value == lexeme)
     }
 
+    fn accept_lexemes(&mut self, lexemes: &[&str]) -> Option<&'a Token<'a>> {
+        self.accept_by(|token| lexemes.contains(&token.value))
+    }
+
     fn expect(&mut self, kind: TokenKind) -> LexResult<'a> {
         self.accept(kind).ok_or(self.expectation_error(&kind))
     }
@@ -188,7 +192,66 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_field(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let name = try!(self.expect_identifier());
+        let type_decl = try!(self.maybe_parse_type());
+        let relation = try!(self.maybe_parse_relation());
+        let comma = try!(self.expect_lexeme(","));
+
+        let field = Field {
+            name:      name.value,
+            type_decl: type_decl,
+            relation:  relation,
+        };
+        let node = Node {
+            begin: Some(name),
+            end:   Some(comma),
+            value: NodeValue::Field(Box::new(field)),
+        };
+
+        Ok(node)
+    }
+
+    fn maybe_parse_type(&mut self) -> Result<Option<Node<'a>>, ParseError<'a>> {
+        let type_decl = match self.accept_lexeme(":") {
+            Some(_) => Some(try!(self.parse_type())),
+            None    => None,
+        };
+
+        Ok(type_decl)
+    }
+
+    fn maybe_parse_relation(&mut self) -> Result<Option<Relation<'a>>, ParseError<'a>> {
+        #[allow(non_upper_case_globals)]
+        static relation_operators: &'static [&'static str] = &[
+            // I just couldn't make up my mind as to how to denote
+            // "exactly one": by nothing or by an exclamation mark
+             "<->",   "<->?",  "<->*",  "<->+",
+            "?<->",  "?<->?", "?<->*", "?<->+",
+            "*<->",  "*<->?", "*<->*", "*<->+",
+            "+<->",  "+<->?", "+<->*", "+<->+",
+
+            "!<->!", "!<->?", "!<->*", "!<->+",
+            "?<->!", "?<->?", "?<->*", "?<->+",
+            "*<->!", "*<->?", "*<->*", "*<->+",
+            "+<->!", "+<->?", "+<->*", "+<->+",
+        ];
+
+        let relation = match self.accept_lexemes(relation_operators) {
+            Some(op) => {
+                let entity = try!(self.expect_identifier());
+                try!(self.expect_lexeme("::"));
+                let field = try!(self.expect_identifier());
+                let relation = Relation {
+                    cardinality: op.value,
+                    entity:      entity.value,
+                    field:       field.value,
+                };
+                Some(relation)
+            },
+            None => None,
+        };
+
+        Ok(relation)
     }
 
     fn parse_enum(&mut self) -> ParseResult<'a> {
@@ -200,6 +263,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_type(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 }
