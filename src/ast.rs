@@ -14,7 +14,7 @@ pub enum NodeValue<'a> {
     Program(Vec<Node<'a>>),
     Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
-    ClassDecl,
+    ClassDecl(ClassDecl<'a>),
     EnumDecl,
     FunctionDecl,
 }
@@ -30,6 +30,13 @@ pub struct Node<'a> {
 pub struct StructDecl<'a> {
     pub name:   &'a str,
     pub fields: Vec<Node<'a>>,
+}
+
+#[derive(Debug)]
+pub struct ClassDecl<'a> {
+    pub name:       &'a str,
+    pub superclass: Option<&'a str>,
+    pub fields:     Vec<Node<'a>>,
 }
 
 #[derive(Debug)]

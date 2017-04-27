@@ -188,7 +188,36 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_class(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let mut fields = vec![];
+
+        let class_keyword = try!(self.expect_lexeme("class"));
+        let class_name = try!(self.expect_identifier());
+
+        let superclass = match self.accept_lexeme(":") {
+            Some(_) => Some(try!(self.expect_identifier()).value),
+            None    => None,
+        };
+
+        try!(self.expect_lexeme("{"));
+
+        while self.has_tokens() && !self.is_at_lexeme("}") {
+            fields.push(try!(self.parse_field()));
+        }
+
+        let close_brace = try!(self.expect_lexeme("}"));
+
+        let decl = ClassDecl {
+            name:       class_name.value,
+            superclass: superclass,
+            fields:     fields,
+        };
+        let node = Node {
+            begin: Some(class_keyword),
+            end:   Some(close_brace),
+            value: NodeValue::ClassDecl(decl),
+        };
+
+        Ok(node)
     }
 
     fn parse_field(&mut self) -> ParseResult<'a> {
