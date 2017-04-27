@@ -8,7 +8,7 @@
 
 use std::slice;
 use std::fmt::Debug;
-use lexer::{ Token, TokenKind };
+use lexer::{ Token, TokenKind, Range };
 use ast::*;
 
 
@@ -18,18 +18,38 @@ struct Parser<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ParseError<'a> {
+pub struct ParseError {
     pub message: String,
-    pub begin:   Option<&'a Token<'a>>,
-    pub end:     Option<&'a Token<'a>>,
+    pub range:   Option<Range>,
 }
 
-pub type ParseResult<'a> = Result<Node<'a>, ParseError<'a>>;
-type LexResult<'a> = Result<&'a Token<'a>, ParseError<'a>>;
+pub type ParseResult<'a> = Result<Node<'a>, ParseError>;
+type LexResult<'a> = Result<&'a Token<'a>, ParseError>;
 
 
 pub fn parse<'a>(tokens: &'a [Token]) -> ParseResult<'a> {
     Parser::new(tokens).parse()
+}
+
+fn token_range(first: &Token, last: &Token) -> Option<Range> {
+    Some(
+        Range {
+            begin: first.range.begin,
+            end:   last.range.end,
+        }
+    )
+}
+
+fn is_keyword(lexeme: &str) -> bool {
+    #[allow(non_upper_case_globals)]
+    static keywords: &'static [&'static str] = &[
+        "struct",
+        "class",
+        "enum",
+        "fn",
+    ];
+
+    keywords.contains(&lexeme)
 }
 
 impl<'a> Parser<'a> {
@@ -39,30 +59,17 @@ impl<'a> Parser<'a> {
 
     // Lexer helpers
 
-    fn is_keyword(lexeme: &str) -> bool {
-        #[allow(non_upper_case_globals)]
-        static keywords: &'static [&'static str] = &[
-            "struct",
-            "class",
-            "enum",
-            "fn",
-        ];
-
-        keywords.contains(&lexeme)
-    }
-
     fn has_tokens(&self) -> bool {
         self.tokens.len() > 0
     }
 
-    fn expectation_error<T: ?Sized + Debug>(&self, expected: &T) -> ParseError<'a> {
+    fn expectation_error<T: ?Sized + Debug>(&self, expected: &T) -> ParseError {
         let token = self.next_token();
         let actual = token.map_or("end of input", |t| t.value);
 
         ParseError {
             message: format!("expected {:#?}; found {}", expected, actual),
-            begin:   token,
-            end:     token,
+            range:   token.and_then(|t| Some(t.range)),
         }
     }
 
@@ -105,7 +112,7 @@ impl<'a> Parser<'a> {
 
     fn accept_identifier(&mut self) -> Option<&'a Token<'a>> {
         self.accept_by(
-            |token| token.kind == TokenKind::Word && !Self::is_keyword(token.value)
+            |token| token.kind == TokenKind::Word && !is_keyword(token.value)
         )
     }
 
@@ -131,6 +138,7 @@ impl<'a> Parser<'a> {
 
     fn parse(mut self) -> ParseResult<'a> {
         let mut children = vec![];
+
         let first_token = self.tokens.as_slice().first();
         let last_token = self.tokens.as_slice().last();
 
@@ -138,9 +146,12 @@ impl<'a> Parser<'a> {
             children.push(try!(self.parse_toplevel()));
         }
 
+        let range = match (first_token, last_token) {
+            (Some(first), Some(last)) => token_range(first, last),
+            (_, _)                    => None,
+        };
         let node = Node {
-            begin: first_token,
-            end:   last_token,
+            range: range,
             value: NodeValue::Program(children),
         };
 
@@ -179,8 +190,7 @@ impl<'a> Parser<'a> {
             fields: fields,
         };
         let node = Node {
-            begin: Some(struct_keyword),
-            end:   Some(close_brace),
+            range: token_range(struct_keyword, close_brace),
             value: NodeValue::StructDecl(decl),
         };
 
@@ -212,8 +222,7 @@ impl<'a> Parser<'a> {
             fields:     fields,
         };
         let node = Node {
-            begin: Some(class_keyword),
-            end:   Some(close_brace),
+            range: token_range(class_keyword, close_brace),
             value: NodeValue::ClassDecl(decl),
         };
 
@@ -222,7 +231,7 @@ impl<'a> Parser<'a> {
 
     fn parse_field(&mut self) -> ParseResult<'a> {
         let name = try!(self.expect_identifier());
-        let type_decl = try!(self.maybe_parse_type());
+        let type_decl = try!(self.maybe_parse_type_annotation());
         let relation = try!(self.maybe_parse_relation());
         let comma = try!(self.expect_lexeme(","));
 
@@ -232,15 +241,14 @@ impl<'a> Parser<'a> {
             relation:  relation,
         };
         let node = Node {
-            begin: Some(name),
-            end:   Some(comma),
+            range: token_range(name, comma),
             value: NodeValue::Field(Box::new(field)),
         };
 
         Ok(node)
     }
 
-    fn maybe_parse_type(&mut self) -> Result<Option<Node<'a>>, ParseError<'a>> {
+    fn maybe_parse_type_annotation(&mut self) -> Result<Option<Node<'a>>, ParseError> {
         let type_decl = match self.accept_lexeme(":") {
             Some(_) => Some(try!(self.parse_type())),
             None    => None,
@@ -249,7 +257,7 @@ impl<'a> Parser<'a> {
         Ok(type_decl)
     }
 
-    fn maybe_parse_relation(&mut self) -> Result<Option<Relation<'a>>, ParseError<'a>> {
+    fn maybe_parse_relation(&mut self) -> Result<Option<Relation<'a>>, ParseError> {
         #[allow(non_upper_case_globals)]
         static relation_operators: &'static [&'static str] = &[
             // I just couldn't make up my mind as to how to denote
@@ -302,8 +310,7 @@ impl<'a> Parser<'a> {
             variants: variants,
         };
         let node = Node {
-            begin: Some(enum_keyword),
-            end:   Some(close_brace),
+            range: token_range(enum_keyword, close_brace),
             value: NodeValue::EnumDecl(decl),
         };
 
@@ -329,8 +336,7 @@ impl<'a> Parser<'a> {
             value_type: value_type,
         };
         let node = Node {
-            begin: Some(name),
-            end:   close_paren.or(Some(name)),
+            range: token_range(name, close_paren.unwrap_or(name)),
             value: NodeValue::Variant(Box::new(variant)),
         };
 
@@ -350,9 +356,12 @@ impl<'a> Parser<'a> {
         match self.accept_lexeme("&") {
             Some(token) => {
                 let child = try!(self.parse_prefix_type());
+                let range = Range {
+                    begin: token.range.begin,
+                    end: child.range.map_or(token.range.end, |r| r.end),
+                };
                 let node = Node {
-                    begin: Some(token),
-                    end:   child.end,
+                    range: Some(range),
                     value: NodeValue::Pointer(Box::new(child)),
                 };
                 Ok(node)

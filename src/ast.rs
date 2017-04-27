@@ -6,7 +6,7 @@
 // on 07/04/2017
 //
 
-use lexer::Token;
+use lexer::Range;
 
 
 #[derive(Debug)]
@@ -26,8 +26,7 @@ pub enum NodeValue<'a> {
 
 #[derive(Debug)]
 pub struct Node<'a> {
-    pub begin: Option<&'a Token<'a>>,
-    pub end:   Option<&'a Token<'a>>,
+    pub range: Option<Range>,
     pub value: NodeValue<'a>,
 }
 
