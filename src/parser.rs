@@ -402,6 +402,57 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_term_type(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        match self.next_token().and_then(|t| Some(t.value)) {
+            Some("(") => self.parse_tuple_type(),
+            Some("[") => self.parse_array_type(),
+            Some(_)   => self.parse_named_type(),
+            None      => Err(self.expectation_error("parenthesized, named, or array type")),
+        }
+    }
+
+    fn parse_tuple_type(&mut self) -> ParseResult<'a> {
+        let mut items = vec![];
+        let open_paren = try!(self.expect_lexeme("("));
+
+        while self.has_tokens() && !self.is_at_lexeme(")") {
+            items.push(try!(self.parse_type()));
+
+            if !self.is_at_lexeme(")") {
+                try!(self.expect_lexeme(","));
+            }
+        }
+
+        let close_paren = try!(self.expect_lexeme(")"));
+
+        let node = Node {
+            range: token_range(open_paren, close_paren),
+            value: NodeValue::TupleType(items),
+        };
+
+        Ok(node)
+    }
+
+    fn parse_array_type(&mut self) -> ParseResult<'a> {
+        let open_bracket = try!(self.expect_lexeme("["));
+        let element_type = try!(self.parse_type());
+        let close_bracket = try!(self.expect_lexeme("]"));
+
+        let node = Node {
+            range: token_range(open_bracket, close_bracket),
+            value: NodeValue::ArrayType(Box::new(element_type)),
+        };
+
+        Ok(node)
+    }
+
+    fn parse_named_type(&mut self) -> ParseResult<'a> {
+        let token = try!(self.expect_identifier());
+
+        let node = Node {
+            range: Some(token.range),
+            value: NodeValue::NamedType(token.value),
+        };
+
+        Ok(node)
     }
 }

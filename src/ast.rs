@@ -24,6 +24,9 @@ pub enum NodeValue<'a> {
     PointerType(Box<Node<'a>>),
     OptionalType(Box<Node<'a>>),
     UniqueType(Box<Node<'a>>),
+    TupleType(Vec<Node<'a>>),
+    ArrayType(Box<Node<'a>>),
+    NamedType(&'a str),
 }
 
 #[derive(Debug)]
