@@ -22,8 +22,10 @@ pub struct ParseError {
     pub range:   Option<Range>,
 }
 
-pub type ParseResult<'a> = Result<Node<'a>, ParseError>;
-type LexResult<'a> = Result<&'a Token<'a>, ParseError>;
+pub type SyntaxResult<T> = Result<T, ParseError>;
+pub type ParseResult<'a> = SyntaxResult<Node<'a>>;
+
+type LexResult<'a> = SyntaxResult<&'a Token<'a>>;
 
 
 pub fn parse<'a>(tokens: &'a [Token]) -> ParseResult<'a> {
@@ -253,7 +255,7 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn maybe_parse_type_annotation(&mut self) -> Result<Option<Node<'a>>, ParseError> {
+    fn maybe_parse_type_annotation(&mut self) -> SyntaxResult<Option<Node<'a>>> {
         let type_decl = match self.accept_lexeme(":") {
             Some(_) => Some(try!(self.parse_type())),
             None    => None,
@@ -262,7 +264,7 @@ impl<'a> Parser<'a> {
         Ok(type_decl)
     }
 
-    fn maybe_parse_relation(&mut self) -> Result<Option<Relation<'a>>, ParseError> {
+    fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<Relation<'a>>> {
         #[allow(non_upper_case_globals)]
         static relation_operators: &'static [&'static str] = &[
             // I just couldn't make up my mind as to how to denote
