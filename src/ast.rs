@@ -21,7 +21,9 @@ pub enum NodeValue<'a> {
     FunctionDecl,
 
     // Types
-    Pointer(Box<Node<'a>>),
+    PointerType(Box<Node<'a>>),
+    OptionalType(Box<Node<'a>>),
+    UniqueType(Box<Node<'a>>),
 }
 
 #[derive(Debug)]

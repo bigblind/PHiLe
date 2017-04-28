@@ -353,7 +353,33 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type(&mut self) -> ParseResult<'a> {
-        self.parse_prefix_type()
+        self.parse_postfix_type()
+    }
+
+    fn parse_postfix_type(&mut self) -> ParseResult<'a> {
+        let mut node = try!(self.parse_prefix_type());
+
+        loop {
+            match self.accept_lexemes(&["?", "!"]) {
+                Some(token) => {
+                    let range = node.range.and_then(
+                        |r| Some(Range { end: token.range.end, .. r })
+                    );
+                    let value = match token.value {
+                        "?" => NodeValue::OptionalType(Box::new(node)),
+                        "!" => NodeValue::UniqueType(Box::new(node)),
+                        _   => break, // TODO(H2CO3): should be an error
+                    };
+                    node = Node {
+                        range: range,
+                        value: value,
+                    };
+                },
+                _ => break,
+            }
+        }
+
+        Ok(node)
     }
 
     fn parse_prefix_type(&mut self) -> ParseResult<'a> {
@@ -367,15 +393,15 @@ impl<'a> Parser<'a> {
                 };
                 let node = Node {
                     range: Some(range),
-                    value: NodeValue::Pointer(Box::new(child)),
+                    value: NodeValue::PointerType(Box::new(child)),
                 };
                 Ok(node)
             },
-            None => self.parse_postfix_type(),
+            None => self.parse_term_type(),
         }
     }
 
-    fn parse_postfix_type(&mut self) -> ParseResult<'a> {
+    fn parse_term_type(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 }
