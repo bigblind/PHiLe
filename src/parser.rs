@@ -7,7 +7,6 @@
 //
 
 use std::slice;
-use std::fmt::Debug;
 use lexer::{ Token, TokenKind, Range };
 use ast::*;
 
@@ -63,12 +62,12 @@ impl<'a> Parser<'a> {
         self.tokens.len() > 0
     }
 
-    fn expectation_error<T: ?Sized + Debug>(&self, expected: &T) -> ParseError {
+    fn expectation_error(&self, expected: &str) -> ParseError {
         let token = self.next_token();
         let actual = token.map_or("end of input", |t| t.value);
 
         ParseError {
-            message: format!("expected {:#?}; found {}", expected, actual),
+            message: format!("expected '{}'; found '{}'", expected, actual),
             range:   token.and_then(|t| Some(t.range)),
         }
     }
@@ -103,11 +102,15 @@ impl<'a> Parser<'a> {
     }
 
     fn expect(&mut self, kind: TokenKind) -> LexResult<'a> {
-        self.accept(kind).ok_or(self.expectation_error(&kind))
+        self.accept(kind).ok_or_else(
+            || self.expectation_error(&format!("{:#?}", kind))
+        )
     }
 
     fn expect_lexeme(&mut self, lexeme: &str) -> LexResult<'a> {
-        self.accept_lexeme(lexeme).ok_or(self.expectation_error(lexeme))
+        self.accept_lexeme(lexeme).ok_or_else(
+            || self.expectation_error(lexeme)
+        )
     }
 
     fn accept_identifier(&mut self) -> Option<&'a Token<'a>> {
@@ -117,7 +120,9 @@ impl<'a> Parser<'a> {
     }
 
     fn expect_identifier(&mut self) -> LexResult<'a> {
-        self.accept_identifier().ok_or(self.expectation_error("identifier"))
+        self.accept_identifier().ok_or_else(
+            || self.expectation_error("identifier")
+        )
     }
 
     fn is_at(&self, kind: TokenKind) -> bool {
@@ -358,7 +363,7 @@ impl<'a> Parser<'a> {
                 let child = try!(self.parse_prefix_type());
                 let range = Range {
                     begin: token.range.begin,
-                    end: child.range.map_or(token.range.end, |r| r.end),
+                    end:   child.range.map_or(token.range.end, |r| r.end),
                 };
                 let node = Node {
                     range: Some(range),

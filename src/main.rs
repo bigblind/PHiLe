@@ -56,6 +56,11 @@ fn read_file(path: &str) -> Result<String, std::io::Error> {
     Ok(buf)
 }
 
+fn format_parse_error(error: &ParseError) -> String {
+    let range = error.range.map_or("end of input".to_owned(), |r| format!("{:#?}", r));
+    format!("Parse error near {}: {}", range, error.message)
+}
+
 fn main() {
     println!("The PHiLe Compiler");
     println!("Copyright (C) Arpad Goretity, 2017");
@@ -84,7 +89,7 @@ fn main() {
     );
 
     let program = parse(&tokens).unwrap_or_else(
-        |error| panic!("Parse error: {:#?}", error)
+        |error| panic!(format_parse_error(&error))
     );
 
     println!("{:#?}", program);
