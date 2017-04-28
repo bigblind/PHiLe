@@ -1,21 +1,23 @@
-# struct Attachment {
-#   url:           String!, # '!' means unique
-#   thumbnail_url: String?, # '?' means optional
-#   kind:          AttachmentKind,
-#   hashtags:      [String],
-# }
+struct Attachment {
+  url:           String!, # '!' means unique
+  thumbnail_url: String?, # '?' means optional
+  kind:          &AttachmentKind?,
+  hashtags:      [String],
+  tagged_users:  [(String, String)], # first name, last name
+}
 
-struct Post {
+class Post : Entity {
   creator *<-> User::posts,
 }
 
-struct User {
-  posts <->* Post::creator,
+class User : Entity {
+  posts: [&Post] <->* Post::creator,
 }
 
 enum Bool {
   False,
   True,
+  FileNotFound(&IOError), # http://thedailywtf.com/articles/What_Is_Truth_0x3f_
 }
 
 # enum AuthMethod {
