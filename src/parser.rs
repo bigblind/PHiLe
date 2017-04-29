@@ -70,7 +70,7 @@ impl<'a> Parser<'a> {
 
         ParseError {
             message: format!("expected '{}'; found '{}'", expected, actual),
-            range:   token.and_then(|t| Some(t.range)),
+            range:   token.map(|t| t.range),
         }
     }
 
@@ -364,8 +364,8 @@ impl<'a> Parser<'a> {
         loop {
             match self.accept_lexemes(&["?", "!"]) {
                 Some(token) => {
-                    let range = node.range.and_then(
-                        |r| Some(Range { end: token.range.end, .. r })
+                    let range = node.range.map(
+                        |r| Range { end: token.range.end, .. r }
                     );
                     let value = match token.value {
                         "?" => NodeValue::OptionalType(Box::new(node)),
@@ -404,7 +404,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_term_type(&mut self) -> ParseResult<'a> {
-        match self.next_token().and_then(|t| Some(t.value)) {
+        match self.next_token().map(|t| t.value) {
             Some("(") => self.parse_tuple_type(),
             Some("[") => self.parse_array_type(),
             Some(_)   => self.parse_named_type(),
