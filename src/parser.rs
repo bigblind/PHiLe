@@ -90,26 +90,16 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn accept(&mut self, kind: TokenKind) -> Option<&'a Token<'a>> {
-        self.accept_by(|token| token.kind == kind)
-    }
-
-    fn accept_lexeme(&mut self, lexeme: &str) -> Option<&'a Token<'a>> {
+    fn accept(&mut self, lexeme: &str) -> Option<&'a Token<'a>> {
         self.accept_by(|token| token.value == lexeme)
     }
 
-    fn accept_lexemes(&mut self, lexemes: &[&str]) -> Option<&'a Token<'a>> {
+    fn accept_one_of(&mut self, lexemes: &[&str]) -> Option<&'a Token<'a>> {
         self.accept_by(|token| lexemes.contains(&token.value))
     }
 
-    fn expect(&mut self, kind: TokenKind) -> LexResult<'a> {
-        self.accept(kind).ok_or_else(
-            || self.expectation_error(&format!("{:#?}", kind))
-        )
-    }
-
-    fn expect_lexeme(&mut self, lexeme: &str) -> LexResult<'a> {
-        self.accept_lexeme(lexeme).ok_or_else(
+    fn expect(&mut self, lexeme: &str) -> LexResult<'a> {
+        self.accept(lexeme).ok_or_else(
             || self.expectation_error(lexeme)
         )
     }
@@ -126,14 +116,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn is_at(&self, kind: TokenKind) -> bool {
-        match self.next_token() {
-            Some(token) => token.kind == kind,
-            None        => false,
-        }
-    }
-
-    fn is_at_lexeme(&self, lexeme: &str) -> bool {
+    fn is_at(&self, lexeme: &str) -> bool {
         match self.next_token() {
             Some(token) => token.value == lexeme,
             None        => false,
@@ -180,16 +163,16 @@ impl<'a> Parser<'a> {
     fn parse_struct(&mut self) -> ParseResult<'a> {
         let mut fields = vec![];
 
-        let struct_keyword = try!(self.expect_lexeme("struct"));
+        let struct_keyword = try!(self.expect("struct"));
         let struct_name = try!(self.expect_identifier());
 
-        try!(self.expect_lexeme("{"));
+        try!(self.expect("{"));
 
-        while self.has_tokens() && !self.is_at_lexeme("}") {
+        while self.has_tokens() && !self.is_at("}") {
             fields.push(try!(self.parse_field()));
         }
 
-        let close_brace = try!(self.expect_lexeme("}"));
+        let close_brace = try!(self.expect("}"));
 
         let decl = StructDecl {
             name:   struct_name.value,
@@ -206,21 +189,21 @@ impl<'a> Parser<'a> {
     fn parse_class(&mut self) -> ParseResult<'a> {
         let mut fields = vec![];
 
-        let class_keyword = try!(self.expect_lexeme("class"));
+        let class_keyword = try!(self.expect("class"));
         let class_name = try!(self.expect_identifier());
 
-        let superclass = match self.accept_lexeme(":") {
+        let superclass = match self.accept(":") {
             Some(_) => Some(try!(self.expect_identifier()).value),
             None    => None,
         };
 
-        try!(self.expect_lexeme("{"));
+        try!(self.expect("{"));
 
-        while self.has_tokens() && !self.is_at_lexeme("}") {
+        while self.has_tokens() && !self.is_at("}") {
             fields.push(try!(self.parse_field()));
         }
 
-        let close_brace = try!(self.expect_lexeme("}"));
+        let close_brace = try!(self.expect("}"));
 
         let decl = ClassDecl {
             name:       class_name.value,
@@ -239,7 +222,7 @@ impl<'a> Parser<'a> {
         let name = try!(self.expect_identifier());
         let type_decl = try!(self.maybe_parse_type_annotation());
         let relation = try!(self.maybe_parse_relation());
-        let comma = try!(self.expect_lexeme(","));
+        let comma = try!(self.expect(","));
 
         let field = Field {
             name:      name.value,
@@ -255,7 +238,7 @@ impl<'a> Parser<'a> {
     }
 
     fn maybe_parse_type_annotation(&mut self) -> SyntaxResult<Option<Node<'a>>> {
-        let type_decl = match self.accept_lexeme(":") {
+        let type_decl = match self.accept(":") {
             Some(_) => Some(try!(self.parse_type())),
             None    => None,
         };
@@ -279,10 +262,10 @@ impl<'a> Parser<'a> {
             "+<->!",
         ];
 
-        let relation = match self.accept_lexemes(relation_operators) {
+        let relation = match self.accept_one_of(relation_operators) {
             Some(op) => {
                 let entity = try!(self.expect_identifier());
-                try!(self.expect_lexeme("::"));
+                try!(self.expect("::"));
                 let field = try!(self.expect_identifier());
                 let relation = Relation {
                     cardinality: op.value,
@@ -300,16 +283,16 @@ impl<'a> Parser<'a> {
     fn parse_enum(&mut self) -> ParseResult<'a> {
         let mut variants = vec![];
 
-        let enum_keyword = try!(self.expect_lexeme("enum"));
+        let enum_keyword = try!(self.expect("enum"));
         let enum_name = try!(self.expect_identifier());
 
-        try!(self.expect_lexeme("{"));
+        try!(self.expect("{"));
 
-        while self.has_tokens() && !self.is_at_lexeme("}") {
+        while self.has_tokens() && !self.is_at("}") {
             variants.push(try!(self.parse_variant()));
         }
 
-        let close_brace = try!(self.expect_lexeme("}"));
+        let close_brace = try!(self.expect("}"));
 
         let decl = EnumDecl {
             name:     enum_name.value,
@@ -328,28 +311,26 @@ impl<'a> Parser<'a> {
 
         let name = try!(self.expect_identifier());
 
-        let close_paren = match self.accept_lexeme("(") {
-            Some(_) => {
-                while self.has_tokens() && !self.is_at_lexeme(")") {
-                    value_types.push(try!(self.parse_type()));
+        if self.accept("(").is_some() {
+            while self.has_tokens() && !self.is_at(")") {
+                value_types.push(try!(self.parse_type()));
 
-                    if !self.is_at_lexeme(")") {
-                        try!(self.expect_lexeme(","));
-                    }
+                if !self.is_at(")") {
+                    try!(self.expect(","));
                 }
-                Some(try!(self.expect_lexeme(")")))
-            },
-            None => None,
-        };
+            }
 
-        try!(self.expect_lexeme(","));
+            try!(self.expect(")"));
+        }
+
+        let comma = try!(self.expect(","));
 
         let variant = Variant {
             name:        name.value,
             value_types: value_types,
         };
         let node = Node {
-            range: token_range(name, close_paren.unwrap_or(name)),
+            range: token_range(name, comma),
             value: NodeValue::Variant(Box::new(variant)),
         };
 
@@ -368,7 +349,7 @@ impl<'a> Parser<'a> {
         let mut node = try!(self.parse_prefix_type());
 
         loop {
-            match self.accept_lexemes(&["?", "!"]) {
+            match self.accept_one_of(&["?", "!"]) {
                 Some(token) => {
                     let range = node.range.map(
                         |r| Range { end: token.range.end, .. r }
@@ -392,7 +373,7 @@ impl<'a> Parser<'a> {
 
     fn parse_prefix_type(&mut self) -> ParseResult<'a> {
         // currently, & is the only prefix type operator
-        match self.accept_lexeme("&") {
+        match self.accept("&") {
             Some(token) => {
                 let child = try!(self.parse_prefix_type());
                 let range = Range {
@@ -420,17 +401,17 @@ impl<'a> Parser<'a> {
 
     fn parse_tuple_type(&mut self) -> ParseResult<'a> {
         let mut items = vec![];
-        let open_paren = try!(self.expect_lexeme("("));
+        let open_paren = try!(self.expect("("));
 
-        while self.has_tokens() && !self.is_at_lexeme(")") {
+        while self.has_tokens() && !self.is_at(")") {
             items.push(try!(self.parse_type()));
 
-            if !self.is_at_lexeme(")") {
-                try!(self.expect_lexeme(","));
+            if !self.is_at(")") {
+                try!(self.expect(","));
             }
         }
 
-        let close_paren = try!(self.expect_lexeme(")"));
+        let close_paren = try!(self.expect(")"));
 
         let node = Node {
             range: token_range(open_paren, close_paren),
@@ -441,9 +422,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_array_type(&mut self) -> ParseResult<'a> {
-        let open_bracket = try!(self.expect_lexeme("["));
+        let open_bracket = try!(self.expect("["));
         let element_type = try!(self.parse_type());
-        let close_bracket = try!(self.expect_lexeme("]"));
+        let close_bracket = try!(self.expect("]"));
 
         let node = Node {
             range: token_range(open_bracket, close_bracket),
