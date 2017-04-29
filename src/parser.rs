@@ -357,14 +357,14 @@ impl<'a> Parser<'a> {
                     let value = match token.value {
                         "?" => NodeValue::OptionalType(Box::new(node)),
                         "!" => NodeValue::UniqueType(Box::new(node)),
-                        _   => break, // TODO(H2CO3): should be an error
+                        op  => unreachable!("forgot to handle '{}'", op),
                     };
                     node = Node {
                         range: range,
                         value: value,
                     };
                 },
-                _ => break,
+                None => break,
             }
         }
 
