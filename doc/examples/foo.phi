@@ -17,7 +17,7 @@ class User : Entity {
 enum Bool {
   False,
   True,
-  FileNotFound(&IOError), # http://thedailywtf.com/articles/What_Is_Truth_0x3f_
+  FileNotFound(&IOError, i32!), # http://thedailywtf.com/articles/What_Is_Truth_0x3f_
 }
 
 # enum AuthMethod {

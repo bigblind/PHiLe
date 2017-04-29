@@ -85,10 +85,9 @@ impl<'a> Parser<'a> {
     fn accept_by<P>(&mut self, pred: P) -> Option<&'a Token<'a>>
         where P: FnOnce(&Token) -> bool {
 
-        match self.next_token() {
-            Some(token) => if pred(token) { self.advance() } else { None },
-            None        => None,
-        }
+        self.next_token().and_then(
+            |token| if pred(token) { self.advance() } else { None }
+        )
     }
 
     fn accept(&mut self, kind: TokenKind) -> Option<&'a Token<'a>> {
@@ -325,22 +324,29 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variant(&mut self) -> ParseResult<'a> {
+        let mut value_types = vec![];
+
         let name = try!(self.expect_identifier());
 
-        let (value_type, close_paren) = match self.accept_lexeme("(") {
+        let close_paren = match self.accept_lexeme("(") {
             Some(_) => {
-                let value_type = try!(self.parse_type());
-                let close_paren = try!(self.expect_lexeme(")"));
-                (Some(value_type), Some(close_paren))
+                while self.has_tokens() && !self.is_at_lexeme(")") {
+                    value_types.push(try!(self.parse_type()));
+
+                    if !self.is_at_lexeme(")") {
+                        try!(self.expect_lexeme(","));
+                    }
+                }
+                Some(try!(self.expect_lexeme(")")))
             },
-            None => (None, None),
+            None => None,
         };
 
         try!(self.expect_lexeme(","));
 
         let variant = Variant {
-            name:       name.value,
-            value_type: value_type,
+            name:        name.value,
+            value_types: value_types,
         };
         let node = Node {
             range: token_range(name, close_paren.unwrap_or(name)),
