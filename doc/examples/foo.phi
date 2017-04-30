@@ -6,11 +6,11 @@ struct Attachment {
   tagged_users:  [(String, String)], # first name, last name
 }
 
-class Post : Entity {
+class Post {
   creator *<-> User::posts,
 }
 
-class User : Entity {
+class User {
   posts: [&Post] <->* Post::creator,
 }
 

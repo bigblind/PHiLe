@@ -44,7 +44,6 @@ pub struct StructDecl<'a> {
 #[derive(Debug)]
 pub struct ClassDecl<'a> {
     pub name:       &'a str,
-    pub superclass: Option<&'a str>,
     pub fields:     Vec<Node<'a>>,
 }
 

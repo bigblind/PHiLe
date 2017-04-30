@@ -6,12 +6,12 @@
 // on 07/04/2017
 //
 
+use itertools::join;
 use std::slice;
 use lexer::{ Token, TokenKind, Range };
 use ast::*;
 
 
-#[allow(missing_debug_implementations)]
 struct Parser<'a> {
     tokens: slice::Iter<'a, Token<'a>>,
 }
@@ -104,6 +104,12 @@ impl<'a> Parser<'a> {
         )
     }
 
+    fn expect_one_of(&mut self, lexemes: &[&str]) -> LexResult<'a> {
+        self.accept_one_of(lexemes).ok_or_else(
+            || self.expectation_error(&join(lexemes, ", "))
+        )
+    }
+
     fn accept_identifier(&mut self) -> Option<&'a Token<'a>> {
         self.accept_by(
             |token| token.kind == TokenKind::Word && !is_keyword(token.value)
@@ -152,19 +158,18 @@ impl<'a> Parser<'a> {
         let token = try!(self.next_token().ok_or_else(|| error.clone()));
 
         match token.value {
-            "struct" => self.parse_struct(),
-            "class"  => self.parse_class(),
-            "enum"   => self.parse_enum(),
-            "fn"     => self.parse_function(),
-            _        => Err(error),
+            "struct" | "class" => self.parse_struct_or_class(),
+            "enum"             => self.parse_enum(),
+            "fn"               => self.parse_function(),
+            _                  => Err(error),
         }
     }
 
-    fn parse_struct(&mut self) -> ParseResult<'a> {
+    fn parse_struct_or_class(&mut self) -> ParseResult<'a> {
         let mut fields = vec![];
 
-        let struct_keyword = try!(self.expect("struct"));
-        let struct_name = try!(self.expect_identifier());
+        let keyword = try!(self.expect_one_of(&["struct", "class"]));
+        let name = try!(self.expect_identifier());
 
         try!(self.expect("{"));
 
@@ -174,45 +179,24 @@ impl<'a> Parser<'a> {
 
         let close_brace = try!(self.expect("}"));
 
-        let decl = StructDecl {
-            name:   struct_name.value,
-            fields: fields,
+        let value = match keyword.value {
+            "struct" => NodeValue::StructDecl(
+                StructDecl {
+                    name:   name.value,
+                    fields: fields,
+                }
+            ),
+            "class" => NodeValue::ClassDecl(
+                ClassDecl {
+                    name:   name.value,
+                    fields: fields,
+                }
+            ),
+            lexeme => unreachable!("forgot to handle {}", lexeme),
         };
         let node = Node {
-            range: token_range(struct_keyword, close_brace),
-            value: NodeValue::StructDecl(decl),
-        };
-
-        Ok(node)
-    }
-
-    fn parse_class(&mut self) -> ParseResult<'a> {
-        let mut fields = vec![];
-
-        let class_keyword = try!(self.expect("class"));
-        let class_name = try!(self.expect_identifier());
-
-        let superclass = match self.accept(":") {
-            Some(_) => Some(try!(self.expect_identifier()).value),
-            None    => None,
-        };
-
-        try!(self.expect("{"));
-
-        while self.has_tokens() && !self.is_at("}") {
-            fields.push(try!(self.parse_field()));
-        }
-
-        let close_brace = try!(self.expect("}"));
-
-        let decl = ClassDecl {
-            name:       class_name.value,
-            superclass: superclass,
-            fields:     fields,
-        };
-        let node = Node {
-            range: token_range(class_keyword, close_brace),
-            value: NodeValue::ClassDecl(decl),
+            range: token_range(keyword, close_brace),
+            value: value,
         };
 
         Ok(node)
