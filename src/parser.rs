@@ -291,13 +291,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variant(&mut self) -> ParseResult<'a> {
-        let mut value_types = vec![];
+        let mut types = vec![];
 
         let name = try!(self.expect_identifier());
 
         if self.accept("(").is_some() {
             while self.has_tokens() && !self.is_at(")") {
-                value_types.push(try!(self.parse_type()));
+                types.push(try!(self.parse_type()));
 
                 if !self.is_at(")") {
                     try!(self.expect(","));
@@ -310,8 +310,8 @@ impl<'a> Parser<'a> {
         let comma = try!(self.expect(","));
 
         let variant = Variant {
-            name:        name.value,
-            value_types: value_types,
+            name:  name.value,
+            types: types,
         };
         let node = Node {
             range: token_range(name, comma),

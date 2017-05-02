@@ -69,6 +69,6 @@ pub struct EnumDecl<'a> {
 
 #[derive(Debug)]
 pub struct Variant<'a> {
-    pub name:        &'a str,
-    pub value_types: Vec<Node<'a>>,
+    pub name:  &'a str,
+    pub types: Vec<Node<'a>>,
 }

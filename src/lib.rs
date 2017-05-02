@@ -21,10 +21,11 @@ extern crate regex;
 extern crate itertools;
 extern crate unicode_segmentation;
 
+#[macro_use]
+pub mod util;
 pub mod lexer;
 pub mod ast;
 pub mod parser;
-pub mod semanal;
 pub mod qir;
 pub mod qirgen;
 pub mod qiropt;
