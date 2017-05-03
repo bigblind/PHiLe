@@ -6,15 +6,26 @@
 // on 07/04/2017
 //
 
-use qir::*;
 use std::collections::HashMap;
+use qir::*;
+use lexer::*;
+use ast;
 
+
+#[derive(Debug, Clone)]
+pub struct SemaError {
+    message: String,
+    range:   Option<Range>,
+}
 
 #[allow(missing_debug_implementations)]
 pub struct QIRGen<'a> {
     named_types: HashMap<&'a str, Type<'a>>,
     relations:   Vec<Relation<'a>>,
 }
+
+pub type SemaResult<T> = Result<T, SemaError>;
+
 
 impl<'a> QIRGen<'a> {
     pub fn new() -> QIRGen<'a> {
@@ -28,15 +39,15 @@ impl<'a> QIRGen<'a> {
         self.named_types.get(name)
     }
 
-    // pub fn declare_struct_type(&mut self, decl: &StructDecl) -> Option<&StructType> {
-    //     unimplemented!()
-    // }
+    pub fn declare_struct_type(&mut self, decl: &ast::StructDecl) -> SemaResult<&StructType> {
+        unimplemented!()
+    }
 
-    // pub fn declare_enum_type(&mut self, decl: &EnumDecl) -> Option<&EnumType> {
-    //     unimplemented!()
-    // }
+    pub fn declare_enum_type(&mut self, decl: &ast::EnumDecl) -> SemaResult<&EnumType> {
+        unimplemented!()
+    }
 
-    // pub fn declare_class_type(&mut self, decl: &ClassDecl) -> Option<&ClassType> {
-    //     unimplemented!()
-    // }
+    pub fn declare_class_type(&mut self, decl: &ast::ClassDecl) -> SemaResult<&ClassType> {
+        unimplemented!()
+    }
 }
