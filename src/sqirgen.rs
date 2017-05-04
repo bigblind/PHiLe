@@ -73,7 +73,7 @@ impl<'a> QIRGen<'a> {
     fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<HashMap<&'a str, &'a Type<'a>>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
-        for node in decl.fields.iter() {
+        for node in &decl.fields {
             let field = match node.value {
                 NodeValue::Field(ref field) => field,
                 _ => return sema_error("struct fields must be Field values".to_owned(), node),
