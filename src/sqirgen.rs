@@ -48,7 +48,7 @@ impl<'a> QIRGen<'a> {
         self.named_types.get(name)
     }
 
-    pub fn declare_struct_type(&mut self, node: &Node<'a>) -> SemaResult<&Type> {
+    pub fn declare_struct_type(&mut self, node: &'a Node<'a>) -> SemaResult<&Type> {
         let decl = match node.value {
             NodeValue::StructDecl(ref decl) => decl,
             _ => return sema_error("declare_struct_type() requires a StructDecl node".to_owned(), node),
@@ -70,7 +70,7 @@ impl<'a> QIRGen<'a> {
         Ok(self.named_types.entry(name).or_insert(struct_type))
     }
 
-    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<HashMap<&'a str, &'a Type<'a>>> {
+    fn typecheck_struct_fields(&mut self, decl: &'a StructDecl) -> SemaResult<HashMap<&'a str, &'a Type<'a>>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
         for node in &decl.fields {
@@ -99,7 +99,11 @@ impl<'a> QIRGen<'a> {
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            unimplemented!() // TODO(H2CO3): continue implementing
+            try!(self.validate_field_type(field_type));
+
+            if fields.insert(field.name, field_type).is_some() {
+                return sema_error(format!("duplicate field '{}'", field.name), node);
+            }
         }
 
         Ok(fields)
@@ -114,6 +118,10 @@ impl<'a> QIRGen<'a> {
     }
 
     fn type_from_decl(&mut self, decl: &Node) -> SemaResult<&'a Type<'a>> {
+        unimplemented!()
+    }
+
+    fn validate_field_type(&mut self, field_type: &Type) -> SemaResult<()> {
         unimplemented!()
     }
 }
