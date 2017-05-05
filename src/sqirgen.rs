@@ -38,9 +38,26 @@ fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
 
 impl<'a> QIRGen<'a> {
     pub fn new() -> QIRGen<'a> {
+        let named_types = hash_map!{
+            "bool"   => Type::BoolType,
+            "i8"     => Type::Int8Type,
+            "u8"     => Type::UInt8Type,
+            "i16"    => Type::Int16Type,
+            "u16"    => Type::UInt16Type,
+            "i32"    => Type::Int32Type,
+            "u32"    => Type::UInt32Type,
+            "i64"    => Type::Int64Type,
+            "u64"    => Type::UInt64Type,
+            "f32"    => Type::Float32Type,
+            "f64"    => Type::Float64Type,
+            "String" => Type::StringType,
+            "Blob"   => Type::BlobType,
+            "Date"   => Type::DateType,
+        };
+
         QIRGen {
-            named_types: hash_map![], // named_types,
-            relations:   vec![], // relations,
+            named_types: named_types,
+            relations:   vec![],
         }
     }
 

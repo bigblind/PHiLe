@@ -13,7 +13,7 @@ macro_rules! hash_map(
             let key = $k;
             let val = $v;
             _tmp.insert(key, val).map(
-                |_| panic!("duplicate value {:#?} for key {:#?}", val, key)
+                |_| panic!("duplicate value for key {:#?}", key)
             );
         })*
         _tmp

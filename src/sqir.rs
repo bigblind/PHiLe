@@ -28,7 +28,7 @@ pub enum Type<'a> {
     DecimalType(usize, usize), // integral digits, fractional digits
 
     StringType,
-    BinaryType,
+    BlobType,
     DateType,
 
     OptionalType(Box<Type<'a>>),
