@@ -63,7 +63,7 @@ impl<'a> QIRGen<'a> {
         let struct_type = Type::StructType(
             StructType {
                 name:   name,
-                fields: try!(self.typecheck_struct_fields(decl)),
+                fields: self.typecheck_struct_fields(decl)?,
             }
         );
 
@@ -91,7 +91,7 @@ impl<'a> QIRGen<'a> {
                 _ => return sema_error(format!("field '{}' must have a type annotation", field.name), node),
             };
 
-            let field_type = try!(self.type_from_decl(&type_decl));
+            let field_type = self.type_from_decl(&type_decl)?;
 
             // No pointers are allowed in a struct.
             // Arrays, optionals and uniques are checked for
@@ -99,7 +99,7 @@ impl<'a> QIRGen<'a> {
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            try!(self.validate_field_type(field_type));
+            self.validate_field_type(field_type)?;
 
             if fields.insert(field.name, field_type).is_some() {
                 return sema_error(format!("duplicate field '{}'", field.name), node);

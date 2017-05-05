@@ -138,7 +138,7 @@ impl<'a> Parser<'a> {
         let last_token = self.tokens.as_slice().last();
 
         while self.has_tokens() {
-            children.push(try!(self.parse_toplevel()));
+            children.push(self.parse_toplevel()?);
         }
 
         let range = match (first_token, last_token) {
@@ -155,7 +155,7 @@ impl<'a> Parser<'a> {
 
     fn parse_toplevel(&mut self) -> ParseResult<'a> {
         let error = self.expectation_error("struct, class, enum or fn");
-        let token = try!(self.next_token().ok_or_else(|| error.clone()));
+        let token = self.next_token().ok_or_else(|| error.clone())?;
 
         match token.value {
             "struct" | "class" => self.parse_struct_or_class(),
@@ -168,16 +168,16 @@ impl<'a> Parser<'a> {
     fn parse_struct_or_class(&mut self) -> ParseResult<'a> {
         let mut fields = vec![];
 
-        let keyword = try!(self.expect_one_of(&["struct", "class"]));
-        let name = try!(self.expect_identifier());
+        let keyword = self.expect_one_of(&["struct", "class"])?;
+        let name = self.expect_identifier()?;
 
-        try!(self.expect("{"));
+        self.expect("{")?;
 
         while self.has_tokens() && !self.is_at("}") {
-            fields.push(try!(self.parse_field()));
+            fields.push(self.parse_field()?);
         }
 
-        let close_brace = try!(self.expect("}"));
+        let close_brace = self.expect("}")?;
 
         let value = match keyword.value {
             "struct" => NodeValue::StructDecl(
@@ -203,10 +203,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_field(&mut self) -> ParseResult<'a> {
-        let name = try!(self.expect_identifier());
-        let type_decl = try!(self.maybe_parse_type_annotation());
-        let relation = try!(self.maybe_parse_relation());
-        let comma = try!(self.expect(","));
+        let name = self.expect_identifier()?;
+        let type_decl = self.maybe_parse_type_annotation()?;
+        let relation = self.maybe_parse_relation()?;
+        let comma = self.expect(",")?;
 
         let field = Field {
             name:      name.value,
@@ -223,7 +223,7 @@ impl<'a> Parser<'a> {
 
     fn maybe_parse_type_annotation(&mut self) -> SyntaxResult<Option<Node<'a>>> {
         let type_decl = match self.accept(":") {
-            Some(_) => Some(try!(self.parse_type())),
+            Some(_) => Some(self.parse_type()?),
             None    => None,
         };
 
@@ -248,9 +248,9 @@ impl<'a> Parser<'a> {
 
         let relation = match self.accept_one_of(relation_operators) {
             Some(op) => {
-                let entity = try!(self.expect_identifier());
-                try!(self.expect("::"));
-                let field = try!(self.expect_identifier());
+                let entity = self.expect_identifier()?;
+                self.expect("::")?;
+                let field = self.expect_identifier()?;
                 let relation = Relation {
                     cardinality: op.value,
                     entity:      entity.value,
@@ -267,16 +267,16 @@ impl<'a> Parser<'a> {
     fn parse_enum(&mut self) -> ParseResult<'a> {
         let mut variants = vec![];
 
-        let enum_keyword = try!(self.expect("enum"));
-        let enum_name = try!(self.expect_identifier());
+        let enum_keyword = self.expect("enum")?;
+        let enum_name = self.expect_identifier()?;
 
-        try!(self.expect("{"));
+        self.expect("{")?;
 
         while self.has_tokens() && !self.is_at("}") {
-            variants.push(try!(self.parse_variant()));
+            variants.push(self.parse_variant()?);
         }
 
-        let close_brace = try!(self.expect("}"));
+        let close_brace = self.expect("}")?;
 
         let decl = EnumDecl {
             name:     enum_name.value,
@@ -293,21 +293,21 @@ impl<'a> Parser<'a> {
     fn parse_variant(&mut self) -> ParseResult<'a> {
         let mut types = vec![];
 
-        let name = try!(self.expect_identifier());
+        let name = self.expect_identifier()?;
 
         if self.accept("(").is_some() {
             while self.has_tokens() && !self.is_at(")") {
-                types.push(try!(self.parse_type()));
+                types.push(self.parse_type()?);
 
                 if !self.is_at(")") {
-                    try!(self.expect(","));
+                    self.expect(",")?;
                 }
             }
 
-            try!(self.expect(")"));
+            self.expect(")")?;
         }
 
-        let comma = try!(self.expect(","));
+        let comma = self.expect(",")?;
 
         let variant = Variant {
             name:  name.value,
@@ -330,7 +330,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_postfix_type(&mut self) -> ParseResult<'a> {
-        let mut node = try!(self.parse_prefix_type());
+        let mut node = self.parse_prefix_type()?;
 
         loop {
             match self.accept_one_of(&["?", "!"]) {
@@ -359,7 +359,7 @@ impl<'a> Parser<'a> {
         // currently, & is the only prefix type operator
         match self.accept("&") {
             Some(token) => {
-                let child = try!(self.parse_prefix_type());
+                let child = self.parse_prefix_type()?;
                 let range = Range {
                     begin: token.range.begin,
                     end:   child.range.map_or(token.range.end, |r| r.end),
@@ -385,17 +385,17 @@ impl<'a> Parser<'a> {
 
     fn parse_tuple_type(&mut self) -> ParseResult<'a> {
         let mut items = vec![];
-        let open_paren = try!(self.expect("("));
+        let open_paren = self.expect("(")?;
 
         while self.has_tokens() && !self.is_at(")") {
-            items.push(try!(self.parse_type()));
+            items.push(self.parse_type()?);
 
             if !self.is_at(")") {
-                try!(self.expect(","));
+                self.expect(",")?;
             }
         }
 
-        let close_paren = try!(self.expect(")"));
+        let close_paren = self.expect(")")?;
 
         let node = Node {
             range: token_range(open_paren, close_paren),
@@ -406,9 +406,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_array_type(&mut self) -> ParseResult<'a> {
-        let open_bracket = try!(self.expect("["));
-        let element_type = try!(self.parse_type());
-        let close_bracket = try!(self.expect("]"));
+        let open_bracket = self.expect("[")?;
+        let element_type = self.parse_type()?;
+        let close_bracket = self.expect("]")?;
 
         let node = Node {
             range: token_range(open_bracket, close_bracket),
@@ -419,7 +419,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_named_type(&mut self) -> ParseResult<'a> {
-        let token = try!(self.expect_identifier());
+        let token = self.expect_identifier()?;
 
         let node = Node {
             range: Some(token.range),

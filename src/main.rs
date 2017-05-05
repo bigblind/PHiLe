@@ -50,9 +50,9 @@ fn get_args() -> ProgramArgs {
 }
 
 fn read_file(path: &str) -> Result<String, std::io::Error> {
-    let mut file = try!(File::open(&Path::new(path)));
+    let mut file = File::open(&Path::new(path))?;
     let mut buf = String::new();
-    try!(file.read_to_string(&mut buf));
+    file.read_to_string(&mut buf)?;
     Ok(buf)
 }
 
