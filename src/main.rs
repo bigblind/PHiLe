@@ -49,10 +49,14 @@ fn get_args() -> ProgramArgs {
     }
 }
 
-fn read_file(path: &str) -> Result<String, std::io::Error> {
-    let mut file = File::open(&Path::new(path))?;
+fn read_files(paths: &[&str]) -> Result<String, std::io::Error> {
     let mut buf = String::new();
-    file.read_to_string(&mut buf)?;
+
+    for path in paths {
+        let mut file = File::open(&Path::new(path))?;
+        file.read_to_string(&mut buf)?;
+    }
+
     Ok(buf)
 }
 
@@ -68,12 +72,8 @@ fn main() {
 
     let args = get_args();
 
-    if args.schemas.len() != 1 {
-        panic!("currently, only compiling one single file is supported");
-    }
-
-    let source = read_file(&args.schemas[0]).unwrap_or_else(
-        |error| panic!("could not read file '{}': {}", args.schemas[0], error.description())
+    let source = read_files(args.schemas).unwrap_or_else(
+        |error| panic!("error reading file: {}", error.description())
     );
 
     let mut tokens = lex(&source).unwrap_or_else(
