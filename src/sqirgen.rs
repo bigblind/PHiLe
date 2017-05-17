@@ -46,19 +46,19 @@ impl<'a> SQIRGen<'a> {
         self.sqir.named_types.get(name)
     }
 
-    pub fn generate_sqir(&mut self, node: &Node) -> SemaResult<&SQIR> {
+    pub fn generate_sqir(mut self, node: &'a Node<'a>) -> SemaResult<SQIR<'a>> {
         let children = match node.value {
-            NodeValue::Program(children) => children,
+            NodeValue::Program(ref children) => children,
             _ => return sema_error("top-level node must be a Program".to_owned(), node),
         };
 
         // Forward declare every struct/class/enum definition
         // by inserting a placeholder type for each of them
-        for child in &children {
+        for child in children.iter() {
             let name = match child.value {
-                NodeValue::StructDecl(s) => s.name,
-                NodeValue::ClassDecl(c)  => c.name,
-                NodeValue::EnumDecl(e)   => e.name,
+                NodeValue::StructDecl(ref s) => s.name,
+                NodeValue::ClassDecl(ref c)  => c.name,
+                NodeValue::EnumDecl(ref e)   => e.name,
                 _ => continue,
             };
 
@@ -66,7 +66,7 @@ impl<'a> SQIRGen<'a> {
         }
 
         // Create semantic types out of AST and check their consistency
-        for child in &children {
+        for child in children.iter() {
             match child.value {
                 NodeValue::StructDecl(_) => self.declare_struct_type(child),
                 NodeValue::ClassDecl(_)  => self.declare_class_type(child),
@@ -79,7 +79,7 @@ impl<'a> SQIRGen<'a> {
         // (It is only now that occurs checking is possible,
         // because at this point, we should have gotten rid of
         // all placeholders that could hide self-containing types.)
-        for (name, tp) in self.sqir.named_types {
+        for (name, tp) in &self.sqir.named_types {
             // TODO(H2CO3): call occurs check
         }
 
@@ -87,23 +87,23 @@ impl<'a> SQIRGen<'a> {
         // For each function: typecheck, and insert placeholder Function
         // into self.sqir.functions that has no actual body/implementation,
         // no instructions/basic blocks, only a type and argument names
-        for child in &children {
+        for child in children.iter() {
             match child.value {
-                NodeValue::FunctionDecl(f) => self.forward_declare_function(&f)?,
+                NodeValue::FunctionDecl(ref f) => self.forward_declare_function(&f)?,
                 _ => continue,
             }
         }
 
         // Then generate SQIR for each function
-        for child in &children {
+        for child in children.iter() {
             match child.value {
-                NodeValue::FunctionDecl(f) => self.generate_sqir_for_function(&f)?,
+                NodeValue::FunctionDecl(ref f) => self.generate_sqir_for_function(&f)?,
                 _ => continue,
             }
         }
 
         // Finally, return the generated SQIR
-        Ok(&self.sqir)
+        Ok(self.sqir)
     }
 
     fn declare_struct_type(&mut self, node: &'a Node<'a>) -> SemaResult<&Type> {
@@ -114,12 +114,12 @@ impl<'a> SQIRGen<'a> {
 
         let name = decl.name;
 
-        if self.named_types.contains_key(name) {
+        if self.sqir.named_types.contains_key(name) {
             return sema_error(format!("redefinition of '{}'", name), node);
         }
 
         // Insert a placeholder type so that we can typecheck fields
-        self.named_types.insert(name, Type::PlaceholderType(name));
+        self.sqir.named_types.insert(name, Type::PlaceholderType(name));
 
         let struct_type = Type::StructType(
             StructType {
@@ -128,9 +128,9 @@ impl<'a> SQIRGen<'a> {
             }
         );
 
-        self.named_types.insert(name, struct_type);
+        self.sqir.named_types.insert(name, struct_type);
 
-        Ok(&self.named_types[name])
+        Ok(&self.sqir.named_types[name])
     }
 
     fn typecheck_struct_fields(&mut self, decl: &'a StructDecl) -> SemaResult<HashMap<&'a str, &'a Type<'a>>> {
@@ -156,7 +156,7 @@ impl<'a> SQIRGen<'a> {
 
             let field_type = self.type_from_decl(&type_decl)?;
 
-            self.validate_field_type(field_type, node, decl.name)?;
+            self.validate_field_type(field_type, node)?;
 
             if fields.insert(field.name, field_type).is_some() {
                 return sema_error(format!("duplicate field '{}'", field.name), node);
@@ -189,16 +189,20 @@ impl<'a> SQIRGen<'a> {
         // not like user-defined enums or structs in that
         // they might legitimately contain pointers when
         // contained within a class.
-        match field_type {
-            Type::PointerType(t)  => sema_error("pointer type not allowed in struct".to_owned(), field_node),
-            Type::OptionalType(t) => self.validate_field_type(t, field_node),
-            Type::UniqueType(t)   => self.validate_field_type(t, field_node),
-            Type::ArrayType(t)    => self.validate_field_type(t, field_type),
-            Type::TupleType(ts)   => ts.map(|t| self.validate_field_type(t, field_node)).collect(),
-            Type::EnumType(t)     => unimplemented!(), // TODO(H2CO3): look through each variant
-            Type::StructType(t)   => unimplemented!(), // TODO(H2CO3): look through each field,
-            Type::ClassType(t)    => sema_error(format!("class type {} not allowed in struct", t.name), field_node),
-            _               => Ok(()), // atomic types (numbers, strings, blobs and dates) and placeholders are OK
+        match *field_type {
+            Type::PointerType(ref t)  => sema_error("pointer type not allowed in struct".to_owned(), field_node),
+            Type::OptionalType(ref t) => self.validate_field_type(t, field_node),
+            Type::UniqueType(ref t)   => self.validate_field_type(t, field_node),
+            Type::ArrayType(ref t)    => self.validate_field_type(t, field_node),
+            Type::TupleType(ref ts)   => {
+                ts.iter().map(
+                    |t| self.validate_field_type(t, field_node)
+                ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
+            },
+            Type::EnumType(ref t)     => unimplemented!(), // TODO(H2CO3): look through each variant
+            Type::StructType(ref t)   => unimplemented!(), // TODO(H2CO3): look through each field,
+            Type::ClassType(ref t)    => sema_error(format!("class type {} not allowed in struct", t.name), field_node),
+            _                         => Ok(()), // atomic types (numbers, strings, blobs, and dates) and placeholders are OK
         }
     }
 

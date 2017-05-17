@@ -73,6 +73,7 @@ pub struct Variant<'a> {
     pub types: Vec<Node<'a>>,
 }
 
+#[allow(missing_copy_implementations)]
 #[derive(Debug)]
 pub struct FunctionDecl {
     // TODO(H2CO3): implement

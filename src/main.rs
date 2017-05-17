@@ -49,11 +49,11 @@ fn get_args() -> ProgramArgs {
     }
 }
 
-fn read_files(paths: &[&str]) -> Result<String, std::io::Error> {
+fn read_files<T: AsRef<str>>(paths: &[T]) -> Result<String, std::io::Error> {
     let mut buf = String::new();
 
     for path in paths {
-        let mut file = File::open(&Path::new(path))?;
+        let mut file = File::open(&Path::new(path.as_ref()))?;
         file.read_to_string(&mut buf)?;
     }
 
@@ -72,7 +72,7 @@ fn main() {
 
     let args = get_args();
 
-    let source = read_files(args.schemas).unwrap_or_else(
+    let source = read_files(&args.schemas).unwrap_or_else(
         |error| panic!("error reading file: {}", error.description())
     );
 
