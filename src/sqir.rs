@@ -83,7 +83,7 @@ pub struct FunctionType<'a> {
 #[derive(Debug, Clone, Copy)]
 pub struct RelationSide<'a> {
     pub class:       &'a Type<'a>,
-    pub field:       &'a str,
+    pub field:       Option<&'a str>,
     pub cardinality: Cardinality,
 }
 

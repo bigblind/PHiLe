@@ -14,8 +14,8 @@ use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl };
 
 #[derive(Debug, Clone)]
 pub struct SemaError {
-    message: String,
-    range:   Option<Range>,
+    pub message: String,
+    pub range:   Option<Range>,
 }
 
 #[allow(missing_debug_implementations)]
