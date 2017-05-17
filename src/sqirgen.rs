@@ -204,8 +204,8 @@ impl<'a> SQIRGen<'a> {
     fn validate_struct_field_type(&self, field_type: &Type, field_node: &Node) -> SemaResult<()> {
         match *field_type {
             // No pointers (and consequently, no classes) are allowed in a struct.
-            Type::PointerType(ref t)  => sema_error("pointer type not allowed in struct".to_owned(), field_node),
-            Type::ClassType(ref t)    => sema_error(format!("class type {} not allowed in struct", t.name), field_node),
+            Type::PointerType(_) => sema_error("pointer type not allowed in struct".to_owned(), field_node),
+            Type::ClassType(ref t) => sema_error(format!("class type {} not allowed in struct", t.name), field_node),
 
             // Optionals, uniques, and arrays are checked for
             // explicitly and recursively, because they are
@@ -219,16 +219,26 @@ impl<'a> SQIRGen<'a> {
             // Every type of a contained tuple, every member of
             // a contained struct, and every variant of a contained enum
             // must be valid as well.
-            Type::TupleType(ref ts)   => {
-                ts.iter().map(
+            Type::TupleType(ref types) => {
+                types.iter().map(
                     |t| self.validate_struct_field_type(t, field_node)
                 ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
             },
-            Type::StructType(ref t)   => unimplemented!(), // TODO(H2CO3): look through each field,
-            Type::EnumType(ref t)     => unimplemented!(), // TODO(H2CO3): look through each variant
+            Type::StructType(ref st) => {
+                st.fields.iter().map(
+                    |(_, t)| self.validate_struct_field_type(t, field_node)
+                ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
+            },
+            Type::EnumType(ref et) => {
+                et.variants.iter().map(
+                    |v| v.types.iter().map(
+                        |t| self.validate_struct_field_type(t, field_node)
+                    ).collect::<SemaResult<Vec<_>>>()
+                ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
+            },
 
             // atomic types (numbers, strings, blobs, and dates) and placeholders are OK
-            _                         => Ok(()),
+            _ => Ok(()),
         }
     }
 
