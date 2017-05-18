@@ -201,45 +201,45 @@ impl<'a> SQIRGen<'a> {
         Ok(fields)
     }
 
-    fn validate_struct_field_type(&self, field_type: &Type, field_node: &Node) -> SemaResult<()> {
+    fn validate_struct_field_type(&self, field_type: &Type, node: &Node) -> SemaResult<()> {
         match *field_type {
             // No pointers (and consequently, no classes) are allowed in a struct.
-            Type::PointerType(_) => sema_error("pointer type not allowed in struct".to_owned(), field_node),
-            Type::ClassType(ref t) => sema_error(format!("class type {} not allowed in struct", t.name), field_node),
+            Type::PointerType(_) => sema_error("pointer type not allowed in struct".to_owned(), node),
+            Type::ClassType(ref t) => sema_error(format!("class type {} not allowed in struct", t.name), node),
 
             // Optionals, uniques, and arrays are checked for
             // explicitly and recursively, because they are
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            Type::OptionalType(ref t) => self.validate_struct_field_type(t, field_node),
-            Type::UniqueType(ref t)   => self.validate_struct_field_type(t, field_node),
-            Type::ArrayType(ref t)    => self.validate_struct_field_type(t, field_node),
+            Type::OptionalType(ref t) => self.validate_struct_field_type(t, node),
+            Type::UniqueType(ref t)   => self.validate_struct_field_type(t, node),
+            Type::ArrayType(ref t)    => self.validate_struct_field_type(t, node),
 
             // Every type of a contained tuple, every member of
             // a contained struct, and every variant of a contained enum
             // must be valid as well.
-            Type::TupleType(ref types) => {
-                types.iter().map(
-                    |t| self.validate_struct_field_type(t, field_node)
-                ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-            },
-            Type::StructType(ref st) => {
-                st.fields.iter().map(
-                    |(_, t)| self.validate_struct_field_type(t, field_node)
-                ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-            },
-            Type::EnumType(ref et) => {
-                et.variants.iter().map(
-                    |v| v.types.iter().map(
-                        |t| self.validate_struct_field_type(t, field_node)
-                    ).collect::<SemaResult<Vec<_>>>()
-                ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-            },
+            Type::TupleType(ref types) => self.validate_types_for_struct_field(types, node),
+            Type::StructType(ref st) => self.validate_types_for_struct_field(st.fields.values(), node),
+            Type::EnumType(ref et) => self.validate_variants_for_struct_field(et, node),
 
             // atomic types (numbers, strings, blobs, and dates) and placeholders are OK
             _ => Ok(()),
         }
+    }
+
+    fn validate_types_for_struct_field<I>(&self, it: I, node: &Node) -> SemaResult<()>
+        where I: IntoIterator<Item = &'a &'a Type<'a>>
+    {
+        it.into_iter().map(
+            |t| self.validate_struct_field_type(t, node)
+        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
+    }
+
+    fn validate_variants_for_struct_field(&self, enum_type: &EnumType, node: &Node) -> SemaResult<()> {
+        enum_type.variants.iter().map(
+            |v| self.validate_types_for_struct_field(&v.types, node)
+        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
     }
 
     //
