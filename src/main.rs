@@ -17,6 +17,7 @@ use std::error::Error;
 use std::io::prelude::*;
 use phile::lexer::*;
 use phile::parser::*;
+use phile::sqirgen::*;
 
 
 #[derive(Debug)]
@@ -65,6 +66,11 @@ fn format_parse_error(error: &ParseError) -> String {
     format!("Parse error near {}: {}", range, error.message)
 }
 
+fn format_sema_error(error: &SemaError) -> String {
+    let range = error.range.map_or("end of input".to_owned(), |r| format!("{:#?}", r));
+    format!("Semantic error near {}: {}", range, error.message)
+}
+
 fn main() {
     println!("The PHiLe Compiler");
     println!("Copyright (C) Arpad Goretity, 2017");
@@ -92,5 +98,9 @@ fn main() {
         |error| panic!(format_parse_error(&error))
     );
 
-    println!("{:#?}", program);
+    let sqir = generate_sqir(&program).unwrap_or_else(
+        |error| panic!(format_sema_error(&error))
+    );
+
+    println!("{:#?}", sqir);
 }

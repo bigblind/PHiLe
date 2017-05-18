@@ -19,12 +19,16 @@ pub struct SemaError {
 }
 
 #[allow(missing_debug_implementations)]
-pub struct SQIRGen<'a> {
+struct SQIRGen<'a> {
     sqir: SQIR<'a>,
 }
 
 pub type SemaResult<T> = Result<T, SemaError>;
 
+
+pub fn generate_sqir<'a>(program: &'a Node) -> SemaResult<SQIR<'a>> {
+    SQIRGen::new().generate_sqir(program)
+}
 
 fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
     Err(
@@ -37,7 +41,7 @@ fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
 
 impl<'a> SQIRGen<'a> {
     // Constructor
-    pub fn new() -> SQIRGen<'a> {
+    fn new() -> SQIRGen<'a> {
         SQIRGen {
             sqir: SQIR::new(),
         }
@@ -47,7 +51,7 @@ impl<'a> SQIRGen<'a> {
     // Top-level SQIR generation methods and helpers
     //
 
-    pub fn generate_sqir(mut self, node: &'a Node<'a>) -> SemaResult<SQIR<'a>> {
+    fn generate_sqir(mut self, node: &'a Node<'a>) -> SemaResult<SQIR<'a>> {
         let children = match node.value {
             NodeValue::Program(ref children) => children,
             _ => return sema_error("top-level node must be a Program".to_owned(), node),
@@ -272,7 +276,15 @@ impl<'a> SQIRGen<'a> {
     //
 
     fn type_from_decl(&mut self, decl: &Node) -> SemaResult<&'a Type<'a>> {
-        unimplemented!()
+        match decl.value {
+            NodeValue::PointerType(ref pointed)  => unimplemented!(),
+            NodeValue::OptionalType(ref wrapped) => unimplemented!(),
+            NodeValue::UniqueType(ref wrapped)   => unimplemented!(),
+            NodeValue::TupleType(ref types)      => unimplemented!(),
+            NodeValue::ArrayType(ref element)    => unimplemented!(),
+            NodeValue::NamedType(name)           => unimplemented!(),
+            _ => sema_error("not a type declaration".to_owned(), decl),
+        }
     }
 
     fn type_by_name(&self, name: &str) -> Option<&Type> {
