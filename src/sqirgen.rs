@@ -29,6 +29,38 @@ struct SQIRGen<'a> {
 pub type SemaResult<T> = Result<T, SemaError>;
 
 
+// This macro generates caching getter functions for types
+// that simply wrap other types, e.g. &T, [T], T?, T!, etc.
+macro_rules! implement_wrapping_type_getter {
+    ($fn_name: ident, $variant: ident, $cache: ident) => {
+        fn $fn_name(&mut self, decl: &Node) -> SemaResult<Weak<Type<'a>>> {
+            // get the current wrapped type
+            let wrapped_type = self.type_from_decl(decl)?;
+
+            // If there is already a cached wrapping type of which the
+            // wrapped type is the type described by `decl`, then return it.
+            // Otherwise, construct the wrapping type, cache it and return it.
+            let wrapping_type = self.sqir.$cache.iter().map(Rc::downgrade).find(
+                |w| match *w.force_rc() {
+                    Type::$variant(ref t) => {
+                        ptr::eq(t.force_rc().as_ref(), wrapped_type.force_rc().as_ref())
+                    },
+                    _ => unreachable!(
+                        "{} must only contain {} types", stringify!($cache), stringify!($variant)
+                    ),
+                }
+            ).unwrap_or_else(|| {
+                let wrapping_type_rc = Rc::new(Type::$variant(wrapped_type));
+                let wrapping_type_wk = Rc::downgrade(&wrapping_type_rc);
+                self.sqir.$cache.push(wrapping_type_rc);
+                wrapping_type_wk
+            });
+
+            Ok(wrapping_type)
+        }
+    }
+}
+
 pub fn generate_sqir<'a>(program: &'a Node) -> SemaResult<SQIR<'a>> {
     SQIRGen::new().generate_sqir(program)
 }
@@ -292,44 +324,28 @@ impl<'a> SQIRGen<'a> {
         }
     }
 
-    // TODO(H2CO3): refactor get_pointer_type(), get_optional_type(),
-    // get_unique_type() and get_array_type() into one function,
-    // because they are almost identical
-    fn get_pointer_type(&mut self, pointed: &Node) -> SemaResult<Weak<Type<'a>>> {
-        // get the current pointed type
-        let pointed_type = self.type_from_decl(pointed)?;
-
-        // If there is already a cached pointer type of which
-        // the pointed type is the current pointed type, return it.
-        // Otherwise, make the pointer type, cache it and return it.
-        let pointer_type = self.sqir.pointer_types.iter().map(Rc::downgrade).find(
-            |p| match *p.force_rc() {
-                Type::PointerType(ref t) => {
-                    ptr::eq(t.force_rc().as_ref(), pointed_type.force_rc().as_ref())
-                },
-                _ => false,
-            }
-        ).unwrap_or_else(|| {
-            let pointer_type_rc = Rc::new(Type::PointerType(pointed_type));
-            let result = Rc::downgrade(&pointer_type_rc);
-            self.sqir.pointer_types.push(pointer_type_rc);
-
-            result
-        });
-
-        Ok(pointer_type)
+    implement_wrapping_type_getter! {
+        get_pointer_type,
+        PointerType,
+        pointer_types
     }
 
-    fn get_optional_type(&mut self, wrapped: &Node) -> SemaResult<Weak<Type<'a>>> {
-        unimplemented!()
+    implement_wrapping_type_getter! {
+        get_optional_type,
+        OptionalType,
+        optional_types
     }
 
-    fn get_unique_type(&mut self, wrapped: &Node) -> SemaResult<Weak<Type<'a>>> {
-        unimplemented!()
+    implement_wrapping_type_getter! {
+        get_unique_type,
+        UniqueType,
+        unique_types
     }
 
-    fn get_array_type(&mut self, element: &Node) -> SemaResult<Weak<Type<'a>>> {
-        unimplemented!()
+    implement_wrapping_type_getter! {
+        get_array_type,
+        ArrayType,
+        array_types
     }
 
     fn get_tuple_type(&mut self, types: &[Node]) -> SemaResult<Weak<Type<'a>>> {
