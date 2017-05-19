@@ -43,7 +43,7 @@ fn token_range(first: &Token, last: &Token) -> Option<Range> {
 
 fn is_keyword(lexeme: &str) -> bool {
     #[allow(non_upper_case_globals)]
-    static keywords: &'static [&'static str] = &[
+    static keywords: &[&str] = &[
         "struct",
         "class",
         "enum",
@@ -232,7 +232,7 @@ impl<'a> Parser<'a> {
 
     fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<Relation<'a>>> {
         #[allow(non_upper_case_globals)]
-        static relation_operators: &'static [&'static str] = &[
+        static relation_operators: &[&str] = &[
             // I just couldn't make up my mind as to how to denote
             // "exactly one": by nothing or by an exclamation mark
              "<->",   "<->?",  "<->*",  "<->+",

@@ -7,6 +7,7 @@
 //
 
 use std::collections::HashMap;
+use std::rc::{ Rc, Weak };
 
 
 // Types (part of the Schema)
@@ -33,11 +34,11 @@ pub enum Type<'a> {
     BlobType,
     DateType,
 
-    OptionalType(&'a Type<'a>),
-    UniqueType(&'a Type<'a>),
-    PointerType(&'a Type<'a>),
-    ArrayType(&'a Type<'a>),
-    TupleType(Vec<&'a Type<'a>>),
+    OptionalType(Weak<Type<'a>>),
+    UniqueType(Weak<Type<'a>>),
+    PointerType(Weak<Type<'a>>),
+    ArrayType(Weak<Type<'a>>),
+    TupleType(Vec<Weak<Type<'a>>>),
 
     EnumType(EnumType<'a>),
     StructType(StructType<'a>),
@@ -57,32 +58,32 @@ pub struct EnumType<'a> {
 #[derive(Debug)]
 pub struct Variant<'a> {
     pub name:  &'a str,
-    pub types: Vec<&'a Type<'a>>,
+    pub types: Vec<Weak<Type<'a>>>,
 }
 
 #[derive(Debug)]
 pub struct StructType<'a> {
     pub name:   &'a str,
-    pub fields: HashMap<&'a str, &'a Type<'a>>,
+    pub fields: HashMap<&'a str, Weak<Type<'a>>>,
 }
 
 #[derive(Debug)]
 pub struct ClassType<'a> {
     pub name: &'a str,
-    pub fields: HashMap<&'a str, &'a Type<'a>>,
+    pub fields: HashMap<&'a str, Weak<Type<'a>>>,
 }
 
 #[derive(Debug)]
 pub struct FunctionType<'a> {
-    pub arg_types: Vec<&'a Type<'a>>,
-    pub ret_type:  &'a Type<'a>,
+    pub arg_types: Vec<Weak<Type<'a>>>,
+    pub ret_type:  Weak<Type<'a>>,
 }
 
 // Relations (also part of the Schema)
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct RelationSide<'a> {
-    pub class:       &'a Type<'a>,
+    pub class:       Weak<Type<'a>>,
     pub field:       Option<&'a str>,
     pub cardinality: Cardinality,
 }
@@ -102,7 +103,7 @@ pub type Relation<'a> = (RelationSide<'a>, RelationSide<'a>);
 #[derive(Debug)]
 pub struct Function<'a> {
     pub name:  &'a str,
-    pub types: &'a Type<'a>, // wraps a FunctionType
+    pub types: Weak<Type<'a>>, // wraps a FunctionType
     pub args:  Vec<&'a str>,
     // TODO(H2CO3): add body (instructions/basic blocks/etc.)
 }
@@ -111,14 +112,14 @@ pub struct Function<'a> {
 
 #[derive(Debug)]
 pub struct SQIR<'a> {
-    pub named_types:    HashMap<&'a str, Type<'a>>, // builtins, structs, classes, enums, placeholders
-    pub decimal_types:  HashMap<(usize, usize), Type<'a>>,
-    pub optional_types: Vec<Type<'a>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub unique_types:   Vec<Type<'a>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub pointer_types:  Vec<Type<'a>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub array_types:    Vec<Type<'a>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub tuple_types:    Vec<Type<'a>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub function_types: Vec<Type<'a>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub named_types:    HashMap<&'a str, Rc<Type<'a>>>, // builtins, structs, classes, enums, placeholders
+    pub decimal_types:  HashMap<(usize, usize), Rc<Type<'a>>>,
+    pub optional_types: Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub unique_types:   Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub pointer_types:  Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub array_types:    Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub tuple_types:    Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub function_types: Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
     pub relations:      Vec<Relation<'a>>,
     pub functions:      HashMap<&'a str, Function<'a>>,
 }
@@ -126,20 +127,20 @@ pub struct SQIR<'a> {
 impl<'a> SQIR<'a> {
     pub fn new() -> SQIR<'a> {
         let named_types = hash_map![
-            "bool"   => Type::BoolType,
-            "i8"     => Type::Int8Type,
-            "u8"     => Type::UInt8Type,
-            "i16"    => Type::Int16Type,
-            "u16"    => Type::UInt16Type,
-            "i32"    => Type::Int32Type,
-            "u32"    => Type::UInt32Type,
-            "i64"    => Type::Int64Type,
-            "u64"    => Type::UInt64Type,
-            "f32"    => Type::Float32Type,
-            "f64"    => Type::Float64Type,
-            "String" => Type::StringType,
-            "Blob"   => Type::BlobType,
-            "Date"   => Type::DateType,
+            "bool"   => Rc::new(Type::BoolType),
+            "i8"     => Rc::new(Type::Int8Type),
+            "u8"     => Rc::new(Type::UInt8Type),
+            "i16"    => Rc::new(Type::Int16Type),
+            "u16"    => Rc::new(Type::UInt16Type),
+            "i32"    => Rc::new(Type::Int32Type),
+            "u32"    => Rc::new(Type::UInt32Type),
+            "i64"    => Rc::new(Type::Int64Type),
+            "u64"    => Rc::new(Type::UInt64Type),
+            "f32"    => Rc::new(Type::Float32Type),
+            "f64"    => Rc::new(Type::Float64Type),
+            "String" => Rc::new(Type::StringType),
+            "Blob"   => Rc::new(Type::BlobType),
+            "Date"   => Rc::new(Type::DateType),
         ];
 
         SQIR {

@@ -7,8 +7,11 @@
 //
 
 use std::collections::HashMap;
+use std::rc::{ Rc, Weak };
+use std::ptr;
 use sqir::*;
 use lexer::*;
+use util::*;
 use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl };
 
 
@@ -81,7 +84,7 @@ impl<'a> SQIRGen<'a> {
                 return sema_error(format!("redefinition of '{}'", name), child);
             }
 
-            self.sqir.named_types.insert(name, Type::PlaceholderType(name));
+            self.sqir.named_types.insert(name, Rc::new(Type::PlaceholderType(name)));
         }
 
         Ok(())
@@ -144,7 +147,7 @@ impl<'a> SQIRGen<'a> {
     // Type-wise semantic analysis methods
     //
 
-    fn define_struct_type(&mut self, decl: &'a StructDecl<'a>) -> SemaResult<&Type> {
+    fn define_struct_type(&mut self, decl: &'a StructDecl<'a>) -> SemaResult<Weak<Type<'a>>> {
         let name = decl.name;
 
         let struct_type = Type::StructType(
@@ -155,16 +158,18 @@ impl<'a> SQIRGen<'a> {
         );
 
         // Replace the placeholder type with the now-created actual type
-        self.sqir.named_types.insert(name, struct_type);
+        let struct_type_rc = Rc::new(struct_type);
+        let result = Ok(Rc::downgrade(&struct_type_rc));
+        self.sqir.named_types.insert(name, struct_type_rc);
 
-        Ok(&self.sqir.named_types[name])
+        result
     }
 
-    fn define_enum_type(&mut self, decl: &'a EnumDecl<'a>) -> SemaResult<&Type> {
+    fn define_enum_type(&mut self, decl: &'a EnumDecl<'a>) -> SemaResult<Weak<Type<'a>>> {
         unimplemented!()
     }
 
-    fn define_class_type(&mut self, decl: &'a ClassDecl<'a>) -> SemaResult<&Type> {
+    fn define_class_type(&mut self, decl: &'a ClassDecl<'a>) -> SemaResult<Weak<Type<'a>>> {
         unimplemented!()
     }
 
@@ -172,7 +177,7 @@ impl<'a> SQIRGen<'a> {
     // Helpers for struct types
     //
 
-    fn typecheck_struct_fields(&mut self, decl: &'a StructDecl) -> SemaResult<HashMap<&'a str, &'a Type<'a>>> {
+    fn typecheck_struct_fields(&mut self, decl: &'a StructDecl) -> SemaResult<HashMap<&'a str, Weak<Type<'a>>>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
         for node in &decl.fields {
@@ -195,7 +200,7 @@ impl<'a> SQIRGen<'a> {
 
             let field_type = self.type_from_decl(&type_decl)?;
 
-            self.validate_struct_field_type(field_type, node)?;
+            self.validate_struct_field_type(field_type.force_rc().as_ref(), node)?;
 
             if fields.insert(field.name, field_type).is_some() {
                 return sema_error(format!("duplicate field '{}'", field.name), node);
@@ -216,9 +221,9 @@ impl<'a> SQIRGen<'a> {
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            Type::OptionalType(ref t) => self.validate_struct_field_type(t, node),
-            Type::UniqueType(ref t)   => self.validate_struct_field_type(t, node),
-            Type::ArrayType(ref t)    => self.validate_struct_field_type(t, node),
+            Type::OptionalType(ref t) => self.validate_struct_field_type(t.force_rc().as_ref(), node),
+            Type::UniqueType(ref t)   => self.validate_struct_field_type(t.force_rc().as_ref(), node),
+            Type::ArrayType(ref t)    => self.validate_struct_field_type(t.force_rc().as_ref(), node),
 
             // Every type of a contained tuple, every member of
             // a contained struct, and every variant of a contained enum
@@ -233,10 +238,10 @@ impl<'a> SQIRGen<'a> {
     }
 
     fn validate_types_for_struct_field<I>(&self, it: I, node: &Node) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a &'a Type<'a>>
+        where I: IntoIterator<Item = &'a Weak<Type<'a>>>
     {
         it.into_iter().map(
-            |t| self.validate_struct_field_type(t, node)
+            |t| self.validate_struct_field_type(t.force_rc().as_ref(), node)
         ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
     }
 
@@ -275,19 +280,70 @@ impl<'a> SQIRGen<'a> {
     // Miscellaneous helpers
     //
 
-    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<&'a Type<'a>> {
+    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<Weak<Type<'a>>> {
         match decl.value {
-            NodeValue::PointerType(ref pointed)  => unimplemented!(),
-            NodeValue::OptionalType(ref wrapped) => unimplemented!(),
-            NodeValue::UniqueType(ref wrapped)   => unimplemented!(),
-            NodeValue::TupleType(ref types)      => unimplemented!(),
-            NodeValue::ArrayType(ref element)    => unimplemented!(),
-            NodeValue::NamedType(name)           => unimplemented!(),
+            NodeValue::PointerType(ref pointed)  => self.get_pointer_type(pointed),
+            NodeValue::OptionalType(ref wrapped) => self.get_optional_type(wrapped),
+            NodeValue::UniqueType(ref wrapped)   => self.get_unique_type(wrapped),
+            NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
+            NodeValue::ArrayType(ref element)    => self.get_array_type(element),
+            NodeValue::NamedType(name)           => self.get_named_type(name, decl),
             _ => sema_error("not a type declaration".to_owned(), decl),
         }
     }
 
-    fn type_by_name(&self, name: &str) -> Option<&Type> {
-        self.sqir.named_types.get(name)
+    // TODO(H2CO3): refactor get_pointer_type(), get_optional_type(),
+    // get_unique_type() and get_array_type() into one function,
+    // because they are almost identical
+    fn get_pointer_type(&mut self, pointed: &Node) -> SemaResult<Weak<Type<'a>>> {
+        // get the current pointed type
+        let pointed_type = self.type_from_decl(pointed)?;
+
+        // If there is already a cached pointer type of which
+        // the pointed type is the current pointed type, return it.
+        // Otherwise, make the pointer type, cache it and return it.
+        let pointer_type = self.sqir.pointer_types.iter().map(Rc::downgrade).find(
+            |p| match *p.force_rc() {
+                Type::PointerType(ref t) => {
+                    ptr::eq(t.force_rc().as_ref(), pointed_type.force_rc().as_ref())
+                },
+                _ => false,
+            }
+        ).unwrap_or_else(|| {
+            let pointer_type_rc = Rc::new(Type::PointerType(pointed_type));
+            let result = Rc::downgrade(&pointer_type_rc);
+            self.sqir.pointer_types.push(pointer_type_rc);
+
+            result
+        });
+
+        Ok(pointer_type)
+    }
+
+    fn get_optional_type(&mut self, wrapped: &Node) -> SemaResult<Weak<Type<'a>>> {
+        unimplemented!()
+    }
+
+    fn get_unique_type(&mut self, wrapped: &Node) -> SemaResult<Weak<Type<'a>>> {
+        unimplemented!()
+    }
+
+    fn get_array_type(&mut self, element: &Node) -> SemaResult<Weak<Type<'a>>> {
+        unimplemented!()
+    }
+
+    fn get_tuple_type(&mut self, types: &[Node]) -> SemaResult<Weak<Type<'a>>> {
+        unimplemented!()
+    }
+
+    fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<Weak<Type<'a>>> {
+        self.type_by_name(name).ok_or_else(|| SemaError {
+            message: format!("Unknown type: {}", name),
+            range:   node.range,
+        })
+    }
+
+    fn type_by_name(&self, name: &str) -> Option<Weak<Type<'a>>> {
+        self.sqir.named_types.get(name).map(Rc::downgrade)
     }
 }
