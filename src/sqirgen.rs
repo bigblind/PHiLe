@@ -41,11 +41,9 @@ macro_rules! implement_wrapping_type_getter {
             // Otherwise, construct the wrapping type, cache it and return it.
             let wrapping_type = self.sqir.$cache.iter().map(Rc::clone).find(
                 |w| match *w.as_ref() {
-                    Type::$variant(ref wk) => {
-                        match wk.upgrade() {
-                            Some(rc) => ptr::eq(rc.as_ref(), wrapped_type.as_ref()),
-                            None => false,
-                        }
+                    Type::$variant(ref wk) => match wk.upgrade() {
+                        Some(rc) => ptr::eq(rc.as_ref(), wrapped_type.as_ref()),
+                        None => unreachable!("No Rc backing Weak for type"),
                     },
                     _ => unreachable!(
                         "{} must only contain {}", stringify!($cache), stringify!($variant)
@@ -75,6 +73,15 @@ fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
     )
 }
 
+fn occurs_check_error<T>(message: String) -> SemaResult<T> {
+    Err(
+        SemaError {
+            message: message,
+            range:   None,
+        }
+    )
+}
+
 impl<'a> SQIRGen<'a> {
     // Constructor
     fn new() -> SQIRGen<'a> {
@@ -90,7 +97,7 @@ impl<'a> SQIRGen<'a> {
     fn generate_sqir(mut self, node: &'a Node<'a>) -> SemaResult<SQIR<'a>> {
         let children = match node.value {
             NodeValue::Program(ref children) => children,
-            _ => return sema_error("top-level node must be a Program".to_owned(), node),
+            _ => return sema_error("Top-level node must be a Program".to_owned(), node),
         };
 
         self.forward_declare_user_defined_types(children)?;
@@ -114,7 +121,7 @@ impl<'a> SQIRGen<'a> {
             };
 
             if self.sqir.named_types.contains_key(name) {
-                return sema_error(format!("redefinition of '{}'", name), child);
+                return sema_error(format!("Redefinition of '{}'", name), child);
             }
 
             self.sqir.named_types.insert(name, Rc::new(Type::PlaceholderType(name)));
@@ -214,19 +221,19 @@ impl<'a> SQIRGen<'a> {
         for node in &decl.fields {
             let field = match node.value {
                 NodeValue::Field(ref field) => field,
-                _ => return sema_error("struct fields must be Field values".to_owned(), node),
+                _ => return sema_error("Struct fields must be Field values".to_owned(), node),
             };
 
             // No relations are allowed in a struct.
             if field.relation.is_some() {
-                return sema_error(format!("struct field '{}' must not be part of a relation", field.name), node);
+                return sema_error(format!("Field '{}' must not be part of a relation", field.name), node);
             }
 
             // Consequently, types cannot be inferred,
             // so type annotations are obligatory.
             let type_decl = match field.type_decl {
                 Some(ref type_decl) => type_decl,
-                _ => return sema_error(format!("field '{}' must have a type annotation", field.name), node),
+                _ => return sema_error(format!("Field '{}' must have a type annotation", field.name), node),
             };
 
             let field_type_rc = self.type_from_decl(&type_decl)?;
@@ -235,7 +242,7 @@ impl<'a> SQIRGen<'a> {
             self.validate_struct_field_type(&field_type_wk, node)?;
 
             if fields.insert(field.name, field_type_wk).is_some() {
-                return sema_error(format!("duplicate field '{}'", field.name), node);
+                return sema_error(format!("Duplicate field '{}'", field.name), node);
             }
         }
 
@@ -245,13 +252,16 @@ impl<'a> SQIRGen<'a> {
     fn validate_struct_field_type(&self, field_type: &Weak<Type>, node: &Node) -> SemaResult<()> {
         let field_type_rc = match field_type.upgrade() {
             Some(rc) => rc,
-            None => return sema_error("no Rc backing Weak for struct field type".to_owned(), node),
+            None => return sema_error("No Rc backing Weak for struct field type".to_owned(), node),
         };
 
         match *field_type_rc {
             // No pointers (and consequently, no classes) are allowed in a struct.
-            Type::PointerType(_) => sema_error("pointer type not allowed in struct".to_owned(), node),
-            Type::ClassType(ref t) => sema_error(format!("class type {} not allowed in struct", t.name), node),
+            Type::PointerType(_) => sema_error("Pointer type not allowed in struct".to_owned(), node),
+            Type::ClassType(ref t) => sema_error(format!("Class type '{}' not allowed in struct", t.name), node),
+
+            // Function types are not allowed within user-defined types.
+            Type::FunctionType(_) => sema_error("Function type not allowed in struct".to_owned(), node),
 
             // Optionals, uniques, and arrays are checked for
             // explicitly and recursively, because they are
@@ -269,7 +279,9 @@ impl<'a> SQIRGen<'a> {
             Type::StructType(ref st) => self.validate_types_for_struct_field(st.fields.values(), node),
             Type::EnumType(ref et) => self.validate_variants_for_struct_field(et, node),
 
-            // atomic types (numbers, strings, blobs, and dates) and placeholders are OK
+            // Atomic types (numbers, strings, blobs, and dates) and placeholders are OK.
+            // TODO(H2CO3): rewrite this using more type-safety so that we can't forget
+            // to check further wrapping types potentially added in the future.
             _ => Ok(()),
         }
     }
@@ -296,9 +308,46 @@ impl<'a> SQIRGen<'a> {
     // Helpers for class types
     //
 
+    //
     // Occurs Check
+    //
+
     fn occurs_check(&self, ud_type: &Type) -> SemaResult<()> {
-        unimplemented!()
+        self.occurs_check_type(ud_type, ud_type)
+    }
+
+    // Try to find the root_type in the transitive-reflexive closure
+    // of its contained/wrapped types that occur without indirection,
+    // i.e. those that are _not_ behind a pointer or in an array.
+    fn occurs_check_type(&self, root: &Type, current: &Type) -> SemaResult<()> {
+        match *current {
+            // Indirection is always OK.
+            Type::PointerType(_) => Ok(()),
+            Type::ArrayType(_)   => Ok(()),
+
+            // Non-indirect, potentially recursive types
+            Type::OptionalType(ref t) => unimplemented!(),
+            Type::UniqueType(ref t)   => unimplemented!(),
+            Type::TupleType(ref ts)   => unimplemented!(),
+            Type::EnumType(ref et)    => unimplemented!(),
+            Type::StructType(ref st)  => unimplemented!(),
+            Type::ClassType(ref ct)   => unimplemented!(),
+
+            // Function types are not allowed within user-defined types
+            Type::FunctionType(_) => occurs_check_error(
+                format!("Function type should not occur within user-defined type: {:#?}", root)
+            ),
+
+            // Occurs check is supposed to happen after type resolution
+            Type::PlaceholderType(name) => occurs_check_error(
+                format!("Placeholder type '{}' should have been resolved by now", name)
+            ),
+
+            // Non-recursive (atomic/non-wrapping) types are always OK.
+            // TODO(H2CO3): rewrite this using more type-safety so that we can't forget to
+            // check further non-indirect wrapping types potentially added in the future.
+            _ => Ok(()),
+        }
     }
 
     //
@@ -325,7 +374,7 @@ impl<'a> SQIRGen<'a> {
             NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
             NodeValue::ArrayType(ref element)    => self.get_array_type(element),
             NodeValue::NamedType(name)           => self.get_named_type(name, decl),
-            _ => sema_error("not a type declaration".to_owned(), decl),
+            _ => sema_error("Not a type declaration".to_owned(), decl),
         }
     }
 
@@ -360,7 +409,7 @@ impl<'a> SQIRGen<'a> {
     fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<Rc<Type<'a>>> {
         match self.sqir.named_types.get(name) {
             Some(rc) => Ok(rc.clone()),
-            None => sema_error(format!("Unknown type: {}", name), node),
+            None => sema_error(format!("Unknown type: '{}'", name), node),
         }
     }
 }

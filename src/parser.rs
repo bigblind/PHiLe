@@ -69,7 +69,7 @@ impl<'a> Parser<'a> {
         let actual = token.map_or("end of input", |t| t.value);
 
         ParseError {
-            message: format!("expected '{}'; found '{}'", expected, actual),
+            message: format!("Expected '{}'; found '{}'", expected, actual),
             range:   token.map(|t| t.range),
         }
     }
