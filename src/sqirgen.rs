@@ -109,7 +109,7 @@ impl<'a> SQIRGen<'a> {
         Ok(self.sqir)
     }
 
-    fn forward_declare_user_defined_types(&mut self, children: &Vec<Node<'a>>) -> SemaResult<()> {
+    fn forward_declare_user_defined_types(&mut self, children: &[Node<'a>]) -> SemaResult<()> {
         // Forward declare every struct/class/enum definition
         // by inserting a placeholder type for each of them
         for child in children {
@@ -130,7 +130,7 @@ impl<'a> SQIRGen<'a> {
         Ok(())
     }
 
-    fn define_user_defined_types(&mut self, children: &'a Vec<Node<'a>>) -> SemaResult<()> {
+    fn define_user_defined_types(&mut self, children: &'a [Node<'a>]) -> SemaResult<()> {
         // Create semantic types out of AST and check their consistency
         for child in children {
             match child.value {
@@ -156,7 +156,7 @@ impl<'a> SQIRGen<'a> {
         Ok(())
     }
 
-    fn forward_declare_functions(&mut self, children: &Vec<Node>) -> SemaResult<()> {
+    fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         // Forward declare functions. (We can do this because we now have types.)
         // For each function: typecheck, and insert placeholder Function
         // into self.sqir.functions that has no actual body/implementation,
@@ -171,7 +171,7 @@ impl<'a> SQIRGen<'a> {
         Ok(())
     }
 
-    fn generate_functions(&mut self, children: &Vec<Node>) -> SemaResult<()> {
+    fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         // Generate SQIR for each function
         for child in children {
             match child.value {
