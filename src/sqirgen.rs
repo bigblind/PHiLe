@@ -326,12 +326,12 @@ impl<'a> SQIRGen<'a> {
             Type::ArrayType(_)   => Ok(()),
 
             // Non-indirect, potentially recursive types
-            Type::OptionalType(ref t) => unimplemented!(),
-            Type::UniqueType(ref t)   => unimplemented!(),
-            Type::TupleType(ref ts)   => unimplemented!(),
+            Type::OptionalType(ref t) => self.ensure_transitive_noncontainment(root, t),
+            Type::UniqueType(ref t)   => self.ensure_transitive_noncontainment(root, t),
+            Type::TupleType(ref ts)   => self.ensure_transitive_noncontainment_multi(root, ts),
             Type::EnumType(ref et)    => unimplemented!(),
-            Type::StructType(ref st)  => unimplemented!(),
-            Type::ClassType(ref ct)   => unimplemented!(),
+            Type::StructType(ref st)  => self.ensure_transitive_noncontainment_multi(root, st.fields.values()),
+            Type::ClassType(ref ct)   => self.ensure_transitive_noncontainment_multi(root, ct.fields.values()),
 
             // Function types are not allowed within user-defined types
             Type::FunctionType(_) => occurs_check_error(
@@ -348,6 +348,24 @@ impl<'a> SQIRGen<'a> {
             // check further non-indirect wrapping types potentially added in the future.
             _ => Ok(()),
         }
+    }
+
+        fn ensure_transitive_noncontainment(&self, root: &Type, current: &Weak<Type>) -> SemaResult<()> {
+        if ptr::eq(root, current.try_rc()?.as_ref()) {
+            occurs_check_error(
+                format!("Recursive type {:#?} contains itself without indirection", root)
+            )
+        } else {
+            self.occurs_check_type(root, current.try_rc()?.as_ref())
+        }
+    }
+
+    fn ensure_transitive_noncontainment_multi<I>(&self, root: &Type, types: I) -> SemaResult<()>
+        where I: IntoIterator<Item = &'a Weak<Type<'a>>>
+    {
+        types.into_iter().map(
+            |t| self.ensure_transitive_noncontainment(root, t)
+        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
     }
 
     //
@@ -411,5 +429,18 @@ impl<'a> SQIRGen<'a> {
             Some(rc) => Ok(rc.clone()),
             None => sema_error(format!("Unknown type: '{}'", name), node),
         }
+    }
+}
+
+trait TryRc<T> {
+    fn try_rc(&self) -> SemaResult<Rc<T>>;
+}
+
+impl<T> TryRc<T> for Weak<T> {
+    fn try_rc(&self) -> SemaResult<Rc<T>> {
+        self.upgrade().ok_or_else(|| SemaError {
+            message: "No Rc backing Weak for type".to_owned(),
+            range:   None,
+        })
     }
 }
