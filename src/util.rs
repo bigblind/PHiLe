@@ -6,8 +6,6 @@
 // on 02/05/2017
 //
 
-use std::rc::{ Rc, Weak };
-
 
 macro_rules! hash_map(
     ($($k:expr => $v:expr),*) => ({
@@ -23,13 +21,3 @@ macro_rules! hash_map(
     });
     ($($k:expr => $v:expr),+,) => (hash_map!($($k => $v),+))
 );
-
-pub trait ForceRc<T> {
-    fn force_rc(&self) -> Rc<T>;
-}
-
-impl<T> ForceRc<T> for Weak<T> {
-    fn force_rc(&self) -> Rc<T> {
-        self.upgrade().expect("Rc backing Weak has been deallocated")
-    }
-}

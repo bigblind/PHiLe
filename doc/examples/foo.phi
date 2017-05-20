@@ -1,24 +1,24 @@
 struct Attachment {
   url:           String!, # '!' means unique
   thumbnail_url: String?, # '?' means optional
-  kind:          &AttachmentKind?,
+#  kind:          &AttachmentKind?,
   hashtags:      [String],
-  tagged_users:  [(String, String)], # first name, last name
+#  tagged_users:  [(String, String)], # first name, last name
 }
 
-class Post {
-  creator *<-> User::posts,
-}
-
-class User {
-  posts: [&Post] <->* Post::creator,
-}
-
-enum Bool {
-  False,
-  True,
-  FileNotFound(&IOError, i32!), # http://thedailywtf.com/articles/What_Is_Truth_0x3f_
-}
+# class Post {
+#   creator *<-> User::posts,
+# }
+# 
+# class User {
+#   posts: [&Post] <->* Post::creator,
+# }
+# 
+# enum Bool {
+#   False,
+#   True,
+#   FileNotFound(&IOError, i32!), # http://thedailywtf.com/articles/What_Is_Truth_0x3f_
+# }
 
 # enum AuthMethod {
 #   Email(String),
