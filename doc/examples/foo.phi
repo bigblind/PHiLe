@@ -4,6 +4,10 @@
 #   hashtags:      [String],
 # }
 
+struct Again {}
+
+struct Again {}
+
 struct ExplicitlySelfContaining {
   myself: ExplicitlySelfContaining,
 }

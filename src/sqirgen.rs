@@ -41,17 +41,15 @@ macro_rules! implement_wrapping_type_getter {
             // wrapped type is the type described by `decl`, then return it.
             // Otherwise, construct the wrapping type, cache it and return it.
             let wrapping_type = self.sqir.$cache.iter().map(RcCell::clone).find(
-                |w| match w.borrow() {
+                |cell| match cell.borrow() {
                     Ok(r) => match *r {
                         Type::$variant(ref wk) => match wk.as_rc() {
                             Ok(rc) => ptr::eq(rc.as_ptr(), wrapped_type.as_ptr()),
-                            Err(_) => unreachable!("No RcCell backing WkCell for type"),
+                            Err(_) => unreachable!("No RcCell backing WkCell<{}>", stringify!($variant)),
                         },
-                        _ => unreachable!(
-                            "{} must only contain {}", stringify!($cache), stringify!($variant)
-                        )
+                        _ => unreachable!("{} must only contain {}", stringify!($cache), stringify!($variant))
                     },
-                    _ => unreachable!("cannot borrow RcCell"),
+                    Err(_) => unreachable!("Cannot borrow RcCell"),
                 }
             ).unwrap_or_else(|| {
                 let rc = RcCell::new(Type::$variant(wrapped_type.as_weak()));
@@ -77,6 +75,7 @@ fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
     )
 }
 
+// TODO(H2CO3): make occurs check know about Nodes and Ranges
 fn occurs_check_error<T>(message: String) -> SemaResult<T> {
     Err(
         SemaError {
