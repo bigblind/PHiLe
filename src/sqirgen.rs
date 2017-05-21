@@ -438,26 +438,77 @@ impl SQIRGen {
         }
     }
 
+    fn get_pointer_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+        let pointer_type = self.get_pointer_type_raw(decl)?;
+
+        match *pointer_type.borrow()? {
+            Type::PointerType(ref pointed_type) => {
+                let rc = pointed_type.as_rc()?;
+                let ptr = rc.borrow()?;
+
+                // Only pointer-to-class types are permitted
+                match *ptr {
+                    Type::ClassType(_) => (),
+                    _ => return sema_error(
+                        format!("Pointer to non-class type '{}'", format_type(pointed_type)),
+                        decl
+                    ),
+                }
+            },
+            _ => return sema_error("Non-pointer pointer type!?".to_owned(), decl),
+        }
+
+        Ok(pointer_type)
+    }
+
+    fn get_optional_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+        self.get_optional_type_raw(decl)
+    }
+
+    fn get_unique_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+        let unique_type = self.get_unique_type_raw(decl)?;
+
+        match *unique_type.borrow()? {
+            Type::UniqueType(ref wrapped_type) => {
+                let rc = wrapped_type.as_rc()?;
+                let ptr = rc.borrow()?;
+
+                // Unique-of-unique does not make sense
+                match *ptr {
+                    Type::UniqueType(_) => return sema_error("Unique of unique type disallowed".to_owned(), decl),
+                    _ => (),
+                }
+            },
+            _ => return sema_error("Non-unique unique type!?".to_owned(), decl),
+        }
+
+        Ok(unique_type)
+    }
+
+    fn get_array_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+        self.get_array_type_raw(decl)
+    }
+
     implement_wrapping_type_getter! {
-        get_pointer_type,
+        get_pointer_type_raw,
         PointerType,
         pointer_types
     }
 
     implement_wrapping_type_getter! {
-        get_optional_type,
+        get_optional_type_raw,
         OptionalType,
         optional_types
     }
 
     implement_wrapping_type_getter! {
-        get_unique_type,
+        get_unique_type_raw,
         UniqueType,
         unique_types
     }
 
     implement_wrapping_type_getter! {
-        get_array_type,
+        get_array_type_raw,
         ArrayType,
         array_types
     }

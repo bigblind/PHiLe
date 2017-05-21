@@ -3,10 +3,19 @@
 #   thumbnail_url: String?, # '?' means optional
 #   hashtags:      [String],
 # }
+#
+#struct IllegalPointer {
+#  ptr: &u32,
+#}
+#
+# struct Again {}
+#
+# struct Again {}
 
-struct Again {}
-
-struct Again {}
+struct UniqueOfUnique {
+  good_unique: String!,
+  bad_unique: String!!,
+}
 
 struct ExplicitlySelfContaining {
   myself: ExplicitlySelfContaining,
