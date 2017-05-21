@@ -1,9 +1,19 @@
-struct Attachment {
-  url:           String!, # '!' means unique
-  thumbnail_url: String?, # '?' means optional
-#  kind:          &AttachmentKind?,
-  hashtags:      [String],
-#  tagged_users:  [(String, String)], # first name, last name
+# struct Attachment {
+#   url:           String!, # '!' means unique
+#   thumbnail_url: String?, # '?' means optional
+#   hashtags:      [String],
+# }
+
+struct ExplicitlySelfContaining {
+  myself: ExplicitlySelfContaining,
+}
+
+struct ImplicitlySelfContainingOne {
+  himself: ImplicitlySelfContainingTwo,
+}
+
+struct ImplicitlySelfContainingTwo {
+  herself: ImplicitlySelfContainingOne,
 }
 
 # class Post {

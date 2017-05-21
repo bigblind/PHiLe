@@ -7,13 +7,13 @@
 //
 
 use std::collections::HashMap;
-use std::rc::{ Rc, Weak };
+use util::*;
 
 
 // Types (part of the Schema)
 
 #[derive(Debug)]
-pub enum Type<'a> {
+pub enum Type {
     BoolType,
 
     Int8Type,
@@ -34,57 +34,57 @@ pub enum Type<'a> {
     BlobType,
     DateType,
 
-    OptionalType(Weak<Type<'a>>),
-    UniqueType(Weak<Type<'a>>),
-    PointerType(Weak<Type<'a>>),
-    ArrayType(Weak<Type<'a>>),
-    TupleType(Vec<Weak<Type<'a>>>),
+    OptionalType(WkCell<Type>),
+    UniqueType(WkCell<Type>),
+    PointerType(WkCell<Type>),
+    ArrayType(WkCell<Type>),
+    TupleType(Vec<WkCell<Type>>),
 
-    EnumType(EnumType<'a>),
-    StructType(StructType<'a>),
-    ClassType(ClassType<'a>),
+    EnumType(EnumType),
+    StructType(StructType),
+    ClassType(ClassType),
 
-    FunctionType(FunctionType<'a>),
+    FunctionType(FunctionType),
 
-    PlaceholderType(&'a str),
+    PlaceholderType(String),
 }
 
 #[derive(Debug)]
-pub struct EnumType<'a> {
-    pub name:     &'a str,
-    pub variants: Vec<Variant<'a>>,
+pub struct EnumType {
+    pub name:     String,
+    pub variants: Vec<Variant>,
 }
 
 #[derive(Debug)]
-pub struct Variant<'a> {
-    pub name:  &'a str,
-    pub types: Vec<Weak<Type<'a>>>,
+pub struct Variant {
+    pub name:  String,
+    pub types: Vec<WkCell<Type>>,
 }
 
 #[derive(Debug)]
-pub struct StructType<'a> {
-    pub name:   &'a str,
-    pub fields: HashMap<&'a str, Weak<Type<'a>>>,
+pub struct StructType {
+    pub name:   String,
+    pub fields: HashMap<String, WkCell<Type>>,
 }
 
 #[derive(Debug)]
-pub struct ClassType<'a> {
-    pub name: &'a str,
-    pub fields: HashMap<&'a str, Weak<Type<'a>>>,
+pub struct ClassType {
+    pub name: String,
+    pub fields: HashMap<String, WkCell<Type>>,
 }
 
 #[derive(Debug)]
-pub struct FunctionType<'a> {
-    pub arg_types: Vec<Weak<Type<'a>>>,
-    pub ret_type:  Weak<Type<'a>>,
+pub struct FunctionType {
+    pub arg_types: Vec<WkCell<Type>>,
+    pub ret_type:  WkCell<Type>,
 }
 
 // Relations (also part of the Schema)
 
 #[derive(Debug)]
-pub struct RelationSide<'a> {
-    pub class:       Weak<Type<'a>>,
-    pub field:       Option<&'a str>,
+pub struct RelationSide {
+    pub class:       WkCell<Type>,
+    pub field:       Option<String>,
     pub cardinality: Cardinality,
 }
 
@@ -96,51 +96,51 @@ pub enum Cardinality {
     OneOrMore,
 }
 
-pub type Relation<'a> = (RelationSide<'a>, RelationSide<'a>);
+pub type Relation = (RelationSide, RelationSide);
 
 // Functions (Queries)
 
 #[derive(Debug)]
-pub struct Function<'a> {
-    pub name:  &'a str,
-    pub types: Weak<Type<'a>>, // wraps a FunctionType
-    pub args:  Vec<&'a str>,
+pub struct Function {
+    pub name:  String,
+    pub types: WkCell<Type>, // wraps a FunctionType
+    pub args:  Vec<String>,
     // TODO(H2CO3): add body (instructions/basic blocks/etc.)
 }
 
 // Top-level type for wrapping SQIR for a complete program
 
 #[derive(Debug)]
-pub struct SQIR<'a> {
-    pub named_types:    HashMap<&'a str, Rc<Type<'a>>>, // builtins, structs, classes, enums, placeholders
-    pub decimal_types:  HashMap<(usize, usize), Rc<Type<'a>>>,
-    pub optional_types: Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub unique_types:   Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub pointer_types:  Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub array_types:    Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub tuple_types:    Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub function_types: Vec<Rc<Type<'a>>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub relations:      Vec<Relation<'a>>,
-    pub functions:      HashMap<&'a str, Function<'a>>,
+pub struct SQIR {
+    pub named_types:    HashMap<String, RcCell<Type>>, // builtins, structs, classes, enums, placeholders
+    pub decimal_types:  HashMap<(usize, usize), RcCell<Type>>,
+    pub optional_types: Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub unique_types:   Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub pointer_types:  Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub array_types:    Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub tuple_types:    Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub function_types: Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
+    pub relations:      Vec<Relation>,
+    pub functions:      HashMap<String, Function>,
 }
 
-impl<'a> SQIR<'a> {
-    pub fn new() -> SQIR<'a> {
+impl SQIR {
+    pub fn new() -> SQIR {
         let named_types = hash_map![
-            "bool"   => Rc::new(Type::BoolType),
-            "i8"     => Rc::new(Type::Int8Type),
-            "u8"     => Rc::new(Type::UInt8Type),
-            "i16"    => Rc::new(Type::Int16Type),
-            "u16"    => Rc::new(Type::UInt16Type),
-            "i32"    => Rc::new(Type::Int32Type),
-            "u32"    => Rc::new(Type::UInt32Type),
-            "i64"    => Rc::new(Type::Int64Type),
-            "u64"    => Rc::new(Type::UInt64Type),
-            "f32"    => Rc::new(Type::Float32Type),
-            "f64"    => Rc::new(Type::Float64Type),
-            "String" => Rc::new(Type::StringType),
-            "Blob"   => Rc::new(Type::BlobType),
-            "Date"   => Rc::new(Type::DateType),
+            "bool"   => RcCell::new(Type::BoolType),
+            "i8"     => RcCell::new(Type::Int8Type),
+            "u8"     => RcCell::new(Type::UInt8Type),
+            "i16"    => RcCell::new(Type::Int16Type),
+            "u16"    => RcCell::new(Type::UInt16Type),
+            "i32"    => RcCell::new(Type::Int32Type),
+            "u32"    => RcCell::new(Type::UInt32Type),
+            "i64"    => RcCell::new(Type::Int64Type),
+            "u64"    => RcCell::new(Type::UInt64Type),
+            "f32"    => RcCell::new(Type::Float32Type),
+            "f64"    => RcCell::new(Type::Float64Type),
+            "String" => RcCell::new(Type::StringType),
+            "Blob"   => RcCell::new(Type::BlobType),
+            "Date"   => RcCell::new(Type::DateType),
         ];
 
         SQIR {

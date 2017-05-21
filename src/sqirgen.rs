@@ -7,8 +7,9 @@
 //
 
 use std::collections::HashMap;
-use std::rc::{ Rc, Weak };
+use std::error::Error;
 use std::ptr;
+use util::*;
 use sqir::*;
 use lexer::*;
 use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl };
@@ -21,8 +22,8 @@ pub struct SemaError {
 }
 
 #[allow(missing_debug_implementations)]
-struct SQIRGen<'a> {
-    sqir: SQIR<'a>,
+struct SQIRGen {
+    sqir: SQIR,
 }
 
 pub type SemaResult<T> = Result<T, SemaError>;
@@ -32,25 +33,28 @@ pub type SemaResult<T> = Result<T, SemaError>;
 // that simply wrap other types, e.g. &T, [T], T?, T!, etc.
 macro_rules! implement_wrapping_type_getter {
     ($fn_name: ident, $variant: ident, $cache: ident) => {
-        fn $fn_name(&mut self, decl: &Node) -> SemaResult<Rc<Type<'a>>> {
+        fn $fn_name(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
             // get the current wrapped type
             let wrapped_type = self.type_from_decl(decl)?;
 
             // If there is already a cached wrapping type of which the
             // wrapped type is the type described by `decl`, then return it.
             // Otherwise, construct the wrapping type, cache it and return it.
-            let wrapping_type = self.sqir.$cache.iter().map(Rc::clone).find(
-                |w| match *w.as_ref() {
-                    Type::$variant(ref wk) => match wk.upgrade() {
-                        Some(rc) => ptr::eq(rc.as_ref(), wrapped_type.as_ref()),
-                        None => unreachable!("No Rc backing Weak for type"),
+            let wrapping_type = self.sqir.$cache.iter().map(RcCell::clone).find(
+                |w| match w.borrow() {
+                    Ok(r) => match *r {
+                        Type::$variant(ref wk) => match wk.as_rc() {
+                            Ok(rc) => ptr::eq(rc.as_ptr(), wrapped_type.as_ptr()),
+                            Err(_) => unreachable!("No RcCell backing WkCell for type"),
+                        },
+                        _ => unreachable!(
+                            "{} must only contain {}", stringify!($cache), stringify!($variant)
+                        )
                     },
-                    _ => unreachable!(
-                        "{} must only contain {}", stringify!($cache), stringify!($variant)
-                    ),
+                    _ => unreachable!("cannot borrow RcCell"),
                 }
             ).unwrap_or_else(|| {
-                let rc = Rc::new(Type::$variant(Rc::downgrade(&wrapped_type)));
+                let rc = RcCell::new(Type::$variant(wrapped_type.as_weak()));
                 self.sqir.$cache.push(rc.clone());
                 rc
             });
@@ -60,7 +64,7 @@ macro_rules! implement_wrapping_type_getter {
     }
 }
 
-pub fn generate_sqir<'a>(program: &'a Node) -> SemaResult<SQIR<'a>> {
+pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
@@ -82,9 +86,37 @@ fn occurs_check_error<T>(message: String) -> SemaResult<T> {
     )
 }
 
-impl<'a> SQIRGen<'a> {
+fn format_type(t: &WkCell<Type>) -> String {
+    let rc = match t.as_rc() {
+        Ok(rc) => rc,
+        Err(_) => return "[WkCell<Type>; no backing RcCell]".to_owned(),
+    };
+    let ptr = match rc.borrow() {
+        Ok(ptr) => ptr,
+        Err(_)  => return "[WkCell<Type>; not borrowable]".to_owned(),
+    };
+
+    format!("{:#?}", *ptr)
+}
+
+impl From<DerefError> for SemaError {
+    fn from(err: DerefError) -> SemaError {
+        let message = match err {
+            DerefError::Borrow(be)    => format!("Cannot borrow RcCell: {}", be.description()),
+            DerefError::BorrowMut(be) => format!("Cannot mutably borrow RcCell: {}", be.description()),
+            DerefError::Strongify     => "No RcCell backing WkCell".to_owned(),
+        };
+
+        SemaError {
+            message: message,
+            range:   None,
+        }
+    }
+}
+
+impl SQIRGen {
     // Constructor
-    fn new() -> SQIRGen<'a> {
+    fn new() -> SQIRGen {
         SQIRGen {
             sqir: SQIR::new(),
         }
@@ -94,7 +126,7 @@ impl<'a> SQIRGen<'a> {
     // Top-level SQIR generation methods and helpers
     //
 
-    fn generate_sqir(mut self, node: &'a Node<'a>) -> SemaResult<SQIR<'a>> {
+    fn generate_sqir(mut self, node: &Node) -> SemaResult<SQIR> {
         let children = match node.value {
             NodeValue::Program(ref children) => children,
             _ => return sema_error("Top-level node must be a Program".to_owned(), node),
@@ -109,7 +141,7 @@ impl<'a> SQIRGen<'a> {
         Ok(self.sqir)
     }
 
-    fn forward_declare_user_defined_types(&mut self, children: &[Node<'a>]) -> SemaResult<()> {
+    fn forward_declare_user_defined_types(&mut self, children: &[Node]) -> SemaResult<()> {
         // Forward declare every struct/class/enum definition
         // by inserting a placeholder type for each of them
         for child in children {
@@ -124,13 +156,16 @@ impl<'a> SQIRGen<'a> {
                 return sema_error(format!("Redefinition of '{}'", name), child);
             }
 
-            self.sqir.named_types.insert(name, Rc::new(Type::PlaceholderType(name)));
+            self.sqir.named_types.insert(
+                name.to_owned(),
+                RcCell::new(Type::PlaceholderType(name.to_owned()))
+            );
         }
 
         Ok(())
     }
 
-    fn define_user_defined_types(&mut self, children: &'a [Node<'a>]) -> SemaResult<()> {
+    fn define_user_defined_types(&mut self, children: &[Node]) -> SemaResult<()> {
         // Create semantic types out of AST and check their consistency
         for child in children {
             match child.value {
@@ -150,7 +185,7 @@ impl<'a> SQIRGen<'a> {
         // because at this point, we should have gotten rid of
         // all placeholders that could hide self-containing types.)
         for (_, t) in &self.sqir.named_types {
-            self.occurs_check(t)?;
+            self.occurs_check(&t.as_weak())?;
         }
 
         Ok(())
@@ -187,27 +222,34 @@ impl<'a> SQIRGen<'a> {
     // Type-wise semantic analysis methods
     //
 
-    fn define_struct_type(&mut self, decl: &'a StructDecl<'a>) -> SemaResult<Rc<Type<'a>>> {
-        let name = decl.name;
+    fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcCell<Type>> {
+        let name = decl.name.to_owned();
 
         let struct_type = Type::StructType(
             StructType {
-                name:   name,
+                name:   name.clone(),
                 fields: self.typecheck_struct_fields(decl)?,
             }
         );
 
         // Replace the placeholder type with the now-created actual type
-        let struct_type_rc = Rc::new(struct_type);
-        self.sqir.named_types.insert(name, struct_type_rc.clone());
-        Ok(struct_type_rc)
+        let struct_type_rc = self.sqir.named_types.get(&name).ok_or_else(
+            || SemaError {
+                message: format!("No placeholder type for struct '{}'", name),
+                range:   None,
+            }
+        )?;
+
+        *struct_type_rc.borrow_mut()? = struct_type;
+
+        Ok(struct_type_rc.clone())
     }
 
-    fn define_enum_type(&mut self, decl: &'a EnumDecl<'a>) -> SemaResult<Rc<Type<'a>>> {
+    fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcCell<Type>> {
         unimplemented!()
     }
 
-    fn define_class_type(&mut self, decl: &'a ClassDecl<'a>) -> SemaResult<Rc<Type<'a>>> {
+    fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcCell<Type>> {
         unimplemented!()
     }
 
@@ -215,7 +257,7 @@ impl<'a> SQIRGen<'a> {
     // Helpers for struct types
     //
 
-    fn typecheck_struct_fields(&mut self, decl: &'a StructDecl) -> SemaResult<HashMap<&'a str, Weak<Type<'a>>>> {
+    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
         for node in &decl.fields {
@@ -237,11 +279,11 @@ impl<'a> SQIRGen<'a> {
             };
 
             let field_type_rc = self.type_from_decl(&type_decl)?;
-            let field_type_wk = Rc::downgrade(&field_type_rc);
+            let field_type_wk = field_type_rc.as_weak();
 
             self.validate_struct_field_type(&field_type_wk, node)?;
 
-            if fields.insert(field.name, field_type_wk).is_some() {
+            if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
                 return sema_error(format!("Duplicate field '{}'", field.name), node);
             }
         }
@@ -249,13 +291,11 @@ impl<'a> SQIRGen<'a> {
         Ok(fields)
     }
 
-    fn validate_struct_field_type(&self, field_type: &Weak<Type>, node: &Node) -> SemaResult<()> {
-        let field_type_rc = match field_type.upgrade() {
-            Some(rc) => rc,
-            None => return sema_error("No Rc backing Weak for struct field type".to_owned(), node),
-        };
+    fn validate_struct_field_type(&self, field_type: &WkCell<Type>, node: &Node) -> SemaResult<()> {
+        let rc = field_type.as_rc()?;
+        let ptr = rc.borrow()?;
 
-        match *field_type_rc {
+        match *ptr {
             // No pointers (and consequently, no classes) are allowed in a struct.
             Type::PointerType(_) => sema_error("Pointer type not allowed in struct".to_owned(), node),
             Type::ClassType(ref t) => sema_error(format!("Class type '{}' not allowed in struct", t.name), node),
@@ -286,8 +326,8 @@ impl<'a> SQIRGen<'a> {
         }
     }
 
-    fn validate_types_for_struct_field<I>(&self, it: I, node: &Node) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a Weak<Type<'a>>>
+    fn validate_types_for_struct_field<'a, I>(&self, it: I, node: &Node) -> SemaResult<()>
+        where I: IntoIterator<Item = &'a WkCell<Type>>
     {
         it.into_iter().map(
             |t| self.validate_struct_field_type(t, node)
@@ -312,15 +352,18 @@ impl<'a> SQIRGen<'a> {
     // Occurs Check
     //
 
-    fn occurs_check(&self, ud_type: &Type) -> SemaResult<()> {
+    fn occurs_check(&self, ud_type: &WkCell<Type>) -> SemaResult<()> {
         self.occurs_check_type(ud_type, ud_type)
     }
 
     // Try to find the root_type in the transitive-reflexive closure
     // of its contained/wrapped types that occur without indirection,
     // i.e. those that are _not_ behind a pointer or in an array.
-    fn occurs_check_type(&self, root: &Type, current: &Type) -> SemaResult<()> {
-        match *current {
+    fn occurs_check_type(&self, root: &WkCell<Type>, current: &WkCell<Type>) -> SemaResult<()> {
+        let rc = current.as_rc()?;
+        let ptr = rc.borrow()?;
+
+        match *ptr {
             // Indirection is always OK.
             Type::PointerType(_) => Ok(()),
             Type::ArrayType(_)   => Ok(()),
@@ -335,11 +378,11 @@ impl<'a> SQIRGen<'a> {
 
             // Function types are not allowed within user-defined types
             Type::FunctionType(_) => occurs_check_error(
-                format!("Function type should not occur within user-defined type: {:#?}", root)
+                format!("Function type should not occur within user-defined type '{}'", format_type(root))
             ),
 
             // Occurs check is supposed to happen after type resolution
-            Type::PlaceholderType(name) => occurs_check_error(
+            Type::PlaceholderType(ref name) => occurs_check_error(
                 format!("Placeholder type '{}' should have been resolved by now", name)
             ),
 
@@ -350,18 +393,18 @@ impl<'a> SQIRGen<'a> {
         }
     }
 
-        fn ensure_transitive_noncontainment(&self, root: &Type, current: &Weak<Type>) -> SemaResult<()> {
-        if ptr::eq(root, current.try_rc()?.as_ref()) {
+    fn ensure_transitive_noncontainment(&self, root: &WkCell<Type>, current: &WkCell<Type>) -> SemaResult<()> {
+        if ptr::eq(root.as_rc()?.as_ptr(), current.as_rc()?.as_ptr()) {
             occurs_check_error(
-                format!("Recursive type {:#?} contains itself without indirection", root)
+                format!("Recursive type '{}' contains itself without indirection", format_type(root))
             )
         } else {
-            self.occurs_check_type(root, current.try_rc()?.as_ref())
+            self.occurs_check_type(root, current)
         }
     }
 
-    fn ensure_transitive_noncontainment_multi<I>(&self, root: &Type, types: I) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a Weak<Type<'a>>>
+    fn ensure_transitive_noncontainment_multi<'a, I>(&self, root: &WkCell<Type>, types: I) -> SemaResult<()>
+        where I: IntoIterator<Item = &'a WkCell<Type>>
     {
         types.into_iter().map(
             |t| self.ensure_transitive_noncontainment(root, t)
@@ -384,7 +427,7 @@ impl<'a> SQIRGen<'a> {
     // Miscellaneous helpers
     //
 
-    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<Rc<Type<'a>>> {
+    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
         match decl.value {
             NodeValue::PointerType(ref pointed)  => self.get_pointer_type(pointed),
             NodeValue::OptionalType(ref wrapped) => self.get_optional_type(wrapped),
@@ -420,27 +463,14 @@ impl<'a> SQIRGen<'a> {
         array_types
     }
 
-    fn get_tuple_type(&mut self, types: &[Node]) -> SemaResult<Rc<Type<'a>>> {
+    fn get_tuple_type(&mut self, types: &[Node]) -> SemaResult<RcCell<Type>> {
         unimplemented!()
     }
 
-    fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<Rc<Type<'a>>> {
+    fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<RcCell<Type>> {
         match self.sqir.named_types.get(name) {
             Some(rc) => Ok(rc.clone()),
             None => sema_error(format!("Unknown type: '{}'", name), node),
         }
-    }
-}
-
-trait TryRc<T> {
-    fn try_rc(&self) -> SemaResult<Rc<T>>;
-}
-
-impl<T> TryRc<T> for Weak<T> {
-    fn try_rc(&self) -> SemaResult<Rc<T>> {
-        self.upgrade().ok_or_else(|| SemaError {
-            message: "No Rc backing Weak for type".to_owned(),
-            range:   None,
-        })
     }
 }
