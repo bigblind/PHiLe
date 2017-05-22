@@ -8,7 +8,6 @@
 
 use std::collections::HashMap;
 use std::error::Error;
-use std::ptr;
 use util::*;
 use sqir::*;
 use lexer::*;
@@ -44,7 +43,7 @@ macro_rules! implement_wrapping_type_getter {
                 |cell| match cell.borrow() {
                     Ok(r) => match *r {
                         Type::$variant(ref wk) => match wk.as_rc() {
-                            Ok(rc) => ptr::eq(rc.as_ptr(), wrapped_type.as_ptr()),
+                            Ok(rc) => rc == wrapped_type,
                             Err(_) => unreachable!("No RcCell backing WkCell<{}>", stringify!($variant)),
                         },
                         _ => unreachable!("{} must only contain {}", stringify!($cache), stringify!($variant))
@@ -295,7 +294,7 @@ impl SQIRGen {
             // so type annotations are obligatory.
             let type_decl = match field.type_decl {
                 Some(ref type_decl) => type_decl,
-                _ => return sema_error(format!("Field '{}' must have a type annotation", field.name), node),
+                None => return sema_error(format!("Field '{}' must have a type annotation", field.name), node),
             };
 
             let field_type_rc = self.type_from_decl(&type_decl)?;
@@ -366,15 +365,74 @@ impl SQIRGen {
 
     // TODO(H2CO3): refactor typecheck_struct_fields(), typecheck_class_fields(),
     // validate_struct_field_type() and validate_class_field_type()
-    // (maybe using a Boolean flag and smaller helper functions?)
+    // (maybe using a discriminator flag and smaller helper functions?)
     fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
-        // self.typecheck_fields(decl, is_class: true)
-        unimplemented!()
+        let mut fields = HashMap::with_capacity(decl.fields.len());
+
+        for node in &decl.fields {
+            let field = match node.value {
+                NodeValue::Field(ref field) => field,
+                _ => return sema_error("Class fields must be Field values".to_owned(), node),
+            };
+
+            // The type of a field can be inferred if a relation is
+            // specified for that field. In that case, the type can
+            // still be specified explicitly, but it must then match.
+            let field_type = match (&field.relation, &field.type_decl) {
+                (&None, &None) => return sema_error(
+                    format!("Field '{}' has neither type annotations nor a relation to infer its type from", field.name),
+                    node
+                ),
+                (&None, &Some(ref decl))          => unimplemented!(),
+                (&Some(ref rel), &None)           => unimplemented!(),
+                (&Some(ref rel), &Some(ref decl)) => unimplemented!(),
+            };
+
+            self.validate_class_field_type(&field_type, node)?;
+
+            if fields.insert(field.name.to_owned(), field_type).is_some() {
+                return sema_error(format!("Duplicate field '{}'", field.name), node);
+            }
+        }
+
+        Ok(fields)
     }
 
     fn validate_class_field_type(&self, field_type: &WkCell<Type>, node: &Node) -> SemaResult<()> {
-        // self.validate_field_type(field_type, node, is_class: true)
-        unimplemented!()
+        let rc = field_type.as_rc()?;
+        let ptr = rc.borrow()?;
+
+        match *ptr {
+            // Pointers (to classes) are explicitly allowed in a class.
+            Type::PointerType(_) => Ok(()),
+
+            // Class types without indirection are never allowed.
+            Type::ClassType(ref t) => sema_error(format!("Class type '{}' not allowed without indirection", t.name), node),
+
+            // Function types are not allowed within user-defined types.
+            Type::FunctionType(_) => sema_error("Function type not allowed in class".to_owned(), node),
+
+            // Optionals, uniques, and arrays are checked for
+            // explicitly and recursively, because they are
+            // not like user-defined enums or structs in that
+            // they might legitimately contain pointers when
+            // contained within a class.
+            Type::OptionalType(ref t) => self.validate_class_field_type(t, node),
+            Type::UniqueType(ref t)   => self.validate_class_field_type(t, node),
+            Type::ArrayType(ref t)    => self.validate_class_field_type(t, node),
+
+            // Every type of a contained tuple, every member of
+            // a contained struct, and every variant of a contained enum
+            // must be valid as well.
+            Type::TupleType(ref types) => self.validate_types_for_class_field(types, node),
+            Type::StructType(ref st) => self.validate_types_for_class_field(st.fields.values(), node),
+            Type::EnumType(ref et) => self.validate_variants_for_class_field(et, node),
+
+            // Atomic types (numbers, strings, blobs, and dates) and placeholders are OK.
+            // TODO(H2CO3): rewrite this using more type-safety so that we can't forget
+            // to check further wrapping types potentially added in the future.
+            _ => Ok(()),
+        }
     }
 
     fn validate_types_for_class_field<'a, I>(&self, it: I, node: &Node) -> SemaResult<()>
@@ -441,7 +499,7 @@ impl SQIRGen {
     }
 
     fn ensure_transitive_noncontainment(&self, root: &WkCell<Type>, current: &WkCell<Type>) -> SemaResult<()> {
-        if ptr::eq(root.as_rc()?.as_ptr(), current.as_rc()?.as_ptr()) {
+        if root.as_rc()? == current.as_rc()? {
             occurs_check_error(
                 format!("Recursive type '{}' contains itself without indirection", format_type(root))
             )

@@ -14,7 +14,10 @@
 
 struct UniqueOfUnique {
   good_unique: String!,
-  bad_unique: String!!,
+#  bad_unique: String!!,
+}
+
+class User {
 }
 
 struct ExplicitlySelfContaining {

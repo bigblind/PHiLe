@@ -6,8 +6,10 @@
 // on 02/05/2017
 //
 
+use std::ptr;
 use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut, BorrowError, BorrowMutError };
+use std::hash::{ Hash, Hasher };
 
 
 macro_rules! hash_map(
@@ -26,7 +28,7 @@ macro_rules! hash_map(
 );
 
 
-#[derive(Debug)]
+#[derive(Debug, Eq)]
 pub struct RcCell<T> {
     ptr: Rc<RefCell<T>>,
 }
@@ -66,10 +68,6 @@ impl<T> RcCell<T> {
             ptr: Rc::downgrade(&self.ptr)
         }
     }
-
-    pub fn as_ptr(&self) -> *const T {
-        self.ptr.as_ptr()
-    }
 }
 
 impl<T> Clone for RcCell<T> {
@@ -80,13 +78,23 @@ impl<T> Clone for RcCell<T> {
     }
 }
 
+// Tests equality based on pointer identity
+impl<T> PartialEq for RcCell<T> {
+    fn eq(&self, other: &Self) -> bool {
+        ptr::eq(self.ptr.as_ptr(), other.ptr.as_ptr())
+    }
+}
+
+// Hashes the pointer address itself
+impl<T> Hash for RcCell<T> {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        self.ptr.as_ptr().hash(hasher)
+    }
+}
+
 impl<T> WkCell<T> {
     pub fn as_rc(&self) -> DerefResult<RcCell<T>> {
         self.ptr.upgrade().map(|rc| RcCell { ptr: rc }).ok_or(DerefError::Strongify)
-    }
-
-    pub fn as_ptr(&self) -> DerefResult<*mut T> {
-        self.ptr.upgrade().map(|rc| rc.as_ptr()).ok_or(DerefError::Strongify)
     }
 }
 

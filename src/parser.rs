@@ -192,7 +192,7 @@ impl<'a> Parser<'a> {
                     fields: fields,
                 }
             ),
-            lexeme => unreachable!("forgot to handle {}", lexeme),
+            lexeme => unreachable!("Forgot to handle '{}'", lexeme),
         };
         let node = Node {
             range: token_range(keyword, close_brace),
