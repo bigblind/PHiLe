@@ -244,11 +244,32 @@ impl SQIRGen {
         Ok(struct_type_rc.clone())
     }
 
-    fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcCell<Type>> {
-        unimplemented!()
+    // TODO(H2CO3): refactor define_struct_type() and define_class_type()
+    // (maybe using a macro similar to that used with wrapper type getters?)
+    fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcCell<Type>> {
+        let name = decl.name.to_owned();
+
+        let class_type = Type::ClassType(
+            ClassType {
+                name:   name.clone(),
+                fields: self.typecheck_class_fields(decl)?,
+            }
+        );
+
+        // Replace the placeholder type with the now-created actual type
+        let class_type_rc = self.sqir.named_types.get(&name).ok_or_else(
+            || SemaError {
+                message: format!("No placeholder type for class '{}'", name),
+                range:   None,
+            }
+        )?;
+
+        *class_type_rc.borrow_mut()? = class_type;
+
+        Ok(class_type_rc.clone())
     }
 
-    fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcCell<Type>> {
+    fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcCell<Type>> {
         unimplemented!()
     }
 
@@ -340,11 +361,38 @@ impl SQIRGen {
     }
 
     //
-    // Helpers for enum types
+    // Helpers for class types
     //
 
+    // TODO(H2CO3): refactor typecheck_struct_fields(), typecheck_class_fields(),
+    // validate_struct_field_type() and validate_class_field_type()
+    // (maybe using a Boolean flag and smaller helper functions?)
+    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
+        // self.typecheck_fields(decl, is_class: true)
+        unimplemented!()
+    }
+
+    fn validate_class_field_type(&self, field_type: &WkCell<Type>, node: &Node) -> SemaResult<()> {
+        // self.validate_field_type(field_type, node, is_class: true)
+        unimplemented!()
+    }
+
+    fn validate_types_for_class_field<'a, I>(&self, it: I, node: &Node) -> SemaResult<()>
+        where I: IntoIterator<Item = &'a WkCell<Type>>
+    {
+        it.into_iter().map(
+            |t| self.validate_class_field_type(t, node)
+        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
+    }
+
+    fn validate_variants_for_class_field(&self, enum_type: &EnumType, node: &Node) -> SemaResult<()> {
+        enum_type.variants.iter().map(
+            |v| self.validate_types_for_class_field(&v.types, node)
+        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
+    }
+
     //
-    // Helpers for class types
+    // Helpers for enum types
     //
 
     //
