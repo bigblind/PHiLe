@@ -488,7 +488,7 @@ impl SQIRGen {
             Type::OptionalType(ref t) => self.ensure_transitive_noncontainment(root, t),
             Type::UniqueType(ref t)   => self.ensure_transitive_noncontainment(root, t),
             Type::TupleType(ref ts)   => self.ensure_transitive_noncontainment_multi(root, ts),
-            Type::EnumType(ref et)    => unimplemented!(),
+            Type::EnumType(ref et)    => self.ensure_transitive_noncontainment_multi(root, et.variants.values()),
             Type::StructType(ref st)  => self.ensure_transitive_noncontainment_multi(root, st.fields.values()),
             Type::ClassType(ref ct)   => self.ensure_transitive_noncontainment_multi(root, ct.fields.values()),
 
@@ -632,8 +632,16 @@ impl SQIRGen {
         array_types
     }
 
-    fn get_tuple_type(&mut self, types: &[Node]) -> SemaResult<RcCell<Type>> {
-        unimplemented!()
+    fn get_tuple_type(&mut self, decls: &[Node]) -> SemaResult<RcCell<Type>> {
+        let types: Vec<_> = decls.iter().map(
+            |decl| self.type_from_decl(decl)
+        ).collect::<Result<_, _>>()?;
+
+        let tuple = self.sqir.tuple_types.entry(types.clone()).or_insert_with(
+            || RcCell::new(Type::TupleType(types.iter().map(RcCell::as_weak).collect()))
+        );
+
+        Ok(tuple.clone())
     }
 
     fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<RcCell<Type>> {

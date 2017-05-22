@@ -18,7 +18,8 @@
 # }
 
 class Bar {
-  qux: &Foo,
+  moar: &Bar,
+  even_moar: &Bar,
 }
 
 class Foo {

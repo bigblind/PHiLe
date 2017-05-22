@@ -6,7 +6,6 @@
 // on 02/05/2017
 //
 
-use std::ptr;
 use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut, BorrowError, BorrowMutError };
 use std::hash::{ Hash, Hasher };
@@ -81,7 +80,7 @@ impl<T> Clone for RcCell<T> {
 // Tests equality based on pointer identity
 impl<T> PartialEq for RcCell<T> {
     fn eq(&self, other: &Self) -> bool {
-        ptr::eq(self.ptr.as_ptr(), other.ptr.as_ptr())
+        self.ptr.as_ptr() == other.ptr.as_ptr()
     }
 }
 
