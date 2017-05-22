@@ -343,10 +343,8 @@ impl<'a> Parser<'a> {
                         "!" => NodeValue::UniqueType(Box::new(node)),
                         op  => unreachable!("forgot to handle '{}'", op),
                     };
-                    node = Node {
-                        range: range,
-                        value: value,
-                    };
+
+                    node = Node { range, value };
                 },
                 None => break,
             }

@@ -110,16 +110,8 @@ impl<'a> Lexer<'a> {
                 let value = m.as_str();
                 let begin = self.location;
                 let end   = self.location.advance_by(value);
-
-                let range = Range {
-                    begin: begin,
-                    end:   end,
-                };
-                let token = Token {
-                    kind:  kind,
-                    value: value,
-                    range: range,
-                };
+                let range = Range { begin, end };
+                let token = Token { kind, value, range };
 
                 self.location = end;
                 self.source = &self.source[m.end()..];
