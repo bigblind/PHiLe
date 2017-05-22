@@ -46,19 +46,21 @@ pub enum Type {
 
     FunctionType(FunctionType),
 
-    PlaceholderType(String),
+    PlaceholderType(String, PlaceholderKind),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PlaceholderKind {
+    Struct,
+    Class,
+    Enum,
 }
 
 #[derive(Debug)]
 pub struct EnumType {
     pub name:     String,
-    pub variants: Vec<Variant>,
-}
-
-#[derive(Debug)]
-pub struct Variant {
-    pub name:  String,
-    pub types: Vec<WkCell<Type>>,
+    pub variants: HashMap<String, WkCell<Type>>,
+    // Multiple types in a variant should be represented by a tuple
 }
 
 #[derive(Debug)]
@@ -69,7 +71,7 @@ pub struct StructType {
 
 #[derive(Debug)]
 pub struct ClassType {
-    pub name: String,
+    pub name:   String,
     pub fields: HashMap<String, WkCell<Type>>,
 }
 
@@ -102,9 +104,9 @@ pub type Relation = (RelationSide, RelationSide);
 
 #[derive(Debug)]
 pub struct Function {
-    pub name:  String,
-    pub types: WkCell<Type>, // wraps a FunctionType
-    pub args:  Vec<String>,
+    pub name:    String,
+    pub fn_type: WkCell<Type>, // wraps a FunctionType
+    pub args:    Vec<String>,
     // TODO(H2CO3): add body (instructions/basic blocks/etc.)
 }
 
@@ -112,15 +114,16 @@ pub struct Function {
 
 #[derive(Debug)]
 pub struct SQIR {
-    pub named_types:    HashMap<String, RcCell<Type>>, // builtins, structs, classes, enums, placeholders
+    // builtins, structs, classes, enums, placeholders
+    pub named_types:    HashMap<String, RcCell<Type>>,
     pub decimal_types:  HashMap<(usize, usize), RcCell<Type>>,
-    pub optional_types: Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub unique_types:   Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub pointer_types:  Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub array_types:    Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub tuple_types:    Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub function_types: Vec<RcCell<Type>>, // TODO(H2CO3): replace with HashSet for O(1)
-    pub relations:      Vec<Relation>,
+    pub optional_types: HashMap<RcCell<Type>, RcCell<Type>>,
+    pub unique_types:   HashMap<RcCell<Type>, RcCell<Type>>,
+    pub pointer_types:  HashMap<RcCell<Type>, RcCell<Type>>,
+    pub array_types:    HashMap<RcCell<Type>, RcCell<Type>>,
+    pub tuple_types:    HashMap<Vec<RcCell<Type>>, RcCell<Type>>,
+    pub function_types: HashMap<(Vec<RcCell<Type>>, RcCell<Type>), RcCell<Type>>,
+    pub relations:      Vec<Relation>, // no need for a HashSet: relations are unique
     pub functions:      HashMap<String, Function>,
 }
 
@@ -146,12 +149,12 @@ impl SQIR {
         SQIR {
             named_types:    named_types,
             decimal_types:  hash_map![],
-            optional_types: vec![],
-            unique_types:   vec![],
-            pointer_types:  vec![],
-            array_types:    vec![],
-            tuple_types:    vec![],
-            function_types: vec![],
+            optional_types: hash_map![],
+            unique_types:   hash_map![],
+            pointer_types:  hash_map![],
+            array_types:    hash_map![],
+            tuple_types:    hash_map![],
+            function_types: hash_map![],
             relations:      vec![],
             functions:      hash_map![], // TODO(H2CO3): declare built-in functions
         }

@@ -12,25 +12,31 @@
 #
 # struct Again {}
 
-struct UniqueOfUnique {
-  good_unique: String!,
-#  bad_unique: String!!,
+# struct UniqueOfUnique {
+#   good_unique: String!,
+#   bad_unique:  String!!,
+# }
+
+class Bar {
+  qux: &Foo,
 }
 
-class User {
+class Foo {
+# bar: Bar,
+# bar: &Bar,
 }
 
-struct ExplicitlySelfContaining {
-  myself: ExplicitlySelfContaining,
-}
+# struct ExplicitlySelfContaining {
+#   myself: ExplicitlySelfContaining,
+# }
 
-struct ImplicitlySelfContainingOne {
-  himself: ImplicitlySelfContainingTwo,
-}
-
-struct ImplicitlySelfContainingTwo {
-  herself: ImplicitlySelfContainingOne,
-}
+# struct ImplicitlySelfContainingOne {
+#   himself: ImplicitlySelfContainingTwo,
+# }
+# 
+# struct ImplicitlySelfContainingTwo {
+#   herself: ImplicitlySelfContainingOne,
+# }
 
 # class Post {
 #   creator *<-> User::posts,

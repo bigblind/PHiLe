@@ -34,29 +34,15 @@ macro_rules! implement_wrapping_type_getter {
     ($fn_name: ident, $variant: ident, $cache: ident) => {
         fn $fn_name(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
             // get the current wrapped type
-            let wrapped_type = self.type_from_decl(decl)?;
+            let wrapped = self.type_from_decl(decl)?;
 
-            // If there is already a cached wrapping type of which the
-            // wrapped type is the type described by `decl`, then return it.
-            // Otherwise, construct the wrapping type, cache it and return it.
-            let wrapping_type = self.sqir.$cache.iter().map(RcCell::clone).find(
-                |cell| match cell.borrow() {
-                    Ok(r) => match *r {
-                        Type::$variant(ref wk) => match wk.as_rc() {
-                            Ok(rc) => rc == wrapped_type,
-                            Err(_) => unreachable!("No RcCell backing WkCell<{}>", stringify!($variant)),
-                        },
-                        _ => unreachable!("{} must only contain {}", stringify!($cache), stringify!($variant))
-                    },
-                    Err(_) => unreachable!("Cannot borrow RcCell"),
-                }
-            ).unwrap_or_else(|| {
-                let rc = RcCell::new(Type::$variant(wrapped_type.as_weak()));
-                self.sqir.$cache.push(rc.clone());
-                rc
-            });
+            // look up corresponding wrapping type in cache; insert if not found
+            let wrapping = self.sqir.$cache.entry(wrapped.clone()).or_insert_with(
+                || RcCell::new(Type::$variant(wrapped.as_weak()))
+            );
 
-            Ok(wrapping_type)
+            // return the wrapping type
+            Ok(wrapping.clone())
         }
     }
 }
@@ -143,10 +129,10 @@ impl SQIRGen {
         // Forward declare every struct/class/enum definition
         // by inserting a placeholder type for each of them
         for child in children {
-            let name = match child.value {
-                NodeValue::StructDecl(ref s) => s.name,
-                NodeValue::ClassDecl(ref c)  => c.name,
-                NodeValue::EnumDecl(ref e)   => e.name,
+            let (name, kind) = match child.value {
+                NodeValue::StructDecl(ref s) => (s.name, PlaceholderKind::Struct),
+                NodeValue::ClassDecl(ref c)  => (c.name, PlaceholderKind::Class),
+                NodeValue::EnumDecl(ref e)   => (e.name, PlaceholderKind::Enum),
                 _ => continue,
             };
 
@@ -156,7 +142,7 @@ impl SQIRGen {
 
             self.sqir.named_types.insert(
                 name.to_owned(),
-                RcCell::new(Type::PlaceholderType(name.to_owned()))
+                RcCell::new(Type::PlaceholderType(name.to_owned(), kind))
             );
         }
 
@@ -316,8 +302,24 @@ impl SQIRGen {
 
         match *ptr {
             // No pointers (and consequently, no classes) are allowed in a struct.
-            Type::PointerType(_) => sema_error("Pointer type not allowed in struct".to_owned(), node),
-            Type::ClassType(ref t) => sema_error(format!("Class type '{}' not allowed in struct", t.name), node),
+            Type::PointerType(_) => sema_error(
+                "Pointer type not allowed in struct".to_owned(),
+                node
+            ),
+            Type::ClassType(ref t) => sema_error(
+                format!("Class type '{}' not allowed in struct", t.name),
+                node
+            ),
+            Type::PlaceholderType(ref name, PlaceholderKind::Class) => sema_error(
+                format!("Class type '{}' not allowed in struct", name),
+                node
+            ),
+
+            // Placeholders of struct and enum types are OK,
+            // because once typechecked on their own, they can be
+            // part of a struct type.
+            Type::PlaceholderType(_, PlaceholderKind::Struct) => Ok(()),
+            Type::PlaceholderType(_, PlaceholderKind::Enum)   => Ok(()),
 
             // Function types are not allowed within user-defined types.
             Type::FunctionType(_) => sema_error("Function type not allowed in struct".to_owned(), node),
@@ -336,11 +338,11 @@ impl SQIRGen {
             // must be valid as well.
             Type::TupleType(ref types) => self.validate_types_for_struct_field(types, node),
             Type::StructType(ref st) => self.validate_types_for_struct_field(st.fields.values(), node),
-            Type::EnumType(ref et) => self.validate_variants_for_struct_field(et, node),
+            Type::EnumType(ref et) => self.validate_types_for_struct_field(et.variants.values(), node),
 
-            // Atomic types (numbers, strings, blobs, and dates) and placeholders are OK.
-            // TODO(H2CO3): rewrite this using more type-safety so that we can't forget
-            // to check further wrapping types potentially added in the future.
+            // Atomic types (numbers, strings, blobs, and dates) are OK.
+            // TODO(H2CO3): rewrite this using more type-safety so that we can't
+            // forget to check further wrapping types potentially added in the future.
             _ => Ok(()),
         }
     }
@@ -350,12 +352,6 @@ impl SQIRGen {
     {
         it.into_iter().map(
             |t| self.validate_struct_field_type(t, node)
-        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-    }
-
-    fn validate_variants_for_struct_field(&self, enum_type: &EnumType, node: &Node) -> SemaResult<()> {
-        enum_type.variants.iter().map(
-            |v| self.validate_types_for_struct_field(&v.types, node)
         ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
     }
 
@@ -378,19 +374,21 @@ impl SQIRGen {
             // The type of a field can be inferred if a relation is
             // specified for that field. In that case, the type can
             // still be specified explicitly, but it must then match.
-            let field_type = match (&field.relation, &field.type_decl) {
+            let field_type_rc = match (&field.relation, &field.type_decl) {
                 (&None, &None) => return sema_error(
                     format!("Field '{}' has neither type annotations nor a relation to infer its type from", field.name),
                     node
                 ),
-                (&None, &Some(ref decl))          => unimplemented!(),
+                (&None,          &Some(ref decl)) => self.type_from_decl(decl)?,
                 (&Some(ref rel), &None)           => unimplemented!(),
                 (&Some(ref rel), &Some(ref decl)) => unimplemented!(),
             };
 
-            self.validate_class_field_type(&field_type, node)?;
+            let field_type_wk = field_type_rc.as_weak();
 
-            if fields.insert(field.name.to_owned(), field_type).is_some() {
+            self.validate_class_field_type(&field_type_wk, node)?;
+
+            if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
                 return sema_error(format!("Duplicate field '{}'", field.name), node);
             }
         }
@@ -403,11 +401,30 @@ impl SQIRGen {
         let ptr = rc.borrow()?;
 
         match *ptr {
-            // Pointers (to classes) are explicitly allowed in a class.
-            Type::PointerType(_) => Ok(()),
+            // Pointers (to classes) are explicitly allowed.
+            // Since get_pointer_type() only gives us pointers-to-class,
+            // the pointed type is guaranteed to be a class, and because
+            // classes are user-defined types, they have been or will be
+            // validated in a separate step. Therefore, we can safely
+            // assume that any errors in the transitive closure of the
+            // pointed type will be caught later in the worst case.
+            Type::PointerType(_)  => Ok(()),
 
             // Class types without indirection are never allowed.
-            Type::ClassType(ref t) => sema_error(format!("Class type '{}' not allowed without indirection", t.name), node),
+            Type::ClassType(ref t) => sema_error(
+                format!("Class type '{}' not allowed without indirection", t.name),
+                node
+            ),
+            Type::PlaceholderType(ref name, PlaceholderKind::Class) => sema_error(
+                format!("Class type '{}' not allowed without indirection", name),
+                node
+            ),
+
+            // Placeholders representing struct and enum types are also OK,
+            // because once typechecked on their own, valid structs and enums
+            // can always be part of a class.
+            Type::PlaceholderType(_, PlaceholderKind::Struct) => Ok(()),
+            Type::PlaceholderType(_, PlaceholderKind::Enum)   => Ok(()),
 
             // Function types are not allowed within user-defined types.
             Type::FunctionType(_) => sema_error("Function type not allowed in class".to_owned(), node),
@@ -425,12 +442,12 @@ impl SQIRGen {
             // a contained struct, and every variant of a contained enum
             // must be valid as well.
             Type::TupleType(ref types) => self.validate_types_for_class_field(types, node),
-            Type::StructType(ref st) => self.validate_types_for_class_field(st.fields.values(), node),
-            Type::EnumType(ref et) => self.validate_variants_for_class_field(et, node),
+            Type::StructType(ref st)   => self.validate_types_for_class_field(st.fields.values(), node),
+            Type::EnumType(ref et)     => self.validate_types_for_class_field(et.variants.values(), node),
 
-            // Atomic types (numbers, strings, blobs, and dates) and placeholders are OK.
-            // TODO(H2CO3): rewrite this using more type-safety so that we can't forget
-            // to check further wrapping types potentially added in the future.
+            // Atomic types (numbers, strings, blobs, and dates) are OK.
+            // TODO(H2CO3): rewrite this using more type-safety so that we can't
+            // forget to check further wrapping types potentially added in the future.
             _ => Ok(()),
         }
     }
@@ -440,12 +457,6 @@ impl SQIRGen {
     {
         it.into_iter().map(
             |t| self.validate_class_field_type(t, node)
-        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-    }
-
-    fn validate_variants_for_class_field(&self, enum_type: &EnumType, node: &Node) -> SemaResult<()> {
-        enum_type.variants.iter().map(
-            |v| self.validate_types_for_class_field(&v.types, node)
         ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
     }
 
@@ -487,7 +498,7 @@ impl SQIRGen {
             ),
 
             // Occurs check is supposed to happen after type resolution
-            Type::PlaceholderType(ref name) => occurs_check_error(
+            Type::PlaceholderType(ref name, _) => occurs_check_error(
                 format!("Placeholder type '{}' should have been resolved by now", name)
             ),
 
@@ -552,9 +563,11 @@ impl SQIRGen {
                 let rc = pointed_type.as_rc()?;
                 let ptr = rc.borrow()?;
 
-                // Only pointer-to-class types are permitted
+                // Only pointer-to-class types are permitted.
+                // (Placeholders to classes are also allowed, obviously.)
                 match *ptr {
                     Type::ClassType(_) => (),
+                    Type::PlaceholderType(_, PlaceholderKind::Class) => (),
                     _ => return sema_error(
                         format!("Pointer to non-class type '{}'", format_type(pointed_type)),
                         decl

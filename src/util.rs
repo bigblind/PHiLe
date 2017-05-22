@@ -12,8 +12,8 @@ use std::cell::{ RefCell, Ref, RefMut, BorrowError, BorrowMutError };
 use std::hash::{ Hash, Hasher };
 
 
-macro_rules! hash_map(
-    ($($k:expr => $v:expr),*) => ({
+macro_rules! hash_map {
+    ($($k: expr => $v: expr),*) => ({
         let mut _tmp = ::std::collections::HashMap::new();
         $({
             let key = $k;
@@ -24,11 +24,11 @@ macro_rules! hash_map(
         })*
         _tmp
     });
-    ($($k:expr => $v:expr),+,) => (hash_map!($($k => $v),+))
-);
+    ($($k: expr => $v: expr),+,) => (hash_map!($($k => $v),+))
+}
 
 
-#[derive(Debug, Eq)]
+#[derive(Debug)]
 pub struct RcCell<T> {
     ptr: Rc<RefCell<T>>,
 }
@@ -84,6 +84,8 @@ impl<T> PartialEq for RcCell<T> {
         ptr::eq(self.ptr.as_ptr(), other.ptr.as_ptr())
     }
 }
+
+impl<T> Eq for RcCell<T> {}
 
 // Hashes the pointer address itself
 impl<T> Hash for RcCell<T> {
