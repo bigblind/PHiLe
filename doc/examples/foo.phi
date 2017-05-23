@@ -25,6 +25,7 @@ class Bar {
 class Foo {
 # bar: Bar,
 # bar: &Bar,
+  tup: (String, Bar),
 }
 
 # struct ExplicitlySelfContaining {

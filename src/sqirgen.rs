@@ -286,7 +286,7 @@ impl SQIRGen {
             let field_type_rc = self.type_from_decl(&type_decl)?;
             let field_type_wk = field_type_rc.as_weak();
 
-            self.validate_struct_field_type(&field_type_wk, node)?;
+            self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Value)?;
 
             if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
                 return sema_error(format!("Duplicate field '{}'", field.name), node);
@@ -296,72 +296,10 @@ impl SQIRGen {
         Ok(fields)
     }
 
-    fn validate_struct_field_type(&self, field_type: &WkCell<Type>, node: &Node) -> SemaResult<()> {
-        let rc = field_type.as_rc()?;
-        let ptr = rc.borrow()?;
-
-        match *ptr {
-            // No pointers (and consequently, no classes) are allowed in a struct.
-            Type::PointerType(_) => sema_error(
-                "Pointer type not allowed in struct".to_owned(),
-                node
-            ),
-            Type::ClassType(ref t) => sema_error(
-                format!("Class type '{}' not allowed in struct", t.name),
-                node
-            ),
-            Type::PlaceholderType(ref name, PlaceholderKind::Class) => sema_error(
-                format!("Class type '{}' not allowed in struct", name),
-                node
-            ),
-
-            // Placeholders of struct and enum types are OK,
-            // because once typechecked on their own, they can be
-            // part of a struct type.
-            Type::PlaceholderType(_, PlaceholderKind::Struct) => Ok(()),
-            Type::PlaceholderType(_, PlaceholderKind::Enum)   => Ok(()),
-
-            // Function types are not allowed within user-defined types.
-            Type::FunctionType(_) => sema_error("Function type not allowed in struct".to_owned(), node),
-
-            // Optionals, uniques, and arrays are checked for
-            // explicitly and recursively, because they are
-            // not like user-defined enums or structs in that
-            // they might legitimately contain pointers when
-            // contained within a class.
-            Type::OptionalType(ref t) => self.validate_struct_field_type(t, node),
-            Type::UniqueType(ref t)   => self.validate_struct_field_type(t, node),
-            Type::ArrayType(ref t)    => self.validate_struct_field_type(t, node),
-
-            // Every type of a contained tuple, every member of
-            // a contained struct, and every variant of a contained enum
-            // must be valid as well.
-            Type::TupleType(ref types) => self.validate_types_for_struct_field(types, node),
-            Type::StructType(ref st) => self.validate_types_for_struct_field(st.fields.values(), node),
-            Type::EnumType(ref et) => self.validate_types_for_struct_field(et.variants.values(), node),
-
-            // Atomic types (numbers, strings, blobs, and dates) are OK.
-            // TODO(H2CO3): rewrite this using more type-safety so that we can't
-            // forget to check further wrapping types potentially added in the future.
-            _ => Ok(()),
-        }
-    }
-
-    fn validate_types_for_struct_field<'a, I>(&self, it: I, node: &Node) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a WkCell<Type>>
-    {
-        it.into_iter().map(
-            |t| self.validate_struct_field_type(t, node)
-        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-    }
-
     //
     // Helpers for class types
     //
 
-    // TODO(H2CO3): refactor typecheck_struct_fields(), typecheck_class_fields(),
-    // validate_struct_field_type() and validate_class_field_type()
-    // (maybe using a discriminator flag and smaller helper functions?)
     fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
@@ -386,7 +324,7 @@ impl SQIRGen {
 
             let field_type_wk = field_type_rc.as_weak();
 
-            self.validate_class_field_type(&field_type_wk, node)?;
+            self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Entity)?;
 
             if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
                 return sema_error(format!("Duplicate field '{}'", field.name), node);
@@ -396,19 +334,30 @@ impl SQIRGen {
         Ok(fields)
     }
 
-    fn validate_class_field_type(&self, field_type: &WkCell<Type>, node: &Node) -> SemaResult<()> {
-        let rc = field_type.as_rc()?;
+    //
+    // Helpers for enum types
+    //
+
+    //
+    // Validating items (fields, variants, etc.) of complex
+    // value and entity types (struct, class, enum, tuple)
+    //
+
+    fn validate_complex_type_item(&self, item_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+        let rc = item_type.as_rc()?;
         let ptr = rc.borrow()?;
 
         match *ptr {
-            // Pointers (to classes) are explicitly allowed.
             // Since get_pointer_type() only gives us pointers-to-class,
             // the pointed type is guaranteed to be a class, and because
             // classes are user-defined types, they have been or will be
             // validated in a separate step. Therefore, we can safely
             // assume that any errors in the transitive closure of the
             // pointed type will be caught later in the worst case.
-            Type::PointerType(_)  => Ok(()),
+            Type::PointerType(_) => match parent_kind {
+                ComplexTypeKind::Entity => Ok(()),
+                ComplexTypeKind::Value  => sema_error("Pointer not allowed in value type".to_owned(), node),
+            },
 
             // Class types without indirection are never allowed.
             Type::ClassType(ref t) => sema_error(
@@ -420,6 +369,15 @@ impl SQIRGen {
                 node
             ),
 
+            // Every type of a contained tuple, every member of
+            // a contained struct, and every variant of a contained enum
+            // must be valid as well. However, this is ensured by these
+            // product types' respective defining methods, so if we have
+            // any of them, we can be sure they are correct by induction.
+            Type::StructType(_) => Ok(()),
+            Type::EnumType(_)   => Ok(()),
+            Type::TupleType(_)  => Ok(()),
+
             // Placeholders representing struct and enum types are also OK,
             // because once typechecked on their own, valid structs and enums
             // can always be part of a class.
@@ -427,23 +385,40 @@ impl SQIRGen {
             Type::PlaceholderType(_, PlaceholderKind::Enum)   => Ok(()),
 
             // Function types are not allowed within user-defined types.
-            Type::FunctionType(_) => sema_error("Function type not allowed in class".to_owned(), node),
+            Type::FunctionType(_) => sema_error("Function type not allowed in user-defined type".to_owned(), node),
 
             // Optionals, uniques, and arrays are checked for
             // explicitly and recursively, because they are
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            Type::OptionalType(ref t) => self.validate_class_field_type(t, node),
-            Type::UniqueType(ref t)   => self.validate_class_field_type(t, node),
-            Type::ArrayType(ref t)    => self.validate_class_field_type(t, node),
-
-            // Every type of a contained tuple, every member of
-            // a contained struct, and every variant of a contained enum
-            // must be valid as well.
-            Type::TupleType(ref types) => self.validate_types_for_class_field(types, node),
-            Type::StructType(ref st)   => self.validate_types_for_class_field(st.fields.values(), node),
-            Type::EnumType(ref et)     => self.validate_types_for_class_field(et.variants.values(), node),
+            // TODO(H2CO3): the optional and array types should
+            // only allow pointers as their immediate children
+            // (one level of containment at the type level),
+            // since those are the types that can be expressed
+            // as foreign keys.
+            // Similarly, a unique type should allow an
+            // optional-of-pointer and an array-of-pointers,
+            // a total of two levels of containment at the type
+            // level; this is because a unique type is not _really_
+            // a "container" type; it merely signifies that the
+            // type may not have equal values across the instances
+            // of its containing class (entity) type.
+            // Finally, unique types are only allowed within
+            // class (entity) types, as entities are the only types
+            // that have 'pointer identity' and --- relatedly ---
+            // one single collection of them in which it
+            // makes sense to ensure uniqueness.
+            //
+            // TODO(H2CO3): figure out which possibilities are valid...
+            // * for a value type V within a value type?
+            // * for a class/entity type E within a value type? (NONE)
+            // * for a value type V within a class/entity type?
+            // * for a class/entity type E within a class/entity type?
+            //
+            Type::OptionalType(ref t) => unimplemented!(),
+            Type::UniqueType(ref t)   => unimplemented!(),
+            Type::ArrayType(ref t)    => unimplemented!(),
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
             // TODO(H2CO3): rewrite this using more type-safety so that we can't
@@ -451,18 +426,6 @@ impl SQIRGen {
             _ => Ok(()),
         }
     }
-
-    fn validate_types_for_class_field<'a, I>(&self, it: I, node: &Node) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a WkCell<Type>>
-    {
-        it.into_iter().map(
-            |t| self.validate_class_field_type(t, node)
-        ).collect::<SemaResult<Vec<_>>>().and(Ok(()))
-    }
-
-    //
-    // Helpers for enum types
-    //
 
     //
     // Occurs Check
@@ -548,8 +511,8 @@ impl SQIRGen {
             NodeValue::PointerType(ref pointed)  => self.get_pointer_type(pointed),
             NodeValue::OptionalType(ref wrapped) => self.get_optional_type(wrapped),
             NodeValue::UniqueType(ref wrapped)   => self.get_unique_type(wrapped),
-            NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
             NodeValue::ArrayType(ref element)    => self.get_array_type(element),
+            NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
             NodeValue::NamedType(name)           => self.get_named_type(name, decl),
             _ => sema_error("Not a type declaration".to_owned(), decl),
         }
@@ -633,9 +596,14 @@ impl SQIRGen {
     }
 
     fn get_tuple_type(&mut self, decls: &[Node]) -> SemaResult<RcCell<Type>> {
-        let types: Vec<_> = decls.iter().map(
-            |decl| self.type_from_decl(decl)
-        ).collect::<Result<_, _>>()?;
+        let types: Vec<_> = decls.iter().map(|decl| {
+            // Tuples are full-fledged value types, similar to structs.
+            // Therefore we must check their items during construction.
+            let item_type_rc = self.type_from_decl(decl)?;
+            let item_type_wk = item_type_rc.as_weak();
+            self.validate_complex_type_item(&item_type_wk, decl, ComplexTypeKind::Value)?;
+            Ok(item_type_rc)
+        }).collect::<SemaResult<_>>()?;
 
         let tuple = self.sqir.tuple_types.entry(types.clone()).or_insert_with(
             || RcCell::new(Type::TupleType(types.iter().map(RcCell::as_weak).collect()))
