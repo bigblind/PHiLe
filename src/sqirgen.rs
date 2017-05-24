@@ -416,9 +416,9 @@ impl SQIRGen {
             // * for a value type V within a class/entity type?
             // * for a class/entity type E within a class/entity type?
             //
-            Type::OptionalType(ref t) => self.validate_optional(t, parent_kind, true),
-            Type::UniqueType(ref t)   => self.validate_unique(t, parent_kind, true),
-            Type::ArrayType(ref t)    => self.validate_array(t, parent_kind, true),
+            Type::OptionalType(ref t) => self.validate_optional(t, node, parent_kind),
+            Type::UniqueType(ref t)   => self.validate_unique(t, node, parent_kind),
+            Type::ArrayType(ref t)    => self.validate_array(t, node, parent_kind),
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
             Type::BoolType | Type::IntType | Type::FloatType   => Ok(()),
@@ -427,16 +427,98 @@ impl SQIRGen {
         }
     }
 
-    fn validate_optional(&self, wrapped: &WkCell<Type>, parent_kind: ComplexTypeKind, toplevel: bool) -> SemaResult<()> {
-        unimplemented!()
+    // TODO(H2CO3): validate_{optional, unique, array} need a refactor
+    fn validate_optional(&self, wrapped_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+        let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
+
+        match parent_kind {
+            ComplexTypeKind::Value => res,
+            ComplexTypeKind::Entity => {
+                match res {
+                    Ok(_) => Ok(()),
+                    Err(err) => {
+                        let rc = wrapped_type.as_rc()?;
+                        let ptr = rc.borrow()?;
+
+                        match *ptr {
+                            // As an immediate member of a class/entity type,
+                            // in addition to everything that is permitted in
+                            // value types, an optional of pointer is also allowed.
+                            Type::PointerType(_) => Ok(()),
+                            _ => sema_error(
+                                format!(
+                                    "Not an optional of value type or pointer ('{}')",
+                                    err.message
+                                ),
+                                node
+                            ),
+                        }
+                    },
+                }
+            },
+        }
     }
 
-    fn validate_unique(&self, wrapped: &WkCell<Type>, parent_kind: ComplexTypeKind, toplevel: bool) -> SemaResult<()> {
-        unimplemented!()
+    fn validate_unique(&self, wrapped_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+        match parent_kind {
+            ComplexTypeKind::Value => sema_error("Unique not allowed in value type".to_owned(), node),
+            ComplexTypeKind::Entity => {
+                let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
+
+                match res {
+                    Ok(_) => Ok(()),
+                    Err(err) => {
+                        let rc = wrapped_type.as_rc()?;
+                        let ptr = rc.borrow()?;
+
+                        match *ptr {
+                            // As an immediate member of a class/entity type,
+                            // in addition to everything that is permitted in
+                            // value types, a unique pointer is also allowed.
+                            Type::PointerType(_) => Ok(()),
+                            _ => sema_error(
+                                format!(
+                                    "Not a unique of value type or pointer ('{}')",
+                                    err.message
+                                ),
+                                node
+                            ),
+                        }
+                    },
+                }
+            },
+        }
     }
 
-    fn validate_array(&self, wrapped: &WkCell<Type>, parent_kind: ComplexTypeKind, toplevel: bool) -> SemaResult<()> {
-        unimplemented!()
+    fn validate_array(&self, element_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+        let res = self.validate_complex_type_item(element_type, node, ComplexTypeKind::Value);
+
+        match parent_kind {
+            ComplexTypeKind::Value => res,
+            ComplexTypeKind::Entity => {
+                match res {
+                    Ok(_) => Ok(()),
+                    Err(err) => {
+                        let rc = element_type.as_rc()?;
+                        let ptr = rc.borrow()?;
+
+                        match *ptr {
+                            // As an immediate member of a class/entity type,
+                            // in addition to everything that is permitted in
+                            // value types, an array of pointers is also allowed.
+                            Type::PointerType(_) => Ok(()),
+                            _ => sema_error(
+                                format!(
+                                    "Not an array of value type or pointers ('{}')",
+                                    err.message
+                                ),
+                                node
+                            ),
+                        }
+                    },
+                }
+            },
+        }
     }
 
     //

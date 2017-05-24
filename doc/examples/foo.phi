@@ -20,12 +20,15 @@
 class Bar {
   moar: &Bar,
   even_moar: &Bar,
+# by_val: Bar,
+# by_val: Foo,
 }
 
 class Foo {
-# bar: Bar,
-# bar: &Bar,
-  tup: (String, Bar),
+  ptr: [&Ptr],
+}
+
+class Ptr {
 }
 
 # struct ExplicitlySelfContaining {
