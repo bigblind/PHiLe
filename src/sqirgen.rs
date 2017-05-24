@@ -416,15 +416,27 @@ impl SQIRGen {
             // * for a value type V within a class/entity type?
             // * for a class/entity type E within a class/entity type?
             //
-            Type::OptionalType(ref t) => unimplemented!(),
-            Type::UniqueType(ref t)   => unimplemented!(),
-            Type::ArrayType(ref t)    => unimplemented!(),
+            Type::OptionalType(ref t) => self.validate_optional(t, parent_kind, true),
+            Type::UniqueType(ref t)   => self.validate_unique(t, parent_kind, true),
+            Type::ArrayType(ref t)    => self.validate_array(t, parent_kind, true),
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
-            // TODO(H2CO3): rewrite this using more type-safety so that we can't
-            // forget to check further wrapping types potentially added in the future.
-            _ => Ok(()),
+            Type::BoolType | Type::IntType | Type::FloatType   => Ok(()),
+            Type::DecimalType(_, _)                            => Ok(()),
+            Type::StringType | Type::BlobType | Type::DateType => Ok(()),
         }
+    }
+
+    fn validate_optional(&self, wrapped: &WkCell<Type>, parent_kind: ComplexTypeKind, toplevel: bool) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn validate_unique(&self, wrapped: &WkCell<Type>, parent_kind: ComplexTypeKind, toplevel: bool) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn validate_array(&self, wrapped: &WkCell<Type>, parent_kind: ComplexTypeKind, toplevel: bool) -> SemaResult<()> {
+        unimplemented!()
     }
 
     //
@@ -447,6 +459,11 @@ impl SQIRGen {
             Type::PointerType(_) => Ok(()),
             Type::ArrayType(_)   => Ok(()),
 
+            // Non-recursive (atomic/non-wrapping) types are always OK.
+            Type::BoolType | Type::IntType | Type::FloatType   => Ok(()),
+            Type::DecimalType(_, _)                            => Ok(()),
+            Type::StringType | Type::BlobType | Type::DateType => Ok(()),
+
             // Non-indirect, potentially recursive types
             Type::OptionalType(ref t) => self.ensure_transitive_noncontainment(root, t),
             Type::UniqueType(ref t)   => self.ensure_transitive_noncontainment(root, t),
@@ -464,11 +481,6 @@ impl SQIRGen {
             Type::PlaceholderType(ref name, _) => occurs_check_error(
                 format!("Placeholder type '{}' should have been resolved by now", name)
             ),
-
-            // Non-recursive (atomic/non-wrapping) types are always OK.
-            // TODO(H2CO3): rewrite this using more type-safety so that we can't forget to
-            // check further non-indirect wrapping types potentially added in the future.
-            _ => Ok(()),
         }
     }
 

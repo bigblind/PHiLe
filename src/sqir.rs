@@ -15,19 +15,8 @@ use util::*;
 #[derive(Debug)]
 pub enum Type {
     BoolType,
-
-    Int8Type,
-    UInt8Type,
-    Int16Type,
-    UInt16Type,
-    Int32Type,
-    UInt32Type,
-    Int64Type,
-    UInt64Type,
-
-    Float32Type,
-    Float64Type,
-
+    IntType,
+    FloatType,
     DecimalType(usize, usize), // integral digits, fractional digits
 
     StringType,
@@ -150,16 +139,8 @@ impl SQIR {
     pub fn new() -> SQIR {
         let named_types = hash_map![
             "bool"   => RcCell::new(Type::BoolType),
-            "i8"     => RcCell::new(Type::Int8Type),
-            "u8"     => RcCell::new(Type::UInt8Type),
-            "i16"    => RcCell::new(Type::Int16Type),
-            "u16"    => RcCell::new(Type::UInt16Type),
-            "i32"    => RcCell::new(Type::Int32Type),
-            "u32"    => RcCell::new(Type::UInt32Type),
-            "i64"    => RcCell::new(Type::Int64Type),
-            "u64"    => RcCell::new(Type::UInt64Type),
-            "f32"    => RcCell::new(Type::Float32Type),
-            "f64"    => RcCell::new(Type::Float64Type),
+            "int"    => RcCell::new(Type::IntType),
+            "float"  => RcCell::new(Type::FloatType),
             "String" => RcCell::new(Type::StringType),
             "Blob"   => RcCell::new(Type::BlobType),
             "Date"   => RcCell::new(Type::DateType),
