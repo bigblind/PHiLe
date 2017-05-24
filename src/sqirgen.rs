@@ -438,8 +438,8 @@ impl SQIRGen {
     // Try to find the root_type in the transitive-reflexive closure
     // of its contained/wrapped types that occur without indirection,
     // i.e. those that are _not_ behind a pointer or in an array.
-    fn occurs_check_type(&self, root: &WkCell<Type>, current: &WkCell<Type>) -> SemaResult<()> {
-        let rc = current.as_rc()?;
+    fn occurs_check_type(&self, root: &WkCell<Type>, child: &WkCell<Type>) -> SemaResult<()> {
+        let rc = child.as_rc()?;
         let ptr = rc.borrow()?;
 
         match *ptr {
@@ -472,13 +472,13 @@ impl SQIRGen {
         }
     }
 
-    fn ensure_transitive_noncontainment(&self, root: &WkCell<Type>, current: &WkCell<Type>) -> SemaResult<()> {
-        if root.as_rc()? == current.as_rc()? {
+    fn ensure_transitive_noncontainment(&self, root: &WkCell<Type>, child: &WkCell<Type>) -> SemaResult<()> {
+        if root.as_rc()? == child.as_rc()? {
             occurs_check_error(
                 format!("Recursive type '{}' contains itself without indirection", format_type(root))
             )
         } else {
-            self.occurs_check_type(root, current)
+            self.occurs_check_type(root, child)
         }
     }
 
