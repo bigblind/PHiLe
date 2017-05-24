@@ -24,8 +24,8 @@ class Bar {
 # by_val: Foo,
 }
 
-class Foo {
-  ptr: [&Ptr],
+struct Foo {
+  ptr: [[Foo!]],
 }
 
 class Ptr {

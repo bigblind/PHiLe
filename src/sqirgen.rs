@@ -403,35 +403,17 @@ impl SQIRGen {
         }
     }
 
-    // TODO(H2CO3): validate_{optional, unique, array} need a refactor
     fn validate_optional(&self, wrapped_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
         let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
 
         match parent_kind {
             ComplexTypeKind::Value => res,
-            ComplexTypeKind::Entity => {
-                match res {
-                    Ok(_) => Ok(()),
-                    Err(err) => {
-                        let rc = wrapped_type.as_rc()?;
-                        let ptr = rc.borrow()?;
-
-                        match *ptr {
-                            // As an immediate member of a class/entity type,
-                            // in addition to everything that is permitted in
-                            // value types, an optional of pointer is also allowed.
-                            Type::PointerType(_) => Ok(()),
-                            _ => sema_error(
-                                format!(
-                                    "Not an optional of value type or pointer ('{}')",
-                                    err.message
-                                ),
-                                node
-                            ),
-                        }
-                    },
-                }
-            },
+            ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
+                wrapped_type,
+                &res,
+                node,
+                "optional"
+            ),
         }
     }
 
@@ -441,27 +423,12 @@ impl SQIRGen {
             ComplexTypeKind::Entity => {
                 let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
 
-                match res {
-                    Ok(_) => Ok(()),
-                    Err(err) => {
-                        let rc = wrapped_type.as_rc()?;
-                        let ptr = rc.borrow()?;
-
-                        match *ptr {
-                            // As an immediate member of a class/entity type,
-                            // in addition to everything that is permitted in
-                            // value types, a unique pointer is also allowed.
-                            Type::PointerType(_) => Ok(()),
-                            _ => sema_error(
-                                format!(
-                                    "Not a unique of value type or pointer ('{}')",
-                                    err.message
-                                ),
-                                node
-                            ),
-                        }
-                    },
-                }
+                self.validate_wrapper_in_entity(
+                    wrapped_type,
+                    &res,
+                    node,
+                    "unique"
+                )
             },
         }
     }
@@ -471,27 +438,41 @@ impl SQIRGen {
 
         match parent_kind {
             ComplexTypeKind::Value => res,
-            ComplexTypeKind::Entity => {
-                match res {
-                    Ok(_) => Ok(()),
-                    Err(err) => {
-                        let rc = element_type.as_rc()?;
-                        let ptr = rc.borrow()?;
+            ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
+                element_type,
+                &res,
+                node,
+                "array"
+            ),
+        }
+    }
 
-                        match *ptr {
-                            // As an immediate member of a class/entity type,
-                            // in addition to everything that is permitted in
-                            // value types, an array of pointers is also allowed.
-                            Type::PointerType(_) => Ok(()),
-                            _ => sema_error(
-                                format!(
-                                    "Not an array of value type or pointers ('{}')",
-                                    err.message
-                                ),
-                                node
-                            ),
-                        }
-                    },
+    fn validate_wrapper_in_entity(
+        &self,
+        wrapped_type: &WkCell<Type>,
+        validation_result: &SemaResult<()>,
+        node: &Node,
+        wrapper_type_name: &str
+    ) -> SemaResult<()> {
+        match *validation_result {
+            Ok(_) => Ok(()),
+            Err(ref err) => {
+                let rc = wrapped_type.as_rc()?;
+                let ptr = rc.borrow()?;
+
+                match *ptr {
+                    // As an immediate member of a class type, in addition
+                    // to everything that is permitted in value types,
+                    // an optional/unique/array of pointers is also allowed.
+                    Type::PointerType(_) => Ok(()),
+                    _ => sema_error(
+                        format!(
+                            "Expected {} of value or pointer ({})",
+                            wrapper_type_name,
+                            err.message
+                        ),
+                        node
+                    ),
                 }
             },
         }
