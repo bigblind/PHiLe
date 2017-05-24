@@ -392,30 +392,6 @@ impl SQIRGen {
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            // TODO(H2CO3): the optional and array types should
-            // only allow pointers as their immediate children
-            // (one level of containment at the type level),
-            // since those are the types that can be expressed
-            // as foreign keys.
-            // Similarly, a unique type should allow an
-            // optional-of-pointer and an array-of-pointers,
-            // a total of two levels of containment at the type
-            // level; this is because a unique type is not _really_
-            // a "container" type; it merely signifies that the
-            // type may not have equal values across the instances
-            // of its containing class (entity) type.
-            // Finally, unique types are only allowed within
-            // class (entity) types, as entities are the only types
-            // that have 'pointer identity' and --- relatedly ---
-            // one single collection of them in which it
-            // makes sense to ensure uniqueness.
-            //
-            // TODO(H2CO3): figure out which possibilities are valid...
-            // * for a value type V within a value type?
-            // * for a class/entity type E within a value type? (NONE)
-            // * for a value type V within a class/entity type?
-            // * for a class/entity type E within a class/entity type?
-            //
             Type::OptionalType(ref t) => self.validate_optional(t, node, parent_kind),
             Type::UniqueType(ref t)   => self.validate_unique(t, node, parent_kind),
             Type::ArrayType(ref t)    => self.validate_array(t, node, parent_kind),
