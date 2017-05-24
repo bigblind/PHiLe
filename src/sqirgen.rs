@@ -410,7 +410,7 @@ impl SQIRGen {
             ComplexTypeKind::Value => res,
             ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
                 wrapped_type,
-                &res,
+                res,
                 node,
                 "optional"
             ),
@@ -425,7 +425,7 @@ impl SQIRGen {
 
                 self.validate_wrapper_in_entity(
                     wrapped_type,
-                    &res,
+                    res,
                     node,
                     "unique"
                 )
@@ -440,7 +440,7 @@ impl SQIRGen {
             ComplexTypeKind::Value => res,
             ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
                 element_type,
-                &res,
+                res,
                 node,
                 "array"
             ),
@@ -450,32 +450,29 @@ impl SQIRGen {
     fn validate_wrapper_in_entity(
         &self,
         wrapped_type: &WkCell<Type>,
-        validation_result: &SemaResult<()>,
+        validation_result: SemaResult<()>,
         node: &Node,
         wrapper_type_name: &str
     ) -> SemaResult<()> {
-        match *validation_result {
-            Ok(_) => Ok(()),
-            Err(ref err) => {
-                let rc = wrapped_type.as_rc()?;
-                let ptr = rc.borrow()?;
+        validation_result.or_else(|err| {
+            let rc = wrapped_type.as_rc()?;
+            let ptr = rc.borrow()?;
 
-                match *ptr {
-                    // As an immediate member of a class type, in addition
-                    // to everything that is permitted in value types,
-                    // an optional/unique/array of pointers is also allowed.
-                    Type::PointerType(_) => Ok(()),
-                    _ => sema_error(
-                        format!(
-                            "Expected {} of value or pointer ({})",
-                            wrapper_type_name,
-                            err.message
-                        ),
-                        node
+            match *ptr {
+                // As an immediate member of a class type, in addition
+                // to everything that is permitted in value types,
+                // an optional/unique/array of pointers is also allowed.
+                Type::PointerType(_) => Ok(()),
+                _ => sema_error(
+                    format!(
+                        "Expected {} of pointer/value type ({})",
+                        wrapper_type_name,
+                        err.message
                     ),
-                }
-            },
-        }
+                    node
+                ),
+            }
+        })
     }
 
     //
