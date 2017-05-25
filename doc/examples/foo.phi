@@ -18,15 +18,15 @@
 # }
 
 class Bar {
-  moar: &Bar,
-  even_moar: &Bar,
+  moar: (([(((&Bar)))])),
+  even_moar: ((&Bar)),
 # by_val: Bar,
 # by_val: Foo,
 }
 
 struct Foo {
 # ptr: [[&Bar?]],
-  unit: (),
+  tee: (String),
 }
 
 class Ptr {

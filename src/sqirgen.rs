@@ -644,6 +644,12 @@ impl SQIRGen {
     }
 
     fn get_tuple_type(&mut self, decls: &[Node]) -> SemaResult<RcCell<Type>> {
+        // A one-element tuple is converted to its element type,
+        // _without_ validation of containment in a value type.
+        if decls.len() == 1 {
+            return self.type_from_decl(&decls[0]);
+        }
+
         let types: Vec<_> = decls.iter().map(|decl| {
             // Tuples are full-fledged value types, similar to structs.
             // Therefore we must check their items during construction.
