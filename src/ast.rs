@@ -16,7 +16,7 @@ pub enum NodeValue<'a> {
     Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
     ClassDecl(ClassDecl<'a>),
-    Variant(Box<Variant<'a>>),
+    Variant(Variant<'a>),
     EnumDecl(EnumDecl<'a>),
     FunctionDecl(FunctionDecl),
 

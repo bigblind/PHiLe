@@ -255,7 +255,26 @@ impl SQIRGen {
     }
 
     fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcCell<Type>> {
-        unimplemented!()
+        let name = decl.name.to_owned();
+
+        let enum_type = Type::EnumType(
+            EnumType {
+                name:     name.clone(),
+                variants: self.typecheck_enum_variants(decl)?,
+            }
+        );
+
+        // Replace the placeholder type with the now-created actual type
+        let enum_type_rc = self.sqir.named_types.get(&name).ok_or_else(
+            || SemaError {
+                message: format!("No placeholder type for enum '{}'", name),
+                range:   None,
+            }
+        )?;
+
+        *enum_type_rc.borrow_mut()? = enum_type;
+
+        Ok(enum_type_rc.clone())
     }
 
     //
@@ -337,6 +356,16 @@ impl SQIRGen {
     //
     // Helpers for enum types
     //
+
+    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
+        let mut variants = HashMap::with_capacity(decl.variants.len());
+
+        for node in &decl.variants {
+            unimplemented!()
+        }
+
+        Ok(variants)
+    }
 
     //
     // Validating items (fields, variants, etc.) of complex

@@ -314,7 +314,7 @@ impl<'a> Parser<'a> {
         };
         let node = Node {
             range: token_range(name, comma),
-            value: NodeValue::Variant(Box::new(variant)),
+            value: NodeValue::Variant(variant),
         };
 
         Ok(node)
