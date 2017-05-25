@@ -25,7 +25,8 @@ class Bar {
 }
 
 struct Foo {
-  ptr: [[&Bar?]],
+# ptr: [[&Bar?]],
+  unit: (),
 }
 
 class Ptr {

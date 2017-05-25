@@ -18,7 +18,6 @@
         /*, missing_docs */)]
 
 extern crate regex;
-extern crate itertools;
 extern crate unicode_segmentation;
 
 #[macro_use]

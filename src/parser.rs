@@ -6,7 +6,6 @@
 // on 07/04/2017
 //
 
-use itertools::join;
 use std::slice;
 use lexer::{ Token, TokenKind, Range };
 use ast::*;
@@ -106,7 +105,7 @@ impl<'a> Parser<'a> {
 
     fn expect_one_of(&mut self, lexemes: &[&str]) -> LexResult<'a> {
         self.accept_one_of(lexemes).ok_or_else(
-            || self.expectation_error(&join(lexemes, ", "))
+            || self.expectation_error(&lexemes.join(" or "))
         )
     }
 

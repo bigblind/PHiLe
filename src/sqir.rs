@@ -68,7 +68,6 @@ pub enum ComplexTypeKind {
 pub struct EnumType {
     pub name:     String,
     pub variants: HashMap<String, WkCell<Type>>,
-    // Multiple types in a variant should be represented by a tuple
 }
 
 #[derive(Debug)]
