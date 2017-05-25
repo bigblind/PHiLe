@@ -24,6 +24,13 @@ class Bar {
 # by_val: Foo,
 }
 
+enum MyBool {
+  True,
+  False,
+  FileNotFound((int, String)), # (code, message)
+  Invalid([[String]]),
+}
+
 struct Foo {
 # ptr: [[&Bar?]],
   tee: (String),

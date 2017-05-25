@@ -290,31 +290,26 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variant(&mut self) -> ParseResult<'a> {
-        let mut types = vec![];
-
         let name = self.expect_identifier()?;
 
-        if self.accept("(").is_some() {
-            while self.has_tokens() && !self.is_at(")") {
-                types.push(self.parse_type()?);
-
-                if !self.is_at(")") {
-                    self.expect(",")?;
-                }
-            }
-
-            self.expect(")")?;
-        }
+        let type_decl = match self.accept("(") {
+            Some(_) => {
+                let decl = self.parse_type()?;
+                self.expect(")")?;
+                Some(decl)
+            },
+            None => None,
+        };
 
         let comma = self.expect(",")?;
 
         let variant = Variant {
-            name:  name.value,
-            types: types,
+            name:      name.value,
+            type_decl: type_decl,
         };
         let node = Node {
             range: token_range(name, comma),
-            value: NodeValue::Variant(variant),
+            value: NodeValue::Variant(Box::new(variant)),
         };
 
         Ok(node)

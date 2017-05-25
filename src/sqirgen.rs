@@ -361,7 +361,23 @@ impl SQIRGen {
         let mut variants = HashMap::with_capacity(decl.variants.len());
 
         for node in &decl.variants {
-            unimplemented!()
+            let variant = match node.value {
+                NodeValue::Variant(ref variant) => variant,
+                _ => return sema_error("Enum variants must be Variant values".to_owned(), node),
+            };
+
+            let type_rc = match variant.type_decl {
+                Some(ref d) => self.type_from_decl(d)?,
+                None        => self.get_tuple_type(&[])?,
+            };
+
+            let type_wk = type_rc.as_weak();
+
+            self.validate_complex_type_item(&type_wk, node, ComplexTypeKind::Value)?;
+
+            if variants.insert(variant.name.to_owned(), type_wk).is_some() {
+                return sema_error(format!("Duplicate variant '{}'", variant.name), node);
+            }
         }
 
         Ok(variants)

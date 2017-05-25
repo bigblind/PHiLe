@@ -16,7 +16,7 @@ pub enum NodeValue<'a> {
     Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
     ClassDecl(ClassDecl<'a>),
-    Variant(Variant<'a>),
+    Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
     FunctionDecl(FunctionDecl),
 
@@ -69,8 +69,8 @@ pub struct EnumDecl<'a> {
 
 #[derive(Debug)]
 pub struct Variant<'a> {
-    pub name:  &'a str,
-    pub types: Vec<Node<'a>>,
+    pub name:      &'a str,
+    pub type_decl: Option<Node<'a>>,
 }
 
 #[allow(missing_copy_implementations)]
