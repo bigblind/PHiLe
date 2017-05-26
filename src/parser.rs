@@ -229,15 +229,11 @@ impl<'a> Parser<'a> {
 
         let relation = match self.accept_one_of(relation_operators) {
             Some(op) => {
-                let entity = self.expect_identifier()?;
+                let cardinality = op.value;
+                let entity = self.expect_identifier()?.value;
                 self.expect("::")?;
-                let field = self.expect_identifier()?;
-                let relation = Relation {
-                    cardinality: op.value,
-                    entity:      entity.value,
-                    field:       field.value,
-                };
-                Some(relation)
+                let field = self.expect_identifier()?.value;
+                Some(Relation { cardinality, entity, field })
             },
             None => None,
         };
@@ -249,7 +245,7 @@ impl<'a> Parser<'a> {
         let mut variants = vec![];
 
         let enum_keyword = self.expect("enum")?;
-        let enum_name = self.expect_identifier()?;
+        let name = self.expect_identifier()?.value;
 
         self.expect("{")?;
 
@@ -259,10 +255,7 @@ impl<'a> Parser<'a> {
 
         let close_brace = self.expect("}")?;
 
-        let decl = EnumDecl {
-            name:     enum_name.value,
-            variants: variants,
-        };
+        let decl = EnumDecl { name, variants };
         let node = Node {
             range: token_range(enum_keyword, close_brace),
             value: NodeValue::EnumDecl(decl),
@@ -272,7 +265,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variant(&mut self) -> ParseResult<'a> {
-        let name = self.expect_identifier()?;
+        let name_tok = self.expect_identifier()?;
+        let name = name_tok.value;
 
         let type_decl = match self.accept("(") {
             Some(_) => {
@@ -285,12 +279,9 @@ impl<'a> Parser<'a> {
 
         let comma = self.expect(",")?;
 
-        let variant = Variant {
-            name:      name.value,
-            type_decl: type_decl,
-        };
+        let variant = Variant { name, type_decl };
         let node = Node {
-            range: token_range(name, comma),
+            range: token_range(name_tok, comma),
             value: NodeValue::Variant(Box::new(variant)),
         };
 

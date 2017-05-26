@@ -695,6 +695,10 @@ impl SQIRGen {
         unimplemented!()
     }
 
+    fn cardinalities_from_operator(&self, op: &str) -> SemaResult<(Cardinality, Cardinality)> {
+        unimplemented!()
+    }
+
     //
     // Function-level SQIR generation
     //

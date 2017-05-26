@@ -52,7 +52,7 @@ pub fn lex(source: &str) -> Result<Vec<Token>, Location> {
 }
 
 fn grapheme_count(lexeme: &str) -> usize {
-    UnicodeSegmentation::graphemes(lexeme, true).count()
+    lexeme.graphemes(true).count()
 }
 
 impl Location {
