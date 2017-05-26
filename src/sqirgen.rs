@@ -295,14 +295,7 @@ impl SQIRGen {
                 return sema_error(format!("Field '{}' must not be part of a relation", field.name), node);
             }
 
-            // Consequently, types cannot be inferred,
-            // so type annotations are obligatory.
-            let type_decl = match field.type_decl {
-                Some(ref type_decl) => type_decl,
-                None => return sema_error(format!("Field '{}' must have a type annotation", field.name), node),
-            };
-
-            let field_type_rc = self.type_from_decl(&type_decl)?;
+            let field_type_rc = self.type_from_decl(&field.type_decl)?;
             let field_type_wk = field_type_rc.as_weak();
 
             self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Value)?;
@@ -328,19 +321,7 @@ impl SQIRGen {
                 _ => return sema_error("Class fields must be Field values".to_owned(), node),
             };
 
-            // The type of a field can be inferred if a relation is
-            // specified for that field. In that case, the type can
-            // still be specified explicitly, but it must then match.
-            let field_type_rc = match (&field.relation, &field.type_decl) {
-                (&None, &None) => return sema_error(
-                    format!("Field '{}' has neither type annotations nor a relation to infer its type from", field.name),
-                    node
-                ),
-                (&None,          &Some(ref decl)) => self.type_from_decl(decl)?,
-                (&Some(ref rel), &None)           => unimplemented!(),
-                (&Some(ref rel), &Some(ref decl)) => unimplemented!(),
-            };
-
+            let field_type_rc = self.type_from_decl(&field.type_decl)?;
             let field_type_wk = field_type_rc.as_weak();
 
             self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Entity)?;
@@ -584,19 +565,7 @@ impl SQIRGen {
     }
 
     //
-    // Function-level SQIR generation
-    //
-
-    fn forward_declare_function(&mut self, func: &FunctionDecl) -> SemaResult<()> {
-        unimplemented!()
-    }
-
-    fn generate_function(&mut self, func: &FunctionDecl) -> SemaResult<()> {
-        unimplemented!()
-    }
-
-    //
-    // Miscellaneous helpers
+    // Caching getters for types
     //
 
     fn type_from_decl(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
@@ -716,5 +685,25 @@ impl SQIRGen {
             Some(rc) => Ok(rc.clone()),
             None => sema_error(format!("Unknown type: '{}'", name), node),
         }
+    }
+
+    //
+    // Type checking relationships
+    //
+
+    fn type_from_relation(&mut self, relation: &Relation) -> SemaResult<RcCell<Type>> {
+        unimplemented!()
+    }
+
+    //
+    // Function-level SQIR generation
+    //
+
+    fn forward_declare_function(&mut self, func: &FunctionDecl) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn generate_function(&mut self, func: &FunctionDecl) -> SemaResult<()> {
+        unimplemented!()
     }
 }

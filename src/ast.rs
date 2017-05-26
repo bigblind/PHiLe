@@ -57,7 +57,7 @@ pub struct Relation<'a> {
 #[derive(Debug)]
 pub struct Field<'a> {
     pub name:      &'a str,
-    pub type_decl: Option<Node<'a>>,
+    pub type_decl: Node<'a>,
     pub relation:  Option<Relation<'a>>,
 }
 

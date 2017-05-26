@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
         let mut fields = vec![];
 
         let keyword = self.expect_one_of(&["struct", "class"])?;
-        let name = self.expect_identifier()?;
+        let name = self.expect_identifier()?.value;
 
         self.expect("{")?;
 
@@ -180,16 +180,10 @@ impl<'a> Parser<'a> {
 
         let value = match keyword.value {
             "struct" => NodeValue::StructDecl(
-                StructDecl {
-                    name:   name.value,
-                    fields: fields,
-                }
+                StructDecl { name, fields }
             ),
             "class" => NodeValue::ClassDecl(
-                ClassDecl {
-                    name:   name.value,
-                    fields: fields,
-                }
+                ClassDecl { name, fields }
             ),
             lexeme => unreachable!("Forgot to handle '{}'", lexeme),
         };
@@ -202,31 +196,19 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_field(&mut self) -> ParseResult<'a> {
-        let name = self.expect_identifier()?;
-        let type_decl = self.maybe_parse_type_annotation()?;
+        let name_tok = self.expect_identifier()?;
+        let name = name_tok.value;
+        let type_decl = self.expect(":").and_then(|_| self.parse_type())?;
         let relation = self.maybe_parse_relation()?;
         let comma = self.expect(",")?;
 
-        let field = Field {
-            name:      name.value,
-            type_decl: type_decl,
-            relation:  relation,
-        };
+        let field = Field { name, type_decl, relation };
         let node = Node {
-            range: token_range(name, comma),
+            range: token_range(name_tok, comma),
             value: NodeValue::Field(Box::new(field)),
         };
 
         Ok(node)
-    }
-
-    fn maybe_parse_type_annotation(&mut self) -> SyntaxResult<Option<Node<'a>>> {
-        let type_decl = match self.accept(":") {
-            Some(_) => Some(self.parse_type()?),
-            None    => None,
-        };
-
-        Ok(type_decl)
     }
 
     fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<Relation<'a>>> {
