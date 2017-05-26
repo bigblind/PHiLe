@@ -14,6 +14,7 @@ use std::str;
 use std::fs::File;
 use std::path::Path;
 use std::error::Error;
+use std::time::Instant;
 use std::io::prelude::*;
 use phile::lexer::*;
 use phile::parser::*;
@@ -25,6 +26,20 @@ struct ProgramArgs {
     database: String,
     wrapper:  String,
     schemas:  Vec<String>,
+}
+
+
+macro_rules! stopwatch {
+    ($msg: expr, $code: expr) => ({
+        print!("{}... ", $msg);
+        let t0 = Instant::now();
+        let val = $code;
+        let t1 = Instant::now();
+        let dt = t1 - t0;
+        let secs = dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
+        println!("{:.0} ms", secs * 1e3);
+        val
+    })
 }
 
 
@@ -78,29 +93,41 @@ fn main() {
 
     let args = get_args();
 
-    let source = read_files(&args.schemas).unwrap_or_else(
-        |error| panic!("error reading file: {}", error.description())
-    );
+    let source = stopwatch!("Reading Sources", {
+        read_files(&args.schemas).unwrap_or_else(
+            |error| panic!("error reading file: {}", error.description())
+        )
+    });
 
-    let mut tokens = lex(&source).unwrap_or_else(
-        |location| panic!("Lexer error at {:#?}", location)
-    );
+    let tokens = stopwatch!("Lexing", {
+        let mut tmp_tokens = lex(&source).unwrap_or_else(
+            |location| panic!("Lexer error at {:#?}", location)
+        );
 
-    tokens.retain(
-        |token| match token.kind {
-            TokenKind::Whitespace => false,
-            TokenKind::Comment    => false,
-            _                     => true,
-        }
-    );
+        tmp_tokens.retain(
+            |token| match token.kind {
+                TokenKind::Whitespace => false,
+                TokenKind::Comment    => false,
+                _                     => true,
+            }
+        );
 
-    let program = parse(&tokens).unwrap_or_else(
-        |error| panic!(format_parse_error(&error))
-    );
+        tmp_tokens
+    });
 
-    let sqir = generate_sqir(&program).unwrap_or_else(
-        |error| panic!(format_sema_error(&error))
-    );
+    let program = stopwatch!("Parsing", {
+        parse(&tokens).unwrap_or_else(
+            |error| panic!(format_parse_error(&error))
+        )
+    });
+
+    let sqir = stopwatch!("Typechecking and generating SQIR", {
+        generate_sqir(&program).unwrap_or_else(
+            |error| panic!(format_sema_error(&error))
+        )
+    });
 
     println!("{:#?}", sqir);
+
+    println!("Compilation Successful");
 }
