@@ -15,6 +15,7 @@ use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use std::time::Instant;
+use std::io::stdout;
 use std::io::prelude::*;
 use phile::lexer::*;
 use phile::parser::*;
@@ -32,6 +33,7 @@ struct ProgramArgs {
 macro_rules! stopwatch {
     ($msg: expr, $code: expr) => ({
         print!("{}... ", $msg);
+        stdout().flush().expect("Could not flush stdout");
         let t0 = Instant::now();
         let val = $code;
         let t1 = Instant::now();

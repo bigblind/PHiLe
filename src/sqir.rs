@@ -14,28 +14,28 @@ use util::*;
 
 #[derive(Debug)]
 pub enum Type {
-    BoolType,
-    IntType,
-    FloatType,
-    DecimalType(usize, usize), // integral digits, fractional digits
+    Bool,
+    Int,
+    Float,
+    Decimal(usize, usize), // integral digits, fractional digits
 
-    StringType,
-    BlobType,
-    DateType,
+    String,
+    Blob,
+    Date,
 
-    OptionalType(WkCell<Type>),
-    UniqueType(WkCell<Type>),
-    PointerType(WkCell<Type>),
-    ArrayType(WkCell<Type>),
-    TupleType(Vec<WkCell<Type>>),
+    Optional(WkCell<Type>),
+    Unique(WkCell<Type>),
+    Pointer(WkCell<Type>),
+    Array(WkCell<Type>),
+    Tuple(Vec<WkCell<Type>>),
 
-    EnumType(EnumType),
-    StructType(StructType),
-    ClassType(ClassType),
+    Enum(EnumType),
+    Struct(StructType),
+    Class(ClassType),
 
-    FunctionType(FunctionType),
+    Function(FunctionType),
 
-    PlaceholderType(String, PlaceholderKind),
+    Placeholder(String, PlaceholderKind),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -137,12 +137,12 @@ pub struct SQIR {
 impl SQIR {
     pub fn new() -> SQIR {
         let named_types = hash_map![
-            "bool"   => RcCell::new(Type::BoolType),
-            "int"    => RcCell::new(Type::IntType),
-            "float"  => RcCell::new(Type::FloatType),
-            "String" => RcCell::new(Type::StringType),
-            "Blob"   => RcCell::new(Type::BlobType),
-            "Date"   => RcCell::new(Type::DateType),
+            "bool"   => RcCell::new(Type::Bool),
+            "int"    => RcCell::new(Type::Int),
+            "float"  => RcCell::new(Type::Float),
+            "String" => RcCell::new(Type::String),
+            "Blob"   => RcCell::new(Type::Blob),
+            "Date"   => RcCell::new(Type::Date),
         ];
 
         SQIR {

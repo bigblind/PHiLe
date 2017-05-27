@@ -142,7 +142,7 @@ impl SQIRGen {
 
             self.sqir.named_types.insert(
                 name.to_owned(),
-                RcCell::new(Type::PlaceholderType(name.to_owned(), kind))
+                RcCell::new(Type::Placeholder(name.to_owned(), kind))
             );
         }
 
@@ -209,7 +209,7 @@ impl SQIRGen {
     fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcCell<Type>> {
         let name = decl.name.to_owned();
 
-        let struct_type = Type::StructType(
+        let struct_type = Type::Struct(
             StructType {
                 name:   name.clone(),
                 fields: self.typecheck_struct_fields(decl)?,
@@ -234,7 +234,7 @@ impl SQIRGen {
     fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcCell<Type>> {
         let name = decl.name.to_owned();
 
-        let class_type = Type::ClassType(
+        let class_type = Type::Class(
             ClassType {
                 name:   name.clone(),
                 fields: self.typecheck_class_fields(decl)?,
@@ -257,7 +257,7 @@ impl SQIRGen {
     fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcCell<Type>> {
         let name = decl.name.to_owned();
 
-        let enum_type = Type::EnumType(
+        let enum_type = Type::Enum(
             EnumType {
                 name:     name.clone(),
                 variants: self.typecheck_enum_variants(decl)?,
@@ -380,17 +380,17 @@ impl SQIRGen {
             // validated in a separate step. Therefore, we can safely
             // assume that any errors in the transitive closure of the
             // pointed type will be caught later in the worst case.
-            Type::PointerType(_) => match parent_kind {
+            Type::Pointer(_) => match parent_kind {
                 ComplexTypeKind::Entity => Ok(()),
                 ComplexTypeKind::Value  => sema_error("Pointer not allowed in value type".to_owned(), node),
             },
 
             // Class types without indirection are never allowed.
-            Type::ClassType(ref t) => sema_error(
+            Type::Class(ref t) => sema_error(
                 format!("Class type '{}' not allowed without indirection", t.name),
                 node
             ),
-            Type::PlaceholderType(ref name, PlaceholderKind::Class) => sema_error(
+            Type::Placeholder(ref name, PlaceholderKind::Class) => sema_error(
                 format!("Class type '{}' not allowed without indirection", name),
                 node
             ),
@@ -400,32 +400,32 @@ impl SQIRGen {
             // must be valid as well. However, this is ensured by these
             // product types' respective defining methods, so if we have
             // any of them, we can be sure they are correct by induction.
-            Type::StructType(_) => Ok(()),
-            Type::EnumType(_)   => Ok(()),
-            Type::TupleType(_)  => Ok(()),
+            Type::Struct(_) => Ok(()),
+            Type::Enum(_)   => Ok(()),
+            Type::Tuple(_)  => Ok(()),
 
             // Placeholders representing struct and enum types are also OK,
             // because once typechecked on their own, valid structs and enums
             // can always be part of a class.
-            Type::PlaceholderType(_, PlaceholderKind::Struct) => Ok(()),
-            Type::PlaceholderType(_, PlaceholderKind::Enum)   => Ok(()),
+            Type::Placeholder(_, PlaceholderKind::Struct) => Ok(()),
+            Type::Placeholder(_, PlaceholderKind::Enum)   => Ok(()),
 
             // Function types are not allowed within user-defined types.
-            Type::FunctionType(_) => sema_error("Function type not allowed in user-defined type".to_owned(), node),
+            Type::Function(_) => sema_error("Function type not allowed in user-defined type".to_owned(), node),
 
             // Optionals, uniques, and arrays are checked for
             // explicitly and recursively, because they are
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            Type::OptionalType(ref t) => self.validate_optional(t, node, parent_kind),
-            Type::UniqueType(ref t)   => self.validate_unique(t, node, parent_kind),
-            Type::ArrayType(ref t)    => self.validate_array(t, node, parent_kind),
+            Type::Optional(ref t) => self.validate_optional(t, node, parent_kind),
+            Type::Unique(ref t)   => self.validate_unique(t, node, parent_kind),
+            Type::Array(ref t)    => self.validate_array(t, node, parent_kind),
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
-            Type::BoolType | Type::IntType | Type::FloatType   => Ok(()),
-            Type::DecimalType(_, _)                            => Ok(()),
-            Type::StringType | Type::BlobType | Type::DateType => Ok(()),
+            Type::Bool | Type::Int | Type::Float   => Ok(()),
+            Type::Decimal(_, _)                    => Ok(()),
+            Type::String | Type::Blob | Type::Date => Ok(()),
         }
     }
 
@@ -488,7 +488,7 @@ impl SQIRGen {
                 // As an immediate member of a class type, in addition
                 // to everything that is permitted in value types,
                 // an optional/unique/array of pointers is also allowed.
-                Type::PointerType(_) => Ok(()),
+                Type::Pointer(_) => Ok(()),
                 _ => sema_error(
                     format!(
                         "Expected {} of pointer/value type ({})",
@@ -509,8 +509,8 @@ impl SQIRGen {
         self.occurs_check_type(ud_type, ud_type)
     }
 
-    // Try to find the root_type in the transitive-reflexive closure
-    // of its contained/wrapped types that occur without indirection,
+    // Try to find the root_type in the transitive closure of its
+    // contained/wrapped types that occur without indirection,
     // i.e. those that are _not_ behind a pointer or in an array.
     fn occurs_check_type(&self, root: &WkCell<Type>, child: &WkCell<Type>) -> SemaResult<()> {
         let rc = child.as_rc()?;
@@ -518,29 +518,29 @@ impl SQIRGen {
 
         match *ptr {
             // Indirection is always OK.
-            Type::PointerType(_) => Ok(()),
-            Type::ArrayType(_)   => Ok(()),
+            Type::Pointer(_) => Ok(()),
+            Type::Array(_)   => Ok(()),
 
             // Non-recursive (atomic/non-wrapping) types are always OK.
-            Type::BoolType | Type::IntType | Type::FloatType   => Ok(()),
-            Type::DecimalType(_, _)                            => Ok(()),
-            Type::StringType | Type::BlobType | Type::DateType => Ok(()),
+            Type::Bool | Type::Int | Type::Float   => Ok(()),
+            Type::Decimal(_, _)                    => Ok(()),
+            Type::String | Type::Blob | Type::Date => Ok(()),
 
             // Non-indirect, potentially recursive types
-            Type::OptionalType(ref t) => self.ensure_transitive_noncontainment(root, t),
-            Type::UniqueType(ref t)   => self.ensure_transitive_noncontainment(root, t),
-            Type::TupleType(ref ts)   => self.ensure_transitive_noncontainment_multi(root, ts),
-            Type::EnumType(ref et)    => self.ensure_transitive_noncontainment_multi(root, et.variants.values()),
-            Type::StructType(ref st)  => self.ensure_transitive_noncontainment_multi(root, st.fields.values()),
-            Type::ClassType(ref ct)   => self.ensure_transitive_noncontainment_multi(root, ct.fields.values()),
+            Type::Optional(ref t) => self.ensure_transitive_noncontainment(root, t),
+            Type::Unique(ref t)   => self.ensure_transitive_noncontainment(root, t),
+            Type::Tuple(ref ts)   => self.ensure_transitive_noncontainment_multi(root, ts),
+            Type::Enum(ref et)    => self.ensure_transitive_noncontainment_multi(root, et.variants.values()),
+            Type::Struct(ref st)  => self.ensure_transitive_noncontainment_multi(root, st.fields.values()),
+            Type::Class(ref ct)   => self.ensure_transitive_noncontainment_multi(root, ct.fields.values()),
 
             // Function types are not allowed within user-defined types
-            Type::FunctionType(_) => occurs_check_error(
+            Type::Function(_) => occurs_check_error(
                 format!("Function type should not occur within user-defined type '{}'", format_type(root))
             ),
 
             // Occurs check is supposed to happen after type resolution
-            Type::PlaceholderType(ref name, _) => occurs_check_error(
+            Type::Placeholder(ref name, _) => occurs_check_error(
                 format!("Placeholder type '{}' should have been resolved by now", name)
             ),
         }
@@ -584,15 +584,15 @@ impl SQIRGen {
         let pointer_type = self.get_pointer_type_raw(decl)?;
 
         match *pointer_type.borrow()? {
-            Type::PointerType(ref pointed_type) => {
+            Type::Pointer(ref pointed_type) => {
                 let rc = pointed_type.as_rc()?;
                 let ptr = rc.borrow()?;
 
                 // Only pointer-to-class types are permitted.
                 // (Placeholders to classes are also allowed, obviously.)
                 match *ptr {
-                    Type::ClassType(_) => (),
-                    Type::PlaceholderType(_, PlaceholderKind::Class) => (),
+                    Type::Class(_) => (),
+                    Type::Placeholder(_, PlaceholderKind::Class) => (),
                     _ => return sema_error(
                         format!("Pointer to non-class type '{}'", format_type(pointed_type)),
                         decl
@@ -613,13 +613,13 @@ impl SQIRGen {
         let unique_type = self.get_unique_type_raw(decl)?;
 
         match *unique_type.borrow()? {
-            Type::UniqueType(ref wrapped_type) => {
+            Type::Unique(ref wrapped_type) => {
                 let rc = wrapped_type.as_rc()?;
                 let ptr = rc.borrow()?;
 
                 // Unique-of-unique does not make sense
                 match *ptr {
-                    Type::UniqueType(_) => return sema_error("Unique of unique type disallowed".to_owned(), decl),
+                    Type::Unique(_) => return sema_error("Unique of unique type disallowed".to_owned(), decl),
                     _ => (),
                 }
             },
@@ -635,25 +635,25 @@ impl SQIRGen {
 
     implement_wrapping_type_getter! {
         get_pointer_type_raw,
-        PointerType,
+        Pointer,
         pointer_types
     }
 
     implement_wrapping_type_getter! {
         get_optional_type_raw,
-        OptionalType,
+        Optional,
         optional_types
     }
 
     implement_wrapping_type_getter! {
         get_unique_type_raw,
-        UniqueType,
+        Unique,
         unique_types
     }
 
     implement_wrapping_type_getter! {
         get_array_type_raw,
-        ArrayType,
+        Array,
         array_types
     }
 
@@ -674,7 +674,7 @@ impl SQIRGen {
         }).collect::<SemaResult<_>>()?;
 
         let tuple = self.sqir.tuple_types.entry(types.clone()).or_insert_with(
-            || RcCell::new(Type::TupleType(types.iter().map(RcCell::as_weak).collect()))
+            || RcCell::new(Type::Tuple(types.iter().map(RcCell::as_weak).collect()))
         );
 
         Ok(tuple.clone())
