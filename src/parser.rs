@@ -227,16 +227,11 @@ impl<'a> Parser<'a> {
             "+<->!",
         ];
 
-        let relation = match self.accept_one_of(relation_operators) {
-            Some(op) => {
-                let cardinality = op.value;
-                let entity = self.expect_identifier()?.value;
-                self.expect("::")?;
-                let field = self.expect_identifier()?.value;
-                Some(Relation { cardinality, entity, field })
-            },
-            None => None,
-        };
+        let relation = self.accept_one_of(relation_operators).map(|op| {
+            let cardinality = op.value;
+            let field = self.accept_identifier().map(|t| t.value);
+            Relation { cardinality, field }
+        });
 
         Ok(relation)
     }
