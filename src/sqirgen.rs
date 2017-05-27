@@ -113,7 +113,7 @@ impl SQIRGen {
     fn generate_sqir(mut self, node: &Node) -> SemaResult<SQIR> {
         let children = match node.value {
             NodeValue::Program(ref children) => children,
-            _ => return sema_error("Top-level node must be a Program".to_owned(), node),
+            _ => unreachable!("Top-level node must be a Program"),
         };
 
         self.forward_declare_user_defined_types(children)?;
@@ -217,20 +217,15 @@ impl SQIRGen {
         );
 
         // Replace the placeholder type with the now-created actual type
-        let struct_type_rc = self.sqir.named_types.get(&name).ok_or_else(
-            || SemaError {
-                message: format!("No placeholder type for struct '{}'", name),
-                range:   None,
-            }
-        )?;
+        let struct_type_rc = self.sqir.named_types.get(&name).unwrap_or_else(
+            || unreachable!("No placeholder type for struct '{}'", name)
+        );
 
         *struct_type_rc.borrow_mut()? = struct_type;
 
         Ok(struct_type_rc.clone())
     }
 
-    // TODO(H2CO3): refactor define_struct_type() and define_class_type()
-    // (maybe using a macro similar to that used with wrapper type getters?)
     fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcCell<Type>> {
         let name = decl.name.to_owned();
 
@@ -242,12 +237,9 @@ impl SQIRGen {
         );
 
         // Replace the placeholder type with the now-created actual type
-        let class_type_rc = self.sqir.named_types.get(&name).ok_or_else(
-            || SemaError {
-                message: format!("No placeholder type for class '{}'", name),
-                range:   None,
-            }
-        )?;
+        let class_type_rc = self.sqir.named_types.get(&name).unwrap_or_else(
+            || unreachable!("No placeholder type for class '{}'", name)
+        );
 
         *class_type_rc.borrow_mut()? = class_type;
 
@@ -265,12 +257,9 @@ impl SQIRGen {
         );
 
         // Replace the placeholder type with the now-created actual type
-        let enum_type_rc = self.sqir.named_types.get(&name).ok_or_else(
-            || SemaError {
-                message: format!("No placeholder type for enum '{}'", name),
-                range:   None,
-            }
-        )?;
+        let enum_type_rc = self.sqir.named_types.get(&name).unwrap_or_else(
+            || unreachable!("No placeholder type for enum '{}'", name)
+        );
 
         *enum_type_rc.borrow_mut()? = enum_type;
 
@@ -287,7 +276,7 @@ impl SQIRGen {
         for node in &decl.fields {
             let field = match node.value {
                 NodeValue::Field(ref field) => field,
-                _ => return sema_error("Struct fields must be Field values".to_owned(), node),
+                _ => unreachable!("Struct fields must be Field values"),
             };
 
             // No relations are allowed in a struct.
@@ -318,7 +307,7 @@ impl SQIRGen {
         for node in &decl.fields {
             let field = match node.value {
                 NodeValue::Field(ref field) => field,
-                _ => return sema_error("Class fields must be Field values".to_owned(), node),
+                _ => unreachable!("Class fields must be Field values"),
             };
 
             let field_type_rc = self.type_from_decl(&field.type_decl)?;
@@ -344,7 +333,7 @@ impl SQIRGen {
         for node in &decl.variants {
             let variant = match node.value {
                 NodeValue::Variant(ref variant) => variant,
-                _ => return sema_error("Enum variants must be Variant values".to_owned(), node),
+                _ => unreachable!("Enum variants must be Variant values"),
             };
 
             let type_rc = match variant.type_decl {
@@ -540,8 +529,9 @@ impl SQIRGen {
             ),
 
             // Occurs check is supposed to happen after type resolution
-            Type::Placeholder(ref name, _) => occurs_check_error(
-                format!("Placeholder type '{}' should have been resolved by now", name)
+            Type::Placeholder(ref name, _) => unreachable!(
+                "Placeholder type '{}' should have been resolved by now",
+                name
             ),
         }
     }
@@ -576,7 +566,7 @@ impl SQIRGen {
             NodeValue::ArrayType(ref element)    => self.get_array_type(element),
             NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
             NodeValue::NamedType(name)           => self.get_named_type(name, decl),
-            _ => sema_error("Not a type declaration".to_owned(), decl),
+            _ => unreachable!("Not a type declaration"),
         }
     }
 
@@ -599,7 +589,7 @@ impl SQIRGen {
                     ),
                 }
             },
-            _ => return sema_error("Non-pointer pointer type!?".to_owned(), decl),
+            _ => unreachable!("Non-pointer pointer type!?"),
         }
 
         Ok(pointer_type)
@@ -623,7 +613,7 @@ impl SQIRGen {
                     _ => (),
                 }
             },
-            _ => return sema_error("Non-unique unique type!?".to_owned(), decl),
+            _ => unreachable!("Non-unique unique type!?"),
         }
 
         Ok(unique_type)
@@ -695,8 +685,24 @@ impl SQIRGen {
         unimplemented!()
     }
 
-    fn cardinalities_from_operator(&self, op: &str) -> SemaResult<(Cardinality, Cardinality)> {
-        unimplemented!()
+    fn cardinalities_from_operator(&self, op: &str) -> (Cardinality, Cardinality) {
+        let cardinality_from_char = |ch| match ch {
+            '<' => Cardinality::One,
+            '>' => Cardinality::One,
+            '?' => Cardinality::ZeroOrOne,
+            '!' => Cardinality::One,
+            '*' => Cardinality::ZeroOrMore,
+            '+' => Cardinality::OneOrMore,
+            _   => unreachable!("invalid cardinality operator '{}'", op),
+        };
+
+        let mut chars = op.chars();
+        let first = chars.next().expect("cardinality operator too short");
+        let last = chars.next_back().expect("cardinality operator too short");
+        let lhs = cardinality_from_char(first);
+        let rhs = cardinality_from_char(last);
+
+        (lhs, rhs)
     }
 
     //
