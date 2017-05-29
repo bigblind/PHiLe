@@ -723,9 +723,9 @@ impl SQIRGen {
 
     fn define_relation_for_field(&mut self, class_type: WkCell<Type>, field: &Field) -> SemaResult<()> {
         let class_type_rc = class_type.as_rc()?;
-        let class_type_ptr = class_type_rc.borrow()?;
+        let class_type = class_type_rc.borrow()?;
 
-        let class = match *class_type_ptr {
+        let class = match *class_type {
             Type::Class(ref c) => c,
             _ => unreachable!("Non-class class type!?"),
         };
@@ -734,43 +734,54 @@ impl SQIRGen {
         let field_type = field_type_rc.borrow()?;
 
         // If the field has an explicit relation, typecheck it.
-        // Else if it has a relational type (&T, &T!, &T?, or [&T]),
-        // then implicitly form a relation.
-        // In the latter case, cardinalities are inferred according
-        // to the following rules:
-        // * The cardinality of the LHS is always ZeroOrMore, since
-        //   we have no information about how many instances of the
-        //   LHS may point to one particular instance of the RHS.
-        // * The cardinality of the RHS is:
-        //   * One        for &T and &T!
-        //   * ZeroOrOne  for &T?
-        //   * ZeroOrMore for [&T]
-        if let Some(ref relation) = field.relation {
-            let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
-            unimplemented!()
-        } else {
-            let (pointed_type, card_rhs) = match self.try_unwrap_relational_type(&*field_type)? {
-                Some(cardinality_and_type) => cardinality_and_type,
-                None => return Ok(()), // not a relational type
-            };
+        // Otherwise, if it has a relational type (&T, &T!, &T?,
+        // or [&T]), then implicitly form a relation.
+        match field.relation {
+            Some(ref rel) => {
+                let (lhs, rhs) = self.cardinalities_from_operator(rel.cardinality);
 
-            // Make the relation
-            let lhs = RelationSide {
-                class:       class_type_rc.clone(),
-                field:       Some(field.name.to_owned()),
-                cardinality: Cardinality::ZeroOrMore,
-            };
-            let rhs = RelationSide {
-                class:       pointed_type,
-                field:       None,
-                cardinality: card_rhs,
-            };
-            let relation = (lhs, rhs);
-
-            self.sqir.relations.push(relation);
-
-            Ok(())
+                // match rel.field {
+                //     Some(_) => _,
+                //     None => _,
+                // }
+                unimplemented!()
+            },
+            None => self.define_implicit_relation(&class_type_rc, &*field_type, field.name),
         }
+    }
+
+    // Defines a one-sided relation based on the referred type.
+    // In the latter case, cardinalities are inferred according
+    // to the following rules:
+    // * The cardinality of the LHS is always ZeroOrMore, since
+    //   we have no information about how many instances of the
+    //   LHS may point to one particular instance of the RHS.
+    // * The cardinality of the RHS is:
+    //   * One        for &T and &T!
+    //   * ZeroOrOne  for &T?
+    //   * ZeroOrMore for [&T]
+    fn define_implicit_relation(&mut self, class_type: &RcCell<Type>, field_type: &Type, field_name: &str) -> SemaResult<()> {
+        let (pointed_type, card_rhs) = match self.try_unwrap_relational_type(field_type)? {
+            Some(type_and_cardinality) => type_and_cardinality,
+            None => return Ok(()), // not a relational type
+        };
+
+        // Make the relation
+        let lhs = RelationSide {
+            class:       class_type.clone(),
+            field:       Some(field_name.to_owned()),
+            cardinality: Cardinality::ZeroOrMore,
+        };
+        let rhs = RelationSide {
+            class:       pointed_type,
+            field:       None,
+            cardinality: card_rhs,
+        };
+        let relation = (lhs, rhs);
+
+        self.sqir.relations.push(relation);
+
+        Ok(())
     }
 
     // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
