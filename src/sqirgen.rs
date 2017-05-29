@@ -767,7 +767,7 @@ impl SQIRGen {
                 match *ptr {
                     Type::Pointer(ref pointed) => match cardinality {
                         $(Cardinality::$card => pointed.as_rc().map_err(SemaError::from),)*
-                            _ => cardinality_mismatch_error($name),
+                        _ => cardinality_mismatch_error($name),
                     },
                     _ => not_relational_error(),
                 }
