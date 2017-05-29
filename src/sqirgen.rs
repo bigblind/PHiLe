@@ -724,8 +724,12 @@ impl SQIRGen {
         // Otherwise, if it has a relational type (&T, &T!, &T?,
         // or [&T]), then implicitly form a relation.
         match field.relation {
-            Some(ref rel) => self.define_explicit_relation(&class_type_rc, &*field_type, field.name, rel, node),
-            None => self.define_implicit_relation(&class_type_rc, &*field_type, field.name),
+            Some(ref rel) => self.define_explicit_relation(
+                &class_type_rc, &*field_type, field.name, rel, node
+            ),
+            None => self.define_implicit_relation(
+                &class_type_rc, &*field_type, field.name
+            ),
         }
     }
 
@@ -740,6 +744,14 @@ impl SQIRGen {
         // Ensure that declared RHS cardinality matches with the field type
         let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
         let pointed_type = self.validate_type_cardinality(field_type, card_rhs, node)?;
+
+        // If the relation declaration specifies a field name for the RHS,
+        // then check that...:
+        // * the RHS refers back to the LHS using LHS's field_name
+        // * the cardinality specifier of the RHS exists, and
+        // * the cardinality specifier of the RHS matches that of the inverse of the LHS
+        // * no other relation refers to the same field of the RHS
+        //   (by induction, this also protects the fields of the LHS)
         unimplemented!()
     }
 
@@ -793,8 +805,7 @@ impl SQIRGen {
     }
 
     // Defines a one-sided relation based on the referred type.
-    // In the latter case, cardinalities are inferred according
-    // to the following rules:
+    // Cardinalities are inferred according to the following rules:
     // * The cardinality of the LHS is always ZeroOrMore, since
     //   we have no information about how many instances of the
     //   LHS may point to one particular instance of the RHS.
