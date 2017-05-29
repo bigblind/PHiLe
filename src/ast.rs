@@ -48,7 +48,7 @@ pub struct ClassDecl<'a> {
 }
 
 #[derive(Debug)]
-pub struct Relation<'a> {
+pub struct RelDecl<'a> {
     pub cardinality: &'a str,
     pub field:       Option<&'a str>,
 }
@@ -57,7 +57,7 @@ pub struct Relation<'a> {
 pub struct Field<'a> {
     pub name:      &'a str,
     pub type_decl: Node<'a>,
-    pub relation:  Option<Relation<'a>>,
+    pub relation:  Option<RelDecl<'a>>,
 }
 
 #[derive(Debug)]

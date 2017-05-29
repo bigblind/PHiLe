@@ -211,7 +211,7 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<Relation<'a>>> {
+    fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<RelDecl<'a>>> {
         #[allow(non_upper_case_globals)]
         static relation_operators: &[&str] = &[
             // I just couldn't make up my mind as to how to denote
@@ -230,7 +230,7 @@ impl<'a> Parser<'a> {
         let relation = self.accept_one_of(relation_operators).map(|op| {
             let cardinality = op.value;
             let field = self.accept_identifier().map(|t| t.value);
-            Relation { cardinality, field }
+            RelDecl { cardinality, field }
         });
 
         Ok(relation)

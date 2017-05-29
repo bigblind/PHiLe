@@ -11,7 +11,7 @@ use std::error::Error;
 use util::*;
 use sqir::*;
 use lexer::*;
-use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, Field };
+use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, Field, RelDecl };
 
 
 #[derive(Debug, Clone)]
@@ -737,17 +737,19 @@ impl SQIRGen {
         // Otherwise, if it has a relational type (&T, &T!, &T?,
         // or [&T]), then implicitly form a relation.
         match field.relation {
-            Some(ref rel) => {
-                let (lhs, rhs) = self.cardinalities_from_operator(rel.cardinality);
-
-                // match rel.field {
-                //     Some(_) => _,
-                //     None => _,
-                // }
-                unimplemented!()
-            },
+            Some(ref rel) => self.define_explicit_relation(&class_type_rc, &*field_type, field.name, rel),
             None => self.define_implicit_relation(&class_type_rc, &*field_type, field.name),
         }
+    }
+
+    fn define_explicit_relation(
+        &mut self,
+        class_type: &RcCell<Type>,
+        field_type: &Type,
+        field_name: &str,
+        relation: &RelDecl,
+    ) -> SemaResult<()> {
+        unimplemented!()
     }
 
     // Defines a one-sided relation based on the referred type.
@@ -793,7 +795,7 @@ impl SQIRGen {
             Type::Optional(ref wrapped) => try_unwrap_pointer_type!(wrapped, ZeroOrOne),
             Type::Array(ref element)    => try_unwrap_pointer_type!(element, ZeroOrMore),
             Type::Pointer(ref pointed)  => (pointed.as_rc()?, Cardinality::One),
-            _                           => return Ok(None),
+            _                           => return Ok(None), // not a relational type
         };
 
         Ok(Some(type_and_cardinality))
