@@ -11,7 +11,7 @@ use std::error::Error;
 use util::*;
 use sqir::*;
 use lexer::*;
-use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, Field, RelDecl };
+use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, RelDecl };
 
 
 #[derive(Debug, Clone)]
@@ -45,19 +45,6 @@ macro_rules! implement_wrapping_type_getter {
             Ok(wrapping.clone())
         }
     }
-}
-
-// This macro is used by try_unwrap_relational_type().
-macro_rules! try_unwrap_pointer_type {
-    ($ty: expr, $card: ident) => ({
-        let rc = $ty.as_rc()?;
-        let ptr = rc.borrow()?;
-
-        match *ptr {
-            Type::Pointer(ref pointed) => (pointed.as_rc()?, Cardinality::$card),
-            _ => return Ok(None),
-        }
-    })
 }
 
 pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
@@ -710,18 +697,18 @@ impl SQIRGen {
         let class_type = self.sqir.named_types[decl.name].as_weak();
 
         for node in &decl.fields {
-            let field = match node.value {
-                NodeValue::Field(ref field) => field,
-                _ => unreachable!("Class fields must be Field values"),
-            };
-
-            self.define_relation_for_field(class_type.clone(), field)?;
+            self.define_relation_for_field(class_type.clone(), node)?;
         }
 
         Ok(())
     }
 
-    fn define_relation_for_field(&mut self, class_type: WkCell<Type>, field: &Field) -> SemaResult<()> {
+    fn define_relation_for_field(&mut self, class_type: WkCell<Type>, node: &Node) -> SemaResult<()> {
+        let field = match node.value {
+            NodeValue::Field(ref field) => field,
+            _ => unreachable!("Class fields must be Field values"),
+        };
+
         let class_type_rc = class_type.as_rc()?;
         let class_type = class_type_rc.borrow()?;
 
@@ -737,7 +724,7 @@ impl SQIRGen {
         // Otherwise, if it has a relational type (&T, &T!, &T?,
         // or [&T]), then implicitly form a relation.
         match field.relation {
-            Some(ref rel) => self.define_explicit_relation(&class_type_rc, &*field_type, field.name, rel),
+            Some(ref rel) => self.define_explicit_relation(&class_type_rc, &*field_type, field.name, rel, node),
             None => self.define_implicit_relation(&class_type_rc, &*field_type, field.name),
         }
     }
@@ -748,8 +735,61 @@ impl SQIRGen {
         field_type: &Type,
         field_name: &str,
         relation: &RelDecl,
+        node: &Node
     ) -> SemaResult<()> {
+        // Ensure that declared RHS cardinality matches with the field type
+        let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
+        let pointed_type = self.validate_type_cardinality(field_type, card_rhs, node)?;
         unimplemented!()
+    }
+
+    // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
+    // ensure that the specified cardinality can be used with it,
+    // then unwrap and return the referred pointed type T.
+    // Otherwise, if the type is either not a relational type,
+    // or it doesn't correspond to the specified cardinality,
+    // then return an error.
+    fn validate_type_cardinality(&self, t: &Type, cardinality: Cardinality, node: &Node) -> SemaResult<RcCell<Type>> {
+        let not_relational_error = || sema_error(
+            format!("Field type is not relational: '{:#?}'", t),
+            node
+        );
+        let cardinality_mismatch_error = |name| sema_error(
+            format!("{} type can't have a cardinality of {:#?}", name, cardinality),
+            node
+        );
+
+        macro_rules! validate_and_unwrap_pointer_type {
+            ($ty: expr, $name: expr, $($card: ident),*) => ({
+                let rc = $ty.as_rc()?;
+                let ptr = rc.borrow()?;
+
+                match *ptr {
+                    Type::Pointer(ref pointed) => match cardinality {
+                        $(Cardinality::$card => pointed.as_rc().map_err(SemaError::from),)*
+                            _ => cardinality_mismatch_error($name),
+                    },
+                    _ => not_relational_error(),
+                }
+            })
+        }
+
+        match *t {
+            Type::Unique(ref wrapped) => validate_and_unwrap_pointer_type!(
+                wrapped, "Unique pointer",   One
+            ),
+            Type::Optional(ref wrapped) => validate_and_unwrap_pointer_type!(
+                wrapped, "Optional pointer", ZeroOrOne
+            ),
+            Type::Array(ref element) => validate_and_unwrap_pointer_type!(
+                element, "Array",            ZeroOrMore, OneOrMore
+            ),
+            Type::Pointer(ref pointed) => match cardinality {
+                Cardinality::One => pointed.as_rc().map_err(SemaError::from),
+                _ => cardinality_mismatch_error("Simple pointer"),
+            },
+            _ => not_relational_error(),
+        }
     }
 
     // Defines a one-sided relation based on the referred type.
@@ -763,7 +803,7 @@ impl SQIRGen {
     //   * ZeroOrOne  for &T?
     //   * ZeroOrMore for [&T]
     fn define_implicit_relation(&mut self, class_type: &RcCell<Type>, field_type: &Type, field_name: &str) -> SemaResult<()> {
-        let (pointed_type, card_rhs) = match self.try_unwrap_relational_type(field_type)? {
+        let (pointed_type, card_rhs) = match self.try_infer_type_cardinality(field_type)? {
             Some(type_and_cardinality) => type_and_cardinality,
             None => return Ok(()), // not a relational type
         };
@@ -789,7 +829,19 @@ impl SQIRGen {
     // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
     // return the corresponding cardinality and the pointed type T.
     // Otherwise, return None.
-    fn try_unwrap_relational_type(&self, t: &Type) -> SemaResult<Option<(RcCell<Type>, Cardinality)>> {
+    fn try_infer_type_cardinality(&self, t: &Type) -> SemaResult<Option<(RcCell<Type>, Cardinality)>> {
+        macro_rules! try_unwrap_pointer_type {
+            ($ty: expr, $card: ident) => ({
+                let rc = $ty.as_rc()?;
+                let ptr = rc.borrow()?;
+
+                match *ptr {
+                    Type::Pointer(ref pointed) => (pointed.as_rc()?, Cardinality::$card),
+                    _ => return Ok(None),
+                }
+            })
+        }
+
         let type_and_cardinality = match *t {
             Type::Unique(ref wrapped)   => try_unwrap_pointer_type!(wrapped, One),
             Type::Optional(ref wrapped) => try_unwrap_pointer_type!(wrapped, ZeroOrOne),
