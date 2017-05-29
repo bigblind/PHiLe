@@ -92,7 +92,7 @@ pub struct FunctionType {
 
 #[derive(Debug)]
 pub struct RelationSide {
-    pub class:       WkCell<Type>,
+    pub class:       RcCell<Type>,
     pub field:       Option<String>,
     pub cardinality: Cardinality,
 }

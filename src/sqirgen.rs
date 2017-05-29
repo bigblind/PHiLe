@@ -11,7 +11,7 @@ use std::error::Error;
 use util::*;
 use sqir::*;
 use lexer::*;
-use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl };
+use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, Field };
 
 
 #[derive(Debug, Clone)]
@@ -45,6 +45,19 @@ macro_rules! implement_wrapping_type_getter {
             Ok(wrapping.clone())
         }
     }
+}
+
+// This macro is used by try_unwrap_relational_type().
+macro_rules! try_unwrap_pointer_type {
+    ($ty: expr, $card: ident) => ({
+        let rc = $ty.as_rc()?;
+        let ptr = rc.borrow()?;
+
+        match *ptr {
+            Type::Pointer(ref pointed) => (pointed.as_rc()?, Cardinality::$card),
+            _ => return Ok(None),
+        }
+    })
 }
 
 pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
@@ -119,6 +132,7 @@ impl SQIRGen {
         self.forward_declare_user_defined_types(children)?;
         self.define_user_defined_types(children)?;
         self.occurs_check_user_defined_types()?;
+        self.define_relations(children)?;
         self.forward_declare_functions(children)?;
         self.generate_functions(children)?;
 
@@ -170,6 +184,17 @@ impl SQIRGen {
         // all placeholders that could hide self-containing types.)
         for (_, t) in &self.sqir.named_types {
             self.occurs_check(&t.as_weak())?;
+        }
+
+        Ok(())
+    }
+
+    fn define_relations(&mut self, children: &[Node]) -> SemaResult<()> {
+        for child in children {
+            match child.value {
+                NodeValue::ClassDecl(ref c) => self.define_relations_for_class(c)?,
+                _ => continue,
+            }
         }
 
         Ok(())
@@ -681,8 +706,86 @@ impl SQIRGen {
     // Type checking relationships
     //
 
-    fn type_from_relation(&mut self, relation: &Relation) -> SemaResult<RcCell<Type>> {
-        unimplemented!()
+    fn define_relations_for_class(&mut self, decl: &ClassDecl) -> SemaResult<()> {
+        let class_type = self.sqir.named_types[decl.name].as_weak();
+
+        for node in &decl.fields {
+            let field = match node.value {
+                NodeValue::Field(ref field) => field,
+                _ => unreachable!("Class fields must be Field values"),
+            };
+
+            self.define_relation_for_field(class_type.clone(), field)?;
+        }
+
+        Ok(())
+    }
+
+    fn define_relation_for_field(&mut self, class_type: WkCell<Type>, field: &Field) -> SemaResult<()> {
+        let class_type_rc = class_type.as_rc()?;
+        let class_type_ptr = class_type_rc.borrow()?;
+
+        let class = match *class_type_ptr {
+            Type::Class(ref c) => c,
+            _ => unreachable!("Non-class class type!?"),
+        };
+
+        let field_type_rc = class.fields[field.name].as_rc()?;
+        let field_type = field_type_rc.borrow()?;
+
+        // If the field has an explicit relation, typecheck it.
+        // Else if it has a relational type (&T, &T!, &T?, or [&T]),
+        // then implicitly form a relation.
+        // In the latter case, cardinalities are inferred according
+        // to the following rules:
+        // * The cardinality of the LHS is always ZeroOrMore, since
+        //   we have no information about how many instances of the
+        //   LHS may point to one particular instance of the RHS.
+        // * The cardinality of the RHS is:
+        //   * One        for &T and &T!
+        //   * ZeroOrOne  for &T?
+        //   * ZeroOrMore for [&T]
+        if let Some(ref relation) = field.relation {
+            let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
+            unimplemented!()
+        } else {
+            let (pointed_type, card_rhs) = match self.try_unwrap_relational_type(&*field_type)? {
+                Some(cardinality_and_type) => cardinality_and_type,
+                None => return Ok(()), // not a relational type
+            };
+
+            // Make the relation
+            let lhs = RelationSide {
+                class:       class_type_rc.clone(),
+                field:       Some(field.name.to_owned()),
+                cardinality: Cardinality::ZeroOrMore,
+            };
+            let rhs = RelationSide {
+                class:       pointed_type,
+                field:       None,
+                cardinality: card_rhs,
+            };
+            let relation = (lhs, rhs);
+
+            self.sqir.relations.push(relation);
+
+            Ok(())
+        }
+    }
+
+    // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
+    // return the corresponding cardinality and the pointed type T.
+    // Otherwise, return None.
+    fn try_unwrap_relational_type(&self, t: &Type) -> SemaResult<Option<(RcCell<Type>, Cardinality)>> {
+        let type_and_cardinality = match *t {
+            Type::Unique(ref wrapped)   => try_unwrap_pointer_type!(wrapped, One),
+            Type::Optional(ref wrapped) => try_unwrap_pointer_type!(wrapped, ZeroOrOne),
+            Type::Array(ref element)    => try_unwrap_pointer_type!(element, ZeroOrMore),
+            Type::Pointer(ref pointed)  => (pointed.as_rc()?, Cardinality::One),
+            _                           => return Ok(None),
+        };
+
+        Ok(Some(type_and_cardinality))
     }
 
     fn cardinalities_from_operator(&self, op: &str) -> (Cardinality, Cardinality) {
