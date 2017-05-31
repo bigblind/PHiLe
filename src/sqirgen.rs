@@ -130,7 +130,7 @@ impl SQIRGen {
         self.define_user_defined_types(children)?;
         self.occurs_check_user_defined_types()?;
         self.define_relations(children)?;
-        self.check_relation_reciprocity()?;
+        self.validate_relations()?;
         self.forward_declare_functions(children)?;
         self.generate_functions(children)?;
 
@@ -181,7 +181,7 @@ impl SQIRGen {
     // all placeholders that could hide self-containing types.)
     fn occurs_check_user_defined_types(&self) -> SemaResult<()> {
         for (_, t) in &self.sqir.named_types {
-            self.occurs_check(&t.as_weak())?;
+            self.occurs_check(&t.as_weak())?
         }
 
         Ok(())
@@ -206,40 +206,45 @@ impl SQIRGen {
     // The two latter conditions can be summed up as "the relations
     // specified by the LHS and the RHS are equivalent".
     // TODO(H2CO3): this does 2 times as many comparisons as necessary.
-    // TODO(H2CO3): this is a monstrosity; refactor
-    fn check_relation_reciprocity(&self) -> SemaResult<()> {
+    fn validate_relations(&self) -> SemaResult<()> {
         for (&(ref lhs_type, ref lhs_field), relation) in &self.sqir.relations {
-            let rhs_type = relation.rhs.class.clone();
-            let rhs_field = match relation.rhs.field {
-                Some(ref name) => name.clone(),
-                None => continue, // unilateral relations need no reciprocal references
-            };
+            self.check_relation_reciprocity(lhs_type, lhs_field, relation)?
+        }
 
-            // Look up the inverse relation. If it doesn't exist, it means that the
-            // LHS refers to a field in the RHS that doesn't correspond to a relation.
-            let rhs_key = (rhs_type.clone(), rhs_field.clone());
-            match self.sqir.relations.get(&rhs_key) {
-                None => return reciprocity_error(
+        Ok(())
+    }
+
+    fn check_relation_reciprocity(&self, lhs_type: &RcCell<Type>, lhs_field: &String, relation: &Relation) -> SemaResult<()> {
+        let rhs_type = relation.rhs.class.clone();
+        let rhs_field = match relation.rhs.field {
+            Some(ref name) => name.clone(),
+            None => return Ok(()), // unilateral relations need no reciprocal references
+        };
+
+        // Look up the inverse relation. If it doesn't exist, it means that the
+        // LHS refers to a field in the RHS that doesn't correspond to a relation.
+        let rhs_key = (rhs_type.clone(), rhs_field.clone());
+        match self.sqir.relations.get(&rhs_key) {
+            None => return reciprocity_error(
+                format!(
+                    "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
+                    unwrap_class_name(&lhs_type),
+                    lhs_field,
+                    unwrap_class_name(&rhs_type),
+                    rhs_field
+                )
+            ),
+            Some(ref inverse_relation) => if relation != *inverse_relation {
+                return reciprocity_error(
                     format!(
-                        "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
+                        "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching cardinalities or field names",
                         unwrap_class_name(&lhs_type),
                         lhs_field,
                         unwrap_class_name(&rhs_type),
                         rhs_field
                     )
-                ),
-                Some(ref inverse_relation) => if relation != *inverse_relation {
-                    return reciprocity_error(
-                        format!(
-                            "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching cardinalities or field names",
-                            unwrap_class_name(&lhs_type),
-                            lhs_field,
-                            unwrap_class_name(&rhs_type),
-                            rhs_field
-                        )
-                    )
-                },
-            }
+                )
+            },
         }
 
         Ok(())
@@ -721,7 +726,7 @@ impl SQIRGen {
         // A one-element tuple is converted to its element type,
         // _without_ validation of containment in a value type.
         if decls.len() == 1 {
-            return self.type_from_decl(&decls[0]);
+            return self.type_from_decl(&decls[0])
         }
 
         // Tuples are full-fledged value types, similar to structs.
@@ -755,7 +760,7 @@ impl SQIRGen {
         let class_type = self.sqir.named_types[decl.name].as_weak();
 
         for node in &decl.fields {
-            self.define_relation_for_field(class_type.clone(), node)?;
+            self.define_relation_for_field(class_type.clone(), node)?
         }
 
         Ok(())
@@ -845,17 +850,14 @@ impl SQIRGen {
         }
 
         // Check that the RHS type contains a field with the specified name
-        let rhs_class_type_ptr = rhs_class_type.borrow()?;
-        let rhs_class = match *rhs_class_type_ptr {
-            Type::Class(ref c) => c,
+        match *rhs_class_type.borrow()? {
+            Type::Class(ref rhs_class) => if !rhs_class.fields.contains_key(rhs_field_name) {
+                return sema_error(
+                    format!("Class '{}' doesn't contain field '{}'", rhs_class.name, rhs_field_name),
+                    node
+                )
+            },
             _ => unreachable!("Non-class Class type!?"),
-        };
-
-        if !rhs_class.fields.contains_key(rhs_field_name) {
-            return sema_error(
-                format!("Class '{}' doesn't contain field '{}'", rhs_class.name, rhs_field_name),
-                node
-            )
         }
 
         // The rest of the validation is a separate task,
