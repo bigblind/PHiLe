@@ -206,6 +206,7 @@ impl SQIRGen {
     // The two latter conditions can be summed up as "the relations
     // specified by the LHS and the RHS are equivalent".
     // TODO(H2CO3): this does 2 times as many comparisons as necessary.
+    // TODO(H2CO3): this is a monstrosity; refactor
     fn check_relation_reciprocity(&self) -> SemaResult<()> {
         for (&(ref lhs_type, ref lhs_field), relation) in &self.sqir.relations {
             let rhs_type = relation.rhs.class.clone();
@@ -227,18 +228,16 @@ impl SQIRGen {
                         rhs_field
                     )
                 ),
-                Some(ref inverse_relation) => {
-                    if relation != *inverse_relation {
-                        return reciprocity_error(
-                            format!(
-                                "Reciprocity check failed: the relations specified by {}::{} and {}::{} have different cardinalities or mismatching field names",
-                                unwrap_class_name(&lhs_type),
-                                lhs_field,
-                                unwrap_class_name(&rhs_type),
-                                rhs_field
-                            )
-                        );
-                    }
+                Some(ref inverse_relation) => if relation != *inverse_relation {
+                    return reciprocity_error(
+                        format!(
+                            "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching cardinalities or field names",
+                            unwrap_class_name(&lhs_type),
+                            lhs_field,
+                            unwrap_class_name(&rhs_type),
+                            rhs_field
+                        )
+                    )
                 },
             }
         }
@@ -813,6 +812,7 @@ impl SQIRGen {
     //     and the syntax of the language: if both A::a and B::b
     //     refer to C::c, then C::c can only refer back to
     //     at most one of A::a or B::b.
+    // TODO(H2CO3): this is too long; refactor
     fn define_explicit_relation(
         &mut self,
         lhs_class_type: &RcCell<Type>,
