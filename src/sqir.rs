@@ -141,6 +141,14 @@ pub struct SQIR {
 }
 
 
+// This is to be used ONLY when you know you have a Class type
+pub fn unwrap_class_name(class: &RcCell<Type>) -> String {
+    match *class.borrow().expect("Cannot borrow Type::Class!?") {
+        Type::Class(ref c) => c.name.clone(),
+        _ => unreachable!("Non-class class type!?"),
+    }
+}
+
 // `RelationSide: PartialOrd + Ord` is necessary for
 // order-independent hashing of `Relation`s.
 impl PartialOrd for RelationSide {
@@ -151,13 +159,8 @@ impl PartialOrd for RelationSide {
 
 impl Ord for RelationSide {
     fn cmp(&self, other: &Self) -> Ordering {
-        let unwrap_class_name = |side: &Self| match *side.class.borrow().expect("Cannot borrow Type::Class") {
-            Type::Class(ref c) => c.name.clone(),
-            _ => unreachable!("Non-class class type!?"),
-        };
-
-        let self_name  = unwrap_class_name(self);
-        let other_name = unwrap_class_name(other);
+        let self_name  = unwrap_class_name(&self.class);
+        let other_name = unwrap_class_name(&other.class);
         let lhs = (self_name,  &self.field,  self.cardinality);
         let rhs = (other_name, &other.field, other.cardinality);
 
@@ -215,6 +218,10 @@ impl SQIR {
     // `relations` field (because they need to be associated
     // with named sides for easy querygen), but schemagen
     // still requireds a non-redundant set of relations.
+    // By convention, `relations` contains relations in a
+    // way that the RelationSide corresponding to the key
+    // appears on the LHS, whereas the referred RelationSide
+    // is the RHS.
     pub fn unique_relations(&self) -> HashSet<&Relation> {
         self.relations.values().collect()
     }

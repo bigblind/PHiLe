@@ -70,6 +70,16 @@ fn occurs_check_error<T>(message: String) -> SemaResult<T> {
     )
 }
 
+// TODO(H2CO3): make reciprocity check know about Nodes and Ranges
+fn reciprocity_error<T>(message: String) -> SemaResult<T> {
+    Err(
+        SemaError {
+            message: message,
+            range:   None,
+        }
+    )
+}
+
 fn format_type(t: &WkCell<Type>) -> String {
     let rc = match t.as_rc() {
         Ok(rc) => rc,
@@ -120,6 +130,7 @@ impl SQIRGen {
         self.define_user_defined_types(children)?;
         self.occurs_check_user_defined_types()?;
         self.define_relations(children)?;
+        self.check_relation_reciprocity()?;
         self.forward_declare_functions(children)?;
         self.generate_functions(children)?;
 
@@ -181,6 +192,54 @@ impl SQIRGen {
             match child.value {
                 NodeValue::ClassDecl(ref c) => self.define_relations_for_class(c)?,
                 _ => continue,
+            }
+        }
+
+        Ok(())
+    }
+
+    // For each relational field of each class (the LHSs), check that...
+    // * the RHS refers back to the LHS using LHS's field_name, and
+    // * the cardinality specifier of the RHS exists, and
+    // * the cardinality specifier of the RHS matches that of the
+    //   inverse of the LHS.
+    // The two latter conditions can be summed up as "the relations
+    // specified by the LHS and the RHS are equivalent".
+    // TODO(H2CO3): this does 2 times as many comparisons as necessary.
+    fn check_relation_reciprocity(&self) -> SemaResult<()> {
+        for (&(ref lhs_type, ref lhs_field), relation) in &self.sqir.relations {
+            let rhs_type = relation.rhs.class.clone();
+            let rhs_field = match relation.rhs.field {
+                Some(ref name) => name.clone(),
+                None => continue, // unilateral relations need no reciprocal references
+            };
+
+            // Look up the inverse relation. If it doesn't exist, it means that the
+            // LHS refers to a field in the RHS that doesn't correspond to a relation.
+            let rhs_key = (rhs_type.clone(), rhs_field.clone());
+            match self.sqir.relations.get(&rhs_key) {
+                None => return reciprocity_error(
+                    format!(
+                        "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
+                        unwrap_class_name(&lhs_type),
+                        lhs_field,
+                        unwrap_class_name(&rhs_type),
+                        rhs_field
+                    )
+                ),
+                Some(ref inverse_relation) => {
+                    if relation != *inverse_relation {
+                        return reciprocity_error(
+                            format!(
+                                "Reciprocity check failed: the relations specified by {}::{} and {}::{} have different cardinalities or mismatching field names",
+                                unwrap_class_name(&lhs_type),
+                                lhs_field,
+                                unwrap_class_name(&rhs_type),
+                                rhs_field
+                            )
+                        );
+                    }
+                },
             }
         }
 
@@ -742,29 +801,121 @@ impl SQIRGen {
     //
     // If the relation declaration specifies a field name for the RHS,
     // then check that...:
+    // * the type does not refer back to the same field in itself
+    // * the RHS type contains a field with the specified name
     // * the RHS refers back to the LHS using LHS's field_name, and
     // * the cardinality specifier of the RHS exists, and
     // * the cardinality specifier of the RHS matches that of the
     //   inverse of the LHS, and
-    // * no other relation refers to the same field of the RHS
-    //   (by induction, this also protects the fields of the LHS)
+    // * no other relation refers to the same field of the RHS.
+    //   By induction, this also protects the fields of the LHS.
     //   * This is also readily ensured by the reciprocity check
     //     and the syntax of the language: if both A::a and B::b
     //     refer to C::c, then C::c can only refer back to
     //     at most one of A::a or B::b.
     fn define_explicit_relation(
         &mut self,
-        class_type: &RcCell<Type>,
-        field_type: &Type,
-        field_name: &str,
+        lhs_class_type: &RcCell<Type>,
+        lhs_field_type: &Type,
+        lhs_field_name: &str,
         relation: &RelDecl,
         node: &Node
     ) -> SemaResult<()> {
         // Ensure that declared RHS cardinality matches with the field type
-        let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
-        let pointed_type = self.validate_type_cardinality(field_type, card_rhs, node)?;
+        let (lhs_card, rhs_card) = self.cardinalities_from_operator(relation.cardinality);
+        let rhs_class_type = self.validate_type_cardinality(lhs_field_type, rhs_card, node)?;
 
-        unimplemented!()
+        let rhs_field_name = match relation.field {
+            None => return self.define_unilateral_relation(
+                lhs_class_type,
+                &rhs_class_type,
+                lhs_field_name,
+                lhs_card,
+                rhs_card
+            ),
+            Some(name) => name,
+        };
+
+        // Check that the referring field doesn't refer back to itself
+        if *lhs_class_type == rhs_class_type && lhs_field_name == rhs_field_name {
+            return sema_error(
+                format!("Field '{}' refers to itself", lhs_field_name),
+                node
+            )
+        }
+
+        // Check that the RHS type contains a field with the specified name
+        let rhs_class_type_ptr = rhs_class_type.borrow()?;
+        let rhs_class = match *rhs_class_type_ptr {
+            Type::Class(ref c) => c,
+            _ => unreachable!("Non-class Class type!?"),
+        };
+
+        if !rhs_class.fields.contains_key(rhs_field_name) {
+            return sema_error(
+                format!("Class '{}' doesn't contain field '{}'", rhs_class.name, rhs_field_name),
+                node
+            )
+        }
+
+        // The rest of the validation is a separate task,
+        // performed by check_relation_reciprocity().
+        // Therefore, we 'prematurely' add the relations
+        // to the cache --- if an error is found later,
+        // they'll be discarded anyway, so this is harmless.
+        let lhs = RelationSide {
+            class:       lhs_class_type.clone(),
+            field:       Some(lhs_field_name.to_owned()),
+            cardinality: lhs_card,
+        };
+        let rhs = RelationSide {
+            class:       rhs_class_type.clone(),
+            field:       Some(rhs_field_name.to_owned()),
+            cardinality: rhs_card,
+        };
+
+        // We only insert the relation for the LHS' key because
+        // if the schema is valid, then the relation will be
+        // symmetric, and thus when we process the now-RHS,
+        // the same (actually, the reversed) relation will be added too.
+        let key = (lhs_class_type.clone(), lhs_field_name.to_owned());
+        if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_some() {
+            unreachable!("Duplicate relation for field '{}'", lhs_field_name)
+        }
+
+        Ok(())
+    }
+
+    // No RHS field name, no cry --- just create a one-sided
+    // relation and associate it with a key describing the LHS.
+    // This cannot fail, as the cardinalities have already
+    // been validated, and duplicate keys are syntactically
+    // impossible (one field can only declare one relation).
+    fn define_unilateral_relation(
+        &mut self,
+        lhs_type: &RcCell<Type>,
+        rhs_type: &RcCell<Type>,
+        lhs_field_name: &str,
+        lhs_cardinality: Cardinality,
+        rhs_cardinality: Cardinality
+    ) -> SemaResult<()> {
+        let lhs = RelationSide {
+            class:       lhs_type.clone(),
+            field:       Some(lhs_field_name.to_owned()),
+            cardinality: lhs_cardinality,
+        };
+        let rhs = RelationSide {
+            class:       rhs_type.clone(),
+            field:       None,
+            cardinality: rhs_cardinality,
+        };
+
+        let key = (lhs_type.clone(), lhs_field_name.to_owned());
+
+        match self.sqir.relations.insert(key, Relation { lhs, rhs }) {
+            None    => Ok(()),
+            Some(_) => unreachable!("Duplicate relation for field '{}'", lhs_field_name),
+        }
     }
 
     // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
@@ -816,7 +967,7 @@ impl SQIRGen {
         }
     }
 
-    // Defines a one-sided relation based on the referred type.
+    // Defines an implicit relation based on the referred type.
     // Cardinalities are inferred according to the following rules:
     // * The cardinality of the LHS is always ZeroOrMore, since
     //   we have no information about how many instances of the
@@ -826,7 +977,7 @@ impl SQIRGen {
     //   * ZeroOrOne  for &T?
     //   * ZeroOrMore for [&T]
     fn define_implicit_relation(&mut self, class_type: &RcCell<Type>, field_type: &Type, field_name: &str) -> SemaResult<()> {
-        let (pointed_type, card_rhs) = match self.try_infer_type_cardinality(field_type)? {
+        let (pointed_type, rhs_card) = match self.try_infer_type_cardinality(field_type)? {
             Some(type_and_cardinality) => type_and_cardinality,
             None => return Ok(()), // not a relational type
         };
@@ -840,14 +991,15 @@ impl SQIRGen {
         let rhs = RelationSide {
             class:       pointed_type,
             field:       None,
-            cardinality: card_rhs,
+            cardinality: rhs_card,
         };
-        let relation = Relation { lhs, rhs };
+
         let key = (class_type.clone(), field_name.to_owned());
 
-        self.sqir.relations.insert(key, relation);
-
-        Ok(())
+        match self.sqir.relations.insert(key, Relation { lhs, rhs }) {
+            None    => Ok(()),
+            Some(_) => unreachable!("Duplicate relation for field '{}'", field_name),
+        }
     }
 
     // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
