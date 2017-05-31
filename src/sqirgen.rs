@@ -126,9 +126,9 @@ impl SQIRGen {
         Ok(self.sqir)
     }
 
+    // Forward declare every struct/class/enum definition
+    // by inserting a placeholder type for each of them
     fn forward_declare_user_defined_types(&mut self, children: &[Node]) -> SemaResult<()> {
-        // Forward declare every struct/class/enum definition
-        // by inserting a placeholder type for each of them
         for child in children {
             let (name, kind) = match child.value {
                 NodeValue::StructDecl(ref s) => (s.name, PlaceholderKind::Struct),
@@ -150,8 +150,8 @@ impl SQIRGen {
         Ok(())
     }
 
+    // Create semantic types out of AST and check their consistency
     fn define_user_defined_types(&mut self, children: &[Node]) -> SemaResult<()> {
-        // Create semantic types out of AST and check their consistency
         for child in children {
             match child.value {
                 NodeValue::StructDecl(ref s) => self.define_struct_type(s)?,
@@ -164,11 +164,11 @@ impl SQIRGen {
         Ok(())
     }
 
+    // Perform the occurs check on every user-defined type.
+    // (It is only now that occurs checking is possible,
+    // because at this point, we should have gotten rid of
+    // all placeholders that could hide self-containing types.)
     fn occurs_check_user_defined_types(&self) -> SemaResult<()> {
-        // Perform the occurs check on every user-defined type.
-        // (It is only now that occurs checking is possible,
-        // because at this point, we should have gotten rid of
-        // all placeholders that could hide self-containing types.)
         for (_, t) in &self.sqir.named_types {
             self.occurs_check(&t.as_weak())?;
         }
@@ -187,11 +187,11 @@ impl SQIRGen {
         Ok(())
     }
 
+    // Forward declare functions. (We can do this because we now have types.)
+    // For each function: typecheck, and insert placeholder Function
+    // into self.sqir.functions that has no actual body/implementation,
+    // no instructions/basic blocks, only a type and argument names
     fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
-        // Forward declare functions. (We can do this because we now have types.)
-        // For each function: typecheck, and insert placeholder Function
-        // into self.sqir.functions that has no actual body/implementation,
-        // no instructions/basic blocks, only a type and argument names
         for child in children {
             match child.value {
                 NodeValue::FunctionDecl(ref f) => self.forward_declare_function(&f)?,
@@ -202,8 +202,8 @@ impl SQIRGen {
         Ok(())
     }
 
+    // Generate SQIR for each function
     fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
-        // Generate SQIR for each function
         for child in children {
             match child.value {
                 NodeValue::FunctionDecl(ref f) => self.generate_function(&f)?,
@@ -485,10 +485,10 @@ impl SQIRGen {
             let rc = wrapped_type.as_rc()?;
             let ptr = rc.borrow()?;
 
+            // As an immediate member of a class type, in addition
+            // to everything that is permitted in value types,
+            // an optional/unique/array of pointers is also allowed.
             match *ptr {
-                // As an immediate member of a class type, in addition
-                // to everything that is permitted in value types,
-                // an optional/unique/array of pointers is also allowed.
                 Type::Pointer(_) => Ok(()),
                 _ => sema_error(
                     format!(
@@ -666,9 +666,9 @@ impl SQIRGen {
             return self.type_from_decl(&decls[0]);
         }
 
+        // Tuples are full-fledged value types, similar to structs.
+        // Therefore we must check their items during construction.
         let types: Vec<_> = decls.iter().map(|decl| {
-            // Tuples are full-fledged value types, similar to structs.
-            // Therefore we must check their items during construction.
             let item_type_rc = self.type_from_decl(decl)?;
             let item_type_wk = item_type_rc.as_weak();
             self.validate_complex_type_item(&item_type_wk, decl, ComplexTypeKind::Value)?;
@@ -733,6 +733,25 @@ impl SQIRGen {
         }
     }
 
+    // If the relation declaration does NOT specify a field name for
+    // the RHS, then check that...:
+    // * no other class' relation refers to this field of this class
+    //   * this condition is already ensured by checking those
+    //     classes that do specify a field name: if their referred
+    //     class and field doesn't refer back, that's an error.
+    //
+    // If the relation declaration specifies a field name for the RHS,
+    // then check that...:
+    // * the RHS refers back to the LHS using LHS's field_name, and
+    // * the cardinality specifier of the RHS exists, and
+    // * the cardinality specifier of the RHS matches that of the
+    //   inverse of the LHS, and
+    // * no other relation refers to the same field of the RHS
+    //   (by induction, this also protects the fields of the LHS)
+    //   * This is also readily ensured by the reciprocity check
+    //     and the syntax of the language: if both A::a and B::b
+    //     refer to C::c, then C::c can only refer back to
+    //     at most one of A::a or B::b.
     fn define_explicit_relation(
         &mut self,
         class_type: &RcCell<Type>,
@@ -745,25 +764,6 @@ impl SQIRGen {
         let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
         let pointed_type = self.validate_type_cardinality(field_type, card_rhs, node)?;
 
-        // If the relation declaration does NOT specify a field name for
-        // the RHS, then check that...:
-        // * no other class' relation refers to this field of this class
-        //   * this condition is already ensured by checking those
-        //     classes that do specify a field name: if their referred
-        //     class and field doesn't refer back, that's an error.
-        //
-        // If the relation declaration specifies a field name for the RHS,
-        // then check that...:
-        // * the RHS refers back to the LHS using LHS's field_name, and
-        // * the cardinality specifier of the RHS exists, and
-        // * the cardinality specifier of the RHS matches that of the
-        //   inverse of the LHS, and
-        // * no other relation refers to the same field of the RHS
-        //   (by induction, this also protects the fields of the LHS)
-        //   * This is also readily ensured by the reciprocity check
-        //     and the syntax of the language: if both A::a and B::b
-        //     refer to C::c, then C::c can only refer back to
-        //     at most one of A::a or B::b.
         unimplemented!()
     }
 
