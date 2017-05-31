@@ -6,7 +6,9 @@
 // on 07/04/2017
 //
 
-use std::collections::HashMap;
+use std::collections::{ HashMap, HashSet };
+use std::hash::{ Hash, Hasher };
+use std::cmp::*;
 use util::*;
 
 
@@ -90,14 +92,14 @@ pub struct FunctionType {
 
 // Relations (also part of the Schema)
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RelationSide {
     pub class:       RcCell<Type>,
     pub field:       Option<String>,
     pub cardinality: Cardinality,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Cardinality {
     ZeroOrOne,
     One,
@@ -105,7 +107,11 @@ pub enum Cardinality {
     OneOrMore,
 }
 
-pub type Relation = (RelationSide, RelationSide);
+#[derive(Debug)]
+pub struct Relation {
+    pub lhs: RelationSide,
+    pub rhs: RelationSide,
+}
 
 // Functions (Queries)
 
@@ -130,8 +136,54 @@ pub struct SQIR {
     pub array_types:    HashMap<RcCell<Type>, RcCell<Type>>,
     pub tuple_types:    HashMap<Vec<RcCell<Type>>, RcCell<Type>>,
     pub function_types: HashMap<(Vec<RcCell<Type>>, RcCell<Type>), RcCell<Type>>,
-    pub relations:      Vec<Relation>, // no need for a HashSet: relations are unique
+    pub relations:      HashMap<(RcCell<Type>, String), Relation>,
     pub functions:      HashMap<String, Function>,
+}
+
+
+// `RelationSide: PartialOrd + Ord` is necessary for
+// order-independent hashing of `Relation`s.
+impl PartialOrd for RelationSide {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for RelationSide {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let unwrap_class_name = |side: &Self| match *side.class.borrow().expect("Cannot borrow Type::Class") {
+            Type::Class(ref c) => c.name.clone(),
+            _ => unreachable!("Non-class class type!?"),
+        };
+
+        let self_name  = unwrap_class_name(self);
+        let other_name = unwrap_class_name(other);
+        let lhs = (self_name,  &self.field,  self.cardinality);
+        let rhs = (other_name, &other.field, other.cardinality);
+
+        lhs.cmp(&rhs)
+    }
+}
+
+impl PartialEq for Relation {
+    fn eq(&self, other: &Self) -> bool {
+        self.lhs == other.lhs && self.rhs == other.rhs
+        ||
+        self.lhs == other.rhs && self.rhs == other.lhs
+    }
+}
+
+impl Eq for Relation {}
+
+// This is how you generate order-independent
+// hashes in a hostile, state-only environment.
+impl Hash for Relation {
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        let mini = min(&self.lhs, &self.rhs);
+        let maxi = max(&self.lhs, &self.rhs);
+        mini.hash(hasher);
+        maxi.hash(hasher);
+    }
 }
 
 impl SQIR {
@@ -154,8 +206,16 @@ impl SQIR {
             array_types:    hash_map![],
             tuple_types:    hash_map![],
             function_types: hash_map![],
-            relations:      vec![],
+            relations:      hash_map![],
             functions:      hash_map![], // TODO(H2CO3): declare built-in functions
         }
+    }
+
+    // Relations can be stored either once or twice in the
+    // `relations` field (because they need to be associated
+    // with named sides for easy querygen), but schemagen
+    // still requireds a non-redundant set of relations.
+    pub fn unique_relations(&self) -> HashSet<&Relation> {
+        self.relations.values().collect()
     }
 }

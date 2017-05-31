@@ -745,6 +745,10 @@ impl SQIRGen {
         let (card_lhs, card_rhs) = self.cardinalities_from_operator(relation.cardinality);
         let pointed_type = self.validate_type_cardinality(field_type, card_rhs, node)?;
 
+        // If the relation declaration does NOT specify a field name for
+        // the RHS, then check that...:
+        // * no other class' relation refers to this field of this class
+        //
         // If the relation declaration specifies a field name for the RHS,
         // then check that...:
         // * the RHS refers back to the LHS using LHS's field_name
@@ -830,9 +834,10 @@ impl SQIRGen {
             field:       None,
             cardinality: card_rhs,
         };
-        let relation = (lhs, rhs);
+        let relation = Relation { lhs, rhs };
+        let key = (class_type.clone(), field_name.to_owned());
 
-        self.sqir.relations.push(relation);
+        self.sqir.relations.insert(key, relation);
 
         Ok(())
     }
