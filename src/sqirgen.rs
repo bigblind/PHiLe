@@ -748,14 +748,22 @@ impl SQIRGen {
         // If the relation declaration does NOT specify a field name for
         // the RHS, then check that...:
         // * no other class' relation refers to this field of this class
+        //   * this condition is already ensured by checking those
+        //     classes that do specify a field name: if their referred
+        //     class and field doesn't refer back, that's an error.
         //
         // If the relation declaration specifies a field name for the RHS,
         // then check that...:
-        // * the RHS refers back to the LHS using LHS's field_name
+        // * the RHS refers back to the LHS using LHS's field_name, and
         // * the cardinality specifier of the RHS exists, and
-        // * the cardinality specifier of the RHS matches that of the inverse of the LHS
+        // * the cardinality specifier of the RHS matches that of the
+        //   inverse of the LHS, and
         // * no other relation refers to the same field of the RHS
         //   (by induction, this also protects the fields of the LHS)
+        //   * This is also readily ensured by the reciprocity check
+        //     and the syntax of the language: if both A::a and B::b
+        //     refer to C::c, then C::c can only refer back to
+        //     at most one of A::a or B::b.
         unimplemented!()
     }
 
