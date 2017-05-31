@@ -105,7 +105,7 @@ impl<'a> Lexer<'a> {
             return Err(false);
         }
 
-        for &(kind, ref re) in self.regexes.iter() {
+        for &(kind, ref re) in &self.regexes {
             if let Some(m) = re.find(self.source) {
                 let value = m.as_str();
                 let begin = self.location;

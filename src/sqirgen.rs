@@ -214,7 +214,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn check_relation_reciprocity(&self, lhs_type: &RcCell<Type>, lhs_field: &String, relation: &Relation) -> SemaResult<()> {
+    fn check_relation_reciprocity(&self, lhs_type: &RcCell<Type>, lhs_field: &str, relation: &Relation) -> SemaResult<()> {
         let rhs_type = relation.rhs.class.clone();
         let rhs_field = match relation.rhs.field {
             Some(ref name) => name.clone(),
