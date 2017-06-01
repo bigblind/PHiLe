@@ -1,7 +1,7 @@
 //
-// wrapgen.rs
+// schemagen.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
-// on 07/04/2017
+// on 01/06/2017
 //
