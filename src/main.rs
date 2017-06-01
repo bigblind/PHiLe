@@ -27,7 +27,7 @@ use phile::sqirgen::*;
 struct ProgramArgs {
     database: String,
     wrapper:  String,
-    schemas:  Vec<String>,
+    sources:  Vec<String>,
 }
 
 
@@ -54,17 +54,17 @@ fn get_args() -> ProgramArgs {
         (about:   env!["CARGO_PKG_DESCRIPTION"])
         (@arg database: -d --database +takes_value +required "database flavor, e.g. SQLite, MySQL, ...")
         (@arg wrapper:  -w --wrapper  +takes_value +required "wrapping language, e.g. Rust, C, ...")
-        (@arg schemas:  +multiple +required "one or more PHiLe files")
+        (@arg sources:  +multiple +required "one or more PHiLe files")
     ).get_matches();
 
     let database = args.value_of("database").unwrap();
     let wrapper  = args.value_of("wrapper").unwrap();
-    let schemas  = args.values_of("schemas").unwrap();
+    let sources  = args.values_of("sources").unwrap();
 
     ProgramArgs {
         database: database.to_owned(),
         wrapper:  wrapper.to_owned(),
-        schemas:  schemas.map(str::to_owned).collect(),
+        sources:  sources.map(str::to_owned).collect(),
     }
 }
 
@@ -79,14 +79,21 @@ fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
     paths.iter().map(|p| read_file(p.as_ref())).collect()
 }
 
-fn format_parse_error(error: &ParseError) -> String {
-    let range = error.range.map_or("end of input".to_owned(), |r| format!("{:#?}", r));
-    format!("Parse error near {}: {}", range, error.message)
+fn format_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> String {
+    let file = files[location.src_idx].as_ref();
+    format!("Lexical error in '{}' near {}", file, location)
 }
 
-fn format_sema_error(error: &SemaError) -> String {
-    let range = error.range.map_or("end of input".to_owned(), |r| format!("{:#?}", r));
-    format!("Semantic error near {}: {}", range, error.message)
+fn format_parse_error<P: AsRef<str>>(error: &ParseError, files: &[P]) -> String {
+    let file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref());
+    let range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r));
+    format!("Parse error in '{}' near {}: {}", file, range, error.message)
+}
+
+fn format_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> String {
+    let file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref());
+    let range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r));
+    format!("Semantic error in '{}' near {}: {}", file, range, error.message)
 }
 
 fn main() {
@@ -97,14 +104,14 @@ fn main() {
     let args = get_args();
 
     let sources = stopwatch!("Reading Sources", {
-        read_files(&args.schemas).unwrap_or_else(
+        read_files(&args.sources).unwrap_or_else(
             |error| panic!("Error reading file: {}", error.description())
         )
     });
 
     let tokens = stopwatch!("Lexing", {
         let mut tmp_tokens = lex(&sources).unwrap_or_else(
-            |location| panic!("Lexer error at {:#?}", location)
+            |location| panic!(format_lexer_error(&location, &args.sources))
         );
 
         tmp_tokens.retain(
@@ -120,13 +127,13 @@ fn main() {
 
     let program = stopwatch!("Parsing", {
         parse(&tokens).unwrap_or_else(
-            |error| panic!(format_parse_error(&error))
+            |error| panic!(format_parse_error(&error, &args.sources))
         )
     });
 
     let sqir = stopwatch!("Typechecking and generating SQIR", {
         generate_sqir(&program).unwrap_or_else(
-            |error| panic!(format_sema_error(&error))
+            |error| panic!(format_sema_error(&error, &args.sources))
         )
     });
 

@@ -6,6 +6,8 @@
 // on 07/04/2017
 //
 
+use std::fmt;
+use std::fmt::{ Display, Formatter };
 use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -74,6 +76,18 @@ impl Location {
                 src_idx: self.src_idx,
             },
         }
+    }
+}
+
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "line {}, char {}", self.line, self.column)
+    }
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}...{}", self.begin, self.end)
     }
 }
 
