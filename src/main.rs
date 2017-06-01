@@ -15,6 +15,7 @@ use std::fs::File;
 use std::path::Path;
 use std::error::Error;
 use std::time::Instant;
+use std::io;
 use std::io::stdout;
 use std::io::prelude::*;
 use phile::lexer::*;
@@ -67,15 +68,15 @@ fn get_args() -> ProgramArgs {
     }
 }
 
-fn read_files<T: AsRef<str>>(paths: &[T]) -> Result<String, std::io::Error> {
+fn read_file(path: &str) -> io::Result<String> {
     let mut buf = String::new();
-
-    for path in paths {
-        let mut file = File::open(&Path::new(path.as_ref()))?;
-        file.read_to_string(&mut buf)?;
-    }
-
+    let mut file = File::open(&Path::new(path))?;
+    file.read_to_string(&mut buf)?;
     Ok(buf)
+}
+
+fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
+    paths.iter().map(|p| read_file(p.as_ref())).collect()
 }
 
 fn format_parse_error(error: &ParseError) -> String {
@@ -95,14 +96,14 @@ fn main() {
 
     let args = get_args();
 
-    let source = stopwatch!("Reading Sources", {
+    let sources = stopwatch!("Reading Sources", {
         read_files(&args.schemas).unwrap_or_else(
-            |error| panic!("error reading file: {}", error.description())
+            |error| panic!("Error reading file: {}", error.description())
         )
     });
 
     let tokens = stopwatch!("Lexing", {
-        let mut tmp_tokens = lex(&source).unwrap_or_else(
+        let mut tmp_tokens = lex(&sources).unwrap_or_else(
             |location| panic!("Lexer error at {:#?}", location)
         );
 
@@ -129,7 +130,8 @@ fn main() {
         )
     });
 
+    println!();
     println!("{:#?}", sqir);
-
+    println!();
     println!("Compilation Successful");
 }

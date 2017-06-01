@@ -10,10 +10,11 @@ use regex::Regex;
 use unicode_segmentation::UnicodeSegmentation;
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Location {
-    pub line:   usize,
-    pub column: usize,
+    pub line:    usize,
+    pub column:  usize,
+    pub src_idx: usize, // index of the source `self` points into
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -43,12 +44,13 @@ pub struct Token<'a> {
 struct Lexer<'a> {
     source:   &'a str,
     location: Location,
+    tokens:   Vec<Token<'a>>,
     regexes:  [(TokenKind, Regex); 6],
 }
 
 
-pub fn lex(source: &str) -> Result<Vec<Token>, Location> {
-    Lexer::new(source).lex()
+pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>, Location> {
+    Lexer::new().lex(sources)
 }
 
 fn grapheme_count(lexeme: &str) -> usize {
@@ -56,28 +58,32 @@ fn grapheme_count(lexeme: &str) -> usize {
 }
 
 impl Location {
+    // TODO(H2CO3): handle all other Unicode line separators
     fn advance_by(&self, lexeme: &str) -> Location {
         match lexeme.rfind('\n') {
+            // -1 because the \n itself doesn't count,
+            // +1 because humans start counting at 1.
             Some(index) => Location {
-                line:   self.line + lexeme.matches('\n').count(),
-                // -1 because the \n itself doesn't count,
-                // +1 because humans start counting at 1.
-                column: grapheme_count(&lexeme[index..]) - 1 + 1,
+                line:    self.line + lexeme.matches('\n').count(),
+                column:  grapheme_count(&lexeme[index..]) - 1 + 1,
+                src_idx: self.src_idx,
             },
             None => Location {
-                line:   self.line,
-                column: self.column + grapheme_count(lexeme),
+                line:    self.line,
+                column:  self.column + grapheme_count(lexeme),
+                src_idx: self.src_idx,
             },
         }
     }
 }
 
 impl<'a> Lexer<'a> {
-    fn new(source: &str) -> Lexer {
+    fn new() -> Lexer<'a> {
         Lexer {
-            source: source,
-            location: Location { line: 1, column: 1 },
-            regexes: [
+            source:   "",
+            location: Location::default(),
+            tokens:   vec![],
+            regexes:  [
                 (TokenKind::Whitespace,     Regex::new(r"^\s+").unwrap()),
                 (TokenKind::Comment,        Regex::new(r"^#[^\n]*\n?").unwrap()),
                 (TokenKind::Word,           Regex::new(r"^[\w_][\w\d_]*").unwrap()),
@@ -88,21 +94,33 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex(mut self) -> Result<Vec<Token<'a>>, Location> {
-        let mut tokens = Vec::with_capacity(self.source.len());
+    fn lex<S: AsRef<str>>(mut self, sources: &'a [S]) -> Result<Vec<Token<'a>>, Location> {
+        self.tokens.reserve(sources.iter().map(|s| s.as_ref().len()).sum());
 
+        for source in sources {
+            self.source = source.as_ref();
+            self.location.line = 1;
+            self.location.column = 1;
+            self.lex_single_source()?;
+            self.location.src_idx += 1;
+        }
+
+        Ok(self.tokens)
+    }
+
+    fn lex_single_source(&mut self) -> Result<(), Location> {
         loop {
             match self.next() {
-                Ok(token)  => tokens.push(token),
+                Ok(token)  => self.tokens.push(token),
                 Err(true)  => return Err(self.location),
-                Err(false) => return Ok(tokens),
+                Err(false) => return Ok(()),
             }
         }
     }
 
     fn next(&mut self) -> Result<Token<'a>, bool> {
         if self.source.is_empty() {
-            return Err(false);
+            return Err(false)
         }
 
         for &(kind, ref re) in &self.regexes {

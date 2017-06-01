@@ -237,7 +237,7 @@ impl SQIRGen {
             Some(ref inverse_relation) => if relation != *inverse_relation {
                 return reciprocity_error(
                     format!(
-                        "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching cardinalities or field names",
+                        "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
                         unwrap_class_name(&lhs_type),
                         lhs_field,
                         unwrap_class_name(&rhs_type),
