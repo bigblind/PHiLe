@@ -67,16 +67,26 @@ pub enum CodegenOutput<'a> {
 }
 
 
+macro_rules! call_declgen {
+    ($module: ident, $sqir: expr, $params: expr, $out: expr) => {
+        match $params.database_access_mode {
+            DatabaseAccessMode::POD          => declgen::$module::generate_pod($sqir, $params, $out),
+            DatabaseAccessMode::ActiveRecord => declgen::$module::generate_active_record($sqir, $params, $out),
+        }
+    }
+}
+
+
 pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
     match params.language {
-        Language::Rust       => declgen::rust::generate(sqir, params, out),
-        Language::C          => declgen::c::generate(sqir, params, out),
-        Language::CXX        => declgen::cxx::generate(sqir, params, out),
-        Language::ObjectiveC => declgen::objc::generate(sqir, params, out),
-        Language::Go         => declgen::go::generate(sqir, params, out),
-        Language::JavaScript => declgen::js::generate(sqir, params, out),
-        Language::Python     => declgen::python::generate(sqir, params, out),
-        Language::Java       => declgen::java::generate(sqir, params, out),
+        Language::Rust       => call_declgen!(rust,   sqir, params, out),
+        Language::C          => call_declgen!(c,      sqir, params, out),
+        Language::CXX        => call_declgen!(cxx,    sqir, params, out),
+        Language::ObjectiveC => call_declgen!(objc,   sqir, params, out),
+        Language::Go         => call_declgen!(go,     sqir, params, out),
+        Language::JavaScript => call_declgen!(js,     sqir, params, out),
+        Language::Python     => call_declgen!(python, sqir, params, out),
+        Language::Java       => call_declgen!(java,   sqir, params, out),
     }
 }
 

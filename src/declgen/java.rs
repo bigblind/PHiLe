@@ -11,6 +11,10 @@ use codegen::*;
 use sqir::*;
 
 
-pub fn generate(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
+pub fn generate_pod(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
+    unimplemented!()
+}
+
+pub fn generate_active_record(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
     unimplemented!()
 }
