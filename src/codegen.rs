@@ -95,3 +95,13 @@ pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput
         DatabaseEngine::MariaDB => querygen::maria::generate(sqir, params, out),
     }
 }
+
+pub fn access_mode_error<T>(params: &CodegenParams) -> io::Result<T> {
+    let message = format!(
+        "Backend '{:#?}/{:#?}' does not support DB access mode '{:#?}'",
+        params.database,
+        params.language,
+        params.database_access_mode
+    );
+    Err(io::Error::new(io::ErrorKind::InvalidInput, message))
+}
