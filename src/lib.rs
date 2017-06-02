@@ -28,6 +28,7 @@ pub mod parser;
 pub mod sqir;
 pub mod sqirgen;
 pub mod sqiropt;
+pub mod codegen;
+pub mod declgen;
 pub mod schemagen;
 pub mod querygen;
-pub mod declgen;
