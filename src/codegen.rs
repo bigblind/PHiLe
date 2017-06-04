@@ -26,6 +26,7 @@ pub enum Language {
     C,
     CXX,
     ObjectiveC,
+    Swift,
     Go,
     JavaScript,
     Python,
@@ -41,29 +42,25 @@ pub enum DatabaseAccessMode {
 #[derive(Debug, Clone, Copy)]
 pub enum NameTransform {
     Identity,
-    DefaultForLanguage,
+    SnakeCase, // isn't SnakeCase spelled with camel case ironic?
     LowerCamelCase,
     UpperCamelCase,
-    SnakeCase, // isn't SnakeCase spelled with camel case ironic?
 }
+
+#[allow(missing_debug_implementations, missing_copy_implementations)]
+pub struct CodegenOutput {}
 
 #[derive(Debug)]
 pub struct CodegenParams {
-    pub database:             DatabaseEngine,
-    pub language:             Language,
-    pub out_filename_prefix:  Option<String>,
-    pub database_access_mode: DatabaseAccessMode,
-    pub namespace:            Option<String>,
-    pub type_name_transform:  NameTransform,
-    pub field_name_transform: NameTransform,
-    pub func_name_transform:  NameTransform,
-    pub namespace_transform:  NameTransform,
-}
-
-#[allow(missing_debug_implementations)]
-pub enum CodegenOutput<'a> {
-    Directory(&'a str),
-    Writer(&'a io::Write),
+    pub database:               DatabaseEngine,
+    pub language:               Language,
+    pub database_access_mode:   DatabaseAccessMode,
+    pub namespace:              Option<String>,
+    pub type_name_transform:    Option<NameTransform>,
+    pub field_name_transform:   Option<NameTransform>,
+    pub variant_name_transform: Option<NameTransform>,
+    pub func_name_transform:    Option<NameTransform>,
+    pub namespace_transform:    Option<NameTransform>,
 }
 
 
@@ -77,12 +74,17 @@ macro_rules! call_declgen {
 }
 
 
+//
+// Main API for code generation
+//
+
 pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
     match params.language {
         Language::Rust       => call_declgen!(rust,   sqir, params, out),
         Language::C          => call_declgen!(c,      sqir, params, out),
         Language::CXX        => call_declgen!(cxx,    sqir, params, out),
         Language::ObjectiveC => call_declgen!(objc,   sqir, params, out),
+        Language::Swift      => call_declgen!(swift,  sqir, params, out),
         Language::Go         => call_declgen!(go,     sqir, params, out),
         Language::JavaScript => call_declgen!(js,     sqir, params, out),
         Language::Python     => call_declgen!(python, sqir, params, out),
@@ -105,6 +107,123 @@ pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput
         DatabaseEngine::MariaDB => querygen::maria::generate(sqir, params, out),
     }
 }
+
+//
+// Name Transforms
+//
+
+pub fn transform_type_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
+    transform_general_name(name, transform, lang, default_type_name_transform)
+}
+
+pub fn transform_field_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
+    transform_general_name(name, transform, lang, default_field_name_transform)
+}
+
+pub fn transform_variant_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
+    transform_general_name(name, transform, lang, default_variant_name_transform)
+}
+
+pub fn transform_func_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
+    transform_general_name(name, transform, lang, default_func_name_transform)
+}
+
+pub fn transform_namespace(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
+    transform_general_name(name, transform, lang, default_namespace_transform)
+}
+
+fn transform_general_name<D>(
+    name: &str,
+    transform: Option<NameTransform>,
+    lang: Language,
+    default: D
+) -> String where D: FnOnce(Language) -> NameTransform {
+    let resolved_transform = transform.unwrap_or_else(|| default(lang));
+    transform_name(name, resolved_transform)
+}
+
+fn default_type_name_transform(lang: Language) -> NameTransform {
+    match lang {
+        Language::Rust       => NameTransform::UpperCamelCase,
+        Language::C          => NameTransform::UpperCamelCase,
+        Language::CXX        => NameTransform::UpperCamelCase,
+        Language::ObjectiveC => NameTransform::UpperCamelCase,
+        Language::Swift      => NameTransform::UpperCamelCase,
+        Language::Go         => NameTransform::UpperCamelCase,
+        Language::JavaScript => NameTransform::UpperCamelCase,
+        Language::Python     => NameTransform::UpperCamelCase,
+        Language::Java       => NameTransform::UpperCamelCase,
+    }
+}
+
+fn default_field_name_transform(lang: Language) -> NameTransform {
+    match lang {
+        Language::Rust       => NameTransform::SnakeCase,
+        Language::C          => NameTransform::SnakeCase,
+        Language::CXX        => NameTransform::SnakeCase,
+        Language::ObjectiveC => NameTransform::LowerCamelCase,
+        Language::Swift      => NameTransform::LowerCamelCase,
+        Language::Go         => NameTransform::UpperCamelCase,
+        Language::JavaScript => NameTransform::LowerCamelCase,
+        Language::Python     => NameTransform::SnakeCase,
+        Language::Java       => NameTransform::LowerCamelCase,
+    }
+}
+
+fn default_variant_name_transform(lang: Language) -> NameTransform {
+    match lang {
+        Language::Rust       => NameTransform::UpperCamelCase,
+        Language::C          => NameTransform::UpperCamelCase,
+        Language::CXX        => NameTransform::UpperCamelCase,
+        Language::ObjectiveC => NameTransform::UpperCamelCase,
+        Language::Swift      => NameTransform::LowerCamelCase, // new Swift enums suck :-(
+        Language::Go         => NameTransform::UpperCamelCase,
+        Language::JavaScript => NameTransform::UpperCamelCase,
+        Language::Python     => NameTransform::UpperCamelCase, // I'm _not_ doing ALL_CAPS.
+        Language::Java       => NameTransform::UpperCamelCase, // Not even for Java.
+    }
+}
+
+fn default_func_name_transform(lang: Language) -> NameTransform {
+    match lang {
+        Language::Rust       => NameTransform::SnakeCase,
+        Language::C          => NameTransform::SnakeCase,
+        Language::CXX        => NameTransform::SnakeCase,
+        Language::ObjectiveC => NameTransform::LowerCamelCase,
+        Language::Swift      => NameTransform::LowerCamelCase,
+        Language::Go         => NameTransform::UpperCamelCase,
+        Language::JavaScript => NameTransform::LowerCamelCase,
+        Language::Python     => NameTransform::SnakeCase,
+        Language::Java       => NameTransform::LowerCamelCase,
+    }
+}
+
+fn default_namespace_transform(lang: Language) -> NameTransform {
+    match lang {
+        Language::Rust       => NameTransform::Identity,
+        Language::C          => NameTransform::Identity,
+        Language::CXX        => NameTransform::Identity,
+        Language::ObjectiveC => NameTransform::Identity,
+        Language::Swift      => NameTransform::Identity,
+        Language::Go         => NameTransform::Identity,
+        Language::JavaScript => NameTransform::Identity,
+        Language::Python     => NameTransform::Identity,
+        Language::Java       => NameTransform::Identity,
+    }
+}
+
+fn transform_name(name: &str, transform: NameTransform) -> String {
+    match transform {
+        NameTransform::Identity       => name.to_owned(),
+        NameTransform::SnakeCase      => unimplemented!(),
+        NameTransform::LowerCamelCase => unimplemented!(),
+        NameTransform::UpperCamelCase => unimplemented!(),
+    }
+}
+
+//
+// Errors
+//
 
 pub fn access_mode_error<T>(params: &CodegenParams) -> io::Result<T> {
     let message = format!(

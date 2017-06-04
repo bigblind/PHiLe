@@ -28,6 +28,7 @@ use phile::codegen::*;
 struct ProgramArgs {
     codegen_params:   CodegenParams,
     output_directory: String,
+    outfile_prefix:   Option<String>,
     migration_script: Option<String>,
     sources:          Vec<String>,
 }
@@ -56,33 +57,35 @@ fn get_args() -> ProgramArgs {
         (about:   env!["CARGO_PKG_DESCRIPTION"])
         (@arg database:    -d --database   +takes_value +required "database engine")
         (@arg language:    -l --language   +takes_value +required "wrapping language")
-        (@arg outprefix:   -p --outprefix  +takes_value           "filename prefix for output files")
         (@arg access:      -a --access     +takes_value           "database access mode")
         (@arg namespace:   -n --namespace  +takes_value           "namespace for types and methods")
         (@arg type_xform:  -t --typexform  +takes_value           "type name transform")
-        (@arg field_xform: -e --fieldxform +takes_value           "struct field/enum variant name transform")
+        (@arg field_xform: -e --fieldxform +takes_value           "struct field name transform")
+        (@arg var_xform:   -v --varxform   +takes_value           "enum variant name transform")
         (@arg func_xform:  -f --funcxform  +takes_value           "function name transform")
         (@arg ns_xform:    -s --nsxform    +takes_value           "namespace name transform")
         (@arg outdir:      -o --outdir     +takes_value           "output directory")
+        (@arg outprefix:   -p --outprefix  +takes_value           "filename prefix for output files")
         (@arg migrate:     -m --migrate    +takes_value           "script to use for schema migration")
         (@arg sources:     +multiple                    +required "one or more PHiLe files")
     ).get_matches();
 
     let codegen_params = CodegenParams {
-        database:             validate_database(args.value_of("database").unwrap()),
-        language:             validate_language(args.value_of("language").unwrap()),
-        out_filename_prefix:  args.value_of("outprefix").map(str::to_owned),
-        database_access_mode: validate_access(args.value_of("access")),
-        namespace:            args.value_of("namespace").map(str::to_owned),
-        type_name_transform:  validate_name_transform(args.value_of("type_xform")),
-        field_name_transform: validate_name_transform(args.value_of("field_xform")),
-        func_name_transform:  validate_name_transform(args.value_of("func_xform")),
-        namespace_transform:  validate_name_transform(args.value_of("ns_xform")),
+        database:               validate_database(args.value_of("database").unwrap()),
+        language:               validate_language(args.value_of("language").unwrap()),
+        database_access_mode:   validate_access(args.value_of("access")),
+        namespace:              args.value_of("namespace").map(str::to_owned),
+        type_name_transform:    validate_name_transform(args.value_of("type_xform")),
+        field_name_transform:   validate_name_transform(args.value_of("field_xform")),
+        variant_name_transform: validate_name_transform(args.value_of("var_xform")),
+        func_name_transform:    validate_name_transform(args.value_of("func_xform")),
+        namespace_transform:    validate_name_transform(args.value_of("ns_xform")),
     };
 
     ProgramArgs {
         codegen_params:   codegen_params,
         output_directory: args.value_of("outdir").unwrap_or(".").to_owned(),
+        outfile_prefix:   args.value_of("outprefix").map(str::to_owned),
         migration_script: args.value_of("migrate").map(str::to_owned),
         sources:          args.values_of("sources").unwrap().map(str::to_owned).collect(),
     }
@@ -103,6 +106,7 @@ fn validate_language(langname: &str) -> Language {
         "c"      => Language::C,
         "cxx"    => Language::CXX,
         "objc"   => Language::ObjectiveC,
+        "swift"  => Language::Swift,
         "go"     => Language::Go,
         "js"     => Language::JavaScript,
         "python" => Language::Python,
@@ -111,25 +115,26 @@ fn validate_language(langname: &str) -> Language {
     }
 }
 
-fn validate_access(modename: Option<&str>) -> DatabaseAccessMode {
-    match modename {
-        None              => DatabaseAccessMode::POD,
-        Some("pod")       => DatabaseAccessMode::POD,
-        Some("activerec") => DatabaseAccessMode::ActiveRecord,
-        Some(name)        => panic!("Invalid DB access mode: '{}'", name),
-    }
+fn validate_access(mode: Option<&str>) -> DatabaseAccessMode {
+    mode.map_or(
+        DatabaseAccessMode::POD,
+        |name| match name {
+            "pod"       => DatabaseAccessMode::POD,
+            "activerec" => DatabaseAccessMode::ActiveRecord,
+            _           => panic!("Invalid DB access mode: '{}'", name),
+        }
+    )
 }
 
-fn validate_name_transform(xformname: Option<&str>) -> NameTransform {
-    match xformname {
-        None             => NameTransform::DefaultForLanguage,
-        Some("identity") => NameTransform::Identity,
-        Some("default")  => NameTransform::DefaultForLanguage,
-        Some("lowcamel") => NameTransform::LowerCamelCase,
-        Some("upcamel")  => NameTransform::UpperCamelCase,
-        Some("snake")    => NameTransform::SnakeCase,
-        Some(name)       => panic!("Invalid name transform: '{}'", name),
-    }
+fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {
+    transform.and_then(|name| match name {
+        "default"  => None,
+        "identity" => Some(NameTransform::Identity),
+        "snake"    => Some(NameTransform::SnakeCase),
+        "lowcamel" => Some(NameTransform::LowerCamelCase),
+        "upcamel"  => Some(NameTransform::UpperCamelCase),
+        _          => panic!("Invalid name transform: '{}'", name),
+    })
 }
 
 fn read_file(path: &str) -> io::Result<String> {
@@ -201,7 +206,9 @@ fn main() {
         )
     });
 
-    let output = CodegenOutput::Directory(&args.output_directory);
+    let output = CodegenOutput {}; // TODO(H2CO3): implement writer provider
+    // TODO(H2CO3): in addition, rewrite declgen+schemagen+querygen
+    // TODO(H2CO3): interfaces to support the new writer provider system
 
     stopwatch!("Generating Declarations", {
         generate_declarations(&sqir, &args.codegen_params, &output).unwrap_or_else(

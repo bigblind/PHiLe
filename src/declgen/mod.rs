@@ -10,6 +10,7 @@ pub mod rust;
 pub mod c;
 pub mod cxx;
 pub mod objc;
+pub mod swift;
 pub mod go;
 pub mod js;
 pub mod python;
