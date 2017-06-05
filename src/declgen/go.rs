@@ -48,7 +48,7 @@ fn declare_fields(name: &str, fields: &HashMap<String, WkCell<Type>>, wr: &mut i
             let pad = " ".repeat(maxlen);
             for (fname, ftype) in fields {
                 write!(wr, "    {}{} ", fname, &pad[fname.len()..])?;
-                write_type(wr, ftype);
+                write_type(wr, ftype)?;
                 write!(wr, "\n")?;
             }
         }
