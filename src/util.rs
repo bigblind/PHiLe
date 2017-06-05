@@ -28,12 +28,12 @@ macro_rules! hash_map {
 
 
 #[derive(Debug)]
-pub struct RcCell<T> {
+pub struct RcCell<T: ?Sized> {
     ptr: Rc<RefCell<T>>,
 }
 
 #[derive(Debug)]
-pub struct WkCell<T> {
+pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
 
@@ -76,6 +76,9 @@ impl<T> Clone for RcCell<T> {
         }
     }
 }
+
+// TODO(H2CO3): implement this once { Unsize, CoerceUnsized } are stable
+// impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<RcCell<U>> for RcCell<T> {}
 
 // Tests equality based on pointer identity
 impl<T> PartialEq for RcCell<T> {

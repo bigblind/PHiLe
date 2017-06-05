@@ -7,6 +7,8 @@
 //
 
 use std::io;
+use std::rc::Rc;
+use std::cell::RefCell;
 use sqir::SQIR;
 use declgen;
 use schemagen;
@@ -47,8 +49,10 @@ pub enum NameTransform {
     UpperCamelCase,
 }
 
-#[allow(missing_debug_implementations, missing_copy_implementations)]
-pub struct CodegenOutput {}
+// TODO(H2CO3): rewrite this using RcCell once custom smart pointers
+//              can point to trait objects, i.e. when CoerceUnsized
+//              and Unsize are stabilized (see issue #27732)
+pub type WriterProvider = FnMut(&str) -> Rc<RefCell<io::Write>>;
 
 #[derive(Debug)]
 pub struct CodegenParams {
@@ -65,10 +69,10 @@ pub struct CodegenParams {
 
 
 macro_rules! call_declgen {
-    ($module: ident, $sqir: expr, $params: expr, $out: expr) => {
+    ($module: ident, $sqir: expr, $params: expr, $wp: expr) => {
         match $params.database_access_mode {
-            DatabaseAccessMode::POD          => declgen::$module::generate_pod($sqir, $params, $out),
-            DatabaseAccessMode::ActiveRecord => declgen::$module::generate_active_record($sqir, $params, $out),
+            DatabaseAccessMode::POD          => declgen::$module::generate_pod($sqir, $params, $wp),
+            DatabaseAccessMode::ActiveRecord => declgen::$module::generate_active_record($sqir, $params, $wp),
         }
     }
 }
@@ -78,33 +82,33 @@ macro_rules! call_declgen {
 // Main API for code generation
 //
 
-pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
+pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
     match params.language {
-        Language::Rust       => call_declgen!(rust,   sqir, params, out),
-        Language::C          => call_declgen!(c,      sqir, params, out),
-        Language::CXX        => call_declgen!(cxx,    sqir, params, out),
-        Language::ObjectiveC => call_declgen!(objc,   sqir, params, out),
-        Language::Swift      => call_declgen!(swift,  sqir, params, out),
-        Language::Go         => call_declgen!(go,     sqir, params, out),
-        Language::JavaScript => call_declgen!(js,     sqir, params, out),
-        Language::Python     => call_declgen!(python, sqir, params, out),
-        Language::Java       => call_declgen!(java,   sqir, params, out),
+        Language::Rust       => call_declgen!(rust,   sqir, params, wp),
+        Language::C          => call_declgen!(c,      sqir, params, wp),
+        Language::CXX        => call_declgen!(cxx,    sqir, params, wp),
+        Language::ObjectiveC => call_declgen!(objc,   sqir, params, wp),
+        Language::Swift      => call_declgen!(swift,  sqir, params, wp),
+        Language::Go         => call_declgen!(go,     sqir, params, wp),
+        Language::JavaScript => call_declgen!(js,     sqir, params, wp),
+        Language::Python     => call_declgen!(python, sqir, params, wp),
+        Language::Java       => call_declgen!(java,   sqir, params, wp),
     }
 }
 
-pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
+pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
     match params.database {
-        DatabaseEngine::SQLite3 => schemagen::sqlite3::generate(sqir, params, out),
-        DatabaseEngine::MongoDB => schemagen::mongo::generate(sqir, params, out),
-        DatabaseEngine::MariaDB => schemagen::maria::generate(sqir, params, out),
+        DatabaseEngine::SQLite3 => schemagen::sqlite3::generate(sqir, params, wp),
+        DatabaseEngine::MongoDB => schemagen::mongo::generate(sqir, params, wp),
+        DatabaseEngine::MariaDB => schemagen::maria::generate(sqir, params, wp),
     }
 }
 
-pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, out: &CodegenOutput) -> io::Result<()> {
+pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
     match params.database {
-        DatabaseEngine::SQLite3 => querygen::sqlite3::generate(sqir, params, out),
-        DatabaseEngine::MongoDB => querygen::mongo::generate(sqir, params, out),
-        DatabaseEngine::MariaDB => querygen::maria::generate(sqir, params, out),
+        DatabaseEngine::SQLite3 => querygen::sqlite3::generate(sqir, params, wp),
+        DatabaseEngine::MongoDB => querygen::mongo::generate(sqir, params, wp),
+        DatabaseEngine::MariaDB => querygen::maria::generate(sqir, params, wp),
     }
 }
 

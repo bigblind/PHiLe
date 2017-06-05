@@ -10,11 +10,13 @@
 extern crate clap;
 extern crate phile;
 
+use std::collections::HashMap;
 use std::str;
 use std::fs::File;
-use std::path::Path;
 use std::error::Error;
 use std::time::Instant;
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::io;
 use std::io::stdout;
 use std::io::prelude::*;
@@ -139,7 +141,7 @@ fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {
 
 fn read_file(path: &str) -> io::Result<String> {
     let mut buf = String::new();
-    let mut file = File::open(&Path::new(path))?;
+    let mut file = File::open(path)?;
     file.read_to_string(&mut buf)?;
     Ok(buf)
 }
@@ -206,24 +208,38 @@ fn main() {
         )
     });
 
-    let output = CodegenOutput {}; // TODO(H2CO3): implement writer provider
-    // TODO(H2CO3): in addition, rewrite declgen+schemagen+querygen
-    // TODO(H2CO3): interfaces to support the new writer provider system
+    // TODO(H2CO3): rewrite this using RcCell once custom smart pointers
+    //              can point to trait objects, i.e. when CoerceUnsized
+    //              and Unsize are stabilized (see issue #27732)
+    let wp = {
+        let mut files = HashMap::new();
+
+        move |s: &str| {
+            let file = File::create(s).unwrap_or_else(
+                |error| panic!("Error opening file '{}': {}", s, error.description())
+            );
+            let ptr = Rc::new(RefCell::new(file));
+
+            files.insert(s.to_owned(), ptr.clone());
+
+            ptr as Rc<RefCell<io::Write>>
+        }
+    };
 
     stopwatch!("Generating Declarations", {
-        generate_declarations(&sqir, &args.codegen_params, &output).unwrap_or_else(
+        generate_declarations(&sqir, &args.codegen_params, &wp).unwrap_or_else(
             |error| panic!("Could not generate declarations: {}", error.description())
         )
     });
 
     stopwatch!("Generating Schema", {
-        generate_schema(&sqir, &args.codegen_params, &output).unwrap_or_else(
+        generate_schema(&sqir, &args.codegen_params, &wp).unwrap_or_else(
             |error| panic!("Could not generate schema: {}", error.description())
         )
     });
 
     stopwatch!("Generating Queries", {
-        generate_queries(&sqir, &args.codegen_params, &output).unwrap_or_else(
+        generate_queries(&sqir, &args.codegen_params, &wp).unwrap_or_else(
             |error| panic!("Could not generate queries: {}", error.description())
         )
     });
