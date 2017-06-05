@@ -1,0 +1,12 @@
+class User {
+  name: String,
+  birth_date: Date,
+  profile_pic: Blob,
+  idents: Ident,
+}
+
+struct Ident {
+  idcard_no: String,
+  ssn: String,
+  credit_card_no: int,
+}
