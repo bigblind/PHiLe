@@ -11,6 +11,6 @@ use codegen::*;
 use sqir::*;
 
 
-pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
+pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     unimplemented!()
 }

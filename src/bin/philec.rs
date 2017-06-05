@@ -211,7 +211,7 @@ fn main() {
     // TODO(H2CO3): rewrite this using RcCell once custom smart pointers
     //              can point to trait objects, i.e. when CoerceUnsized
     //              and Unsize are stabilized (see issue #27732)
-    let wp = {
+    let mut wp = {
         let mut files = HashMap::new();
 
         // If the file exists, truncate it, otherwise create it.
@@ -227,19 +227,19 @@ fn main() {
     };
 
     stopwatch!("Generating Declarations", {
-        generate_declarations(&sqir, &args.codegen_params, &wp).unwrap_or_else(
+        generate_declarations(&sqir, &args.codegen_params, &mut wp).unwrap_or_else(
             |error| panic!("Could not generate declarations: {}", error.description())
         )
     });
 
     stopwatch!("Generating Schema", {
-        generate_schema(&sqir, &args.codegen_params, &wp).unwrap_or_else(
+        generate_schema(&sqir, &args.codegen_params, &mut wp).unwrap_or_else(
             |error| panic!("Could not generate schema: {}", error.description())
         )
     });
 
     stopwatch!("Generating Queries", {
-        generate_queries(&sqir, &args.codegen_params, &wp).unwrap_or_else(
+        generate_queries(&sqir, &args.codegen_params, &mut wp).unwrap_or_else(
             |error| panic!("Could not generate queries: {}", error.description())
         )
     });

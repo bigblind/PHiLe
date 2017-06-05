@@ -82,7 +82,7 @@ macro_rules! call_declgen {
 // Main API for code generation
 //
 
-pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
+pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     match params.language {
         Language::Rust       => call_declgen!(rust,   sqir, params, wp),
         Language::C          => call_declgen!(c,      sqir, params, wp),
@@ -96,7 +96,7 @@ pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &WriterPro
     }
 }
 
-pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
+pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     match params.database {
         DatabaseEngine::SQLite3 => schemagen::sqlite3::generate(sqir, params, wp),
         DatabaseEngine::MongoDB => schemagen::mongo::generate(sqir, params, wp),
@@ -104,7 +104,7 @@ pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider)
     }
 }
 
-pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, wp: &WriterProvider) -> io::Result<()> {
+pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     match params.database {
         DatabaseEngine::SQLite3 => querygen::sqlite3::generate(sqir, params, wp),
         DatabaseEngine::MongoDB => querygen::mongo::generate(sqir, params, wp),
