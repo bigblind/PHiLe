@@ -214,16 +214,16 @@ fn main() {
     let wp = {
         let mut files = HashMap::new();
 
-        move |s: &str| {
+        // If the file exists, truncate it, otherwise create it.
+        // We then cache the file handle so that later
+        // passes don't overwrite the output of earlier ones.
+        move |s: &str| files.entry(s.to_owned()).or_insert_with(|| {
             let file = File::create(s).unwrap_or_else(
-                |error| panic!("Error opening file '{}': {}", s, error.description())
+                |err| panic!("Error opening file '{}': {}", s, err.description())
             );
-            let ptr = Rc::new(RefCell::new(file));
 
-            files.insert(s.to_owned(), ptr.clone());
-
-            ptr as Rc<RefCell<io::Write>>
-        }
+            Rc::new(RefCell::new(file))
+        }).clone() as Rc<RefCell<io::Write>>
     };
 
     stopwatch!("Generating Declarations", {
