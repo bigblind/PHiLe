@@ -20,8 +20,8 @@ pub fn generate_pod(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider
 
     write!(wr, "package main\n\nimport \"time\"\n\n")?;
 
-    // TODO(H2eCO3): for determinism, order named
-    // user-defined type by name
+    // TODO(H2eCO3): for determinism, sort named
+    // user-defined types by name
     for (name, typ) in &sqir.named_types {
         match *typ.borrow().map_err(err)? {
             Type::Struct(ref st) => declare_fields(&st.name, &st.fields, &mut *wr)?,
@@ -41,7 +41,7 @@ fn declare_fields(name: &str, fields: &HashMap<String, WkCell<Type>>, wr: &mut i
 
     // TODO(H2CO3): Respect the field name transform
     // TODO(H2CO3): For determinism and efficiency,
-    // order fields by alignment and then by name.
+    // sort fields by alignment and then by name.
     match fields.keys().map(String::len).max() {
         None => (),
         Some(maxlen) => {
