@@ -118,34 +118,64 @@ pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProv
 // Name Transforms
 //
 
-pub fn transform_type_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
-    transform_general_name(name, transform, lang, default_type_name_transform)
+pub fn transform_type_name(name: &str, params: &CodegenParams) -> String {
+    transform_name(
+        name,
+        params.type_name_transform,
+        params.language,
+        default_type_name_transform
+    )
 }
 
-pub fn transform_field_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
-    transform_general_name(name, transform, lang, default_field_name_transform)
+pub fn transform_field_name(name: &str, params: &CodegenParams) -> String {
+    transform_name(
+        name,
+        params.field_name_transform,
+        params.language,
+        default_field_name_transform
+    )
 }
 
-pub fn transform_variant_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
-    transform_general_name(name, transform, lang, default_variant_name_transform)
+pub fn transform_variant_name(name: &str, params: &CodegenParams) -> String {
+    transform_name(
+        name,
+        params.variant_name_transform,
+        params.language,
+        default_variant_name_transform
+    )
 }
 
-pub fn transform_func_name(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
-    transform_general_name(name, transform, lang, default_func_name_transform)
+pub fn transform_func_name(name: &str, params: &CodegenParams) -> String {
+    transform_name(
+        name,
+        params.func_name_transform,
+        params.language,
+        default_func_name_transform
+    )
 }
 
-pub fn transform_namespace(name: &str, transform: Option<NameTransform>, lang: Language) -> String {
-    transform_general_name(name, transform, lang, default_namespace_transform)
+pub fn transform_namespace(name: &str, params: &CodegenParams) -> String {
+    transform_name(
+        name,
+        params.namespace_transform,
+        params.language,
+        default_namespace_transform
+    )
 }
 
-fn transform_general_name<D>(
+fn transform_name<D>(
     name: &str,
     transform: Option<NameTransform>,
     lang: Language,
     default: D
 ) -> String where D: FnOnce(Language) -> NameTransform {
-    let resolved_transform = transform.unwrap_or_else(|| default(lang));
-    transform_name(name, resolved_transform)
+    match transform.unwrap_or_else(|| default(lang)) {
+        NameTransform::Identity       => name.to_owned(),
+        NameTransform::LowerSnakeCase => name.to_snake_case(),
+        NameTransform::UpperSnakeCase => name.to_shouty_snake_case(),
+        NameTransform::LowerCamelCase => name.to_mixed_case(),
+        NameTransform::UpperCamelCase => name.to_camel_case(),
+    }
 }
 
 fn default_type_name_transform(lang: Language) -> NameTransform {
@@ -215,16 +245,6 @@ fn default_namespace_transform(lang: Language) -> NameTransform {
         Language::JavaScript => NameTransform::Identity,
         Language::Python     => NameTransform::Identity,
         Language::Java       => NameTransform::Identity,
-    }
-}
-
-fn transform_name(name: &str, transform: NameTransform) -> String {
-    match transform {
-        NameTransform::Identity       => name.to_owned(),
-        NameTransform::LowerSnakeCase => name.to_snake_case(),
-        NameTransform::UpperSnakeCase => name.to_shouty_snake_case(),
-        NameTransform::LowerCamelCase => name.to_mixed_case(),
-        NameTransform::UpperCamelCase => name.to_camel_case(),
     }
 }
 

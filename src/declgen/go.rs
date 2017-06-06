@@ -72,11 +72,7 @@ impl<'a> Generator<'a> {
         fields: &HashMap<String, WkCell<Type>>
     ) -> io::Result<()> {
         // Respect the type name transform
-        let struct_name = transform_type_name(
-            raw_struct_name,
-            self.params.type_name_transform,
-            self.params.language
-        );
+        let struct_name = transform_type_name(raw_struct_name, &self.params);
         write!(wr, "\ntype {} struct {{\n", struct_name)?;
 
         // For determinism, sort fields by name.
@@ -84,11 +80,7 @@ impl<'a> Generator<'a> {
         // TODO(H2CO3): For efficiency, sort fields by alignment.
         let ordered_fields = {
             let mut fs: Vec<_> = fields.iter().map(|(fname, typ)| {
-                let field_name = transform_field_name(
-                    fname,
-                    self.params.field_name_transform,
-                    self.params.language
-                );
+                let field_name = transform_field_name(fname, &self.params);
                 (field_name, typ)
             }).collect();
 
@@ -102,7 +94,7 @@ impl<'a> Generator<'a> {
 
         for (fname, ftype) in ordered_fields {
             write!(wr, "    {}{} ", fname, &pad[fname.len()..])?;
-            write_type(wr, ftype)?;
+            self.write_type(wr, ftype)?;
             write!(wr, "\n")?;
         }
 
@@ -119,11 +111,7 @@ impl<'a> Generator<'a> {
         variants: &HashMap<String, WkCell<Type>>
     ) -> io::Result<()> {
         // Respect the type name transform
-        let enum_name = transform_type_name(
-            raw_enum_name,
-            self.params.type_name_transform,
-            self.params.language
-        );
+        let enum_name = transform_type_name(raw_enum_name, &self.params);
 
         // TODO(H2CO3): if none of the variants has an
         // associated value (every variant has type ()),
@@ -140,11 +128,7 @@ impl<'a> Generator<'a> {
         // Respect the variant name transform too.
         let ordered_variants = {
             let mut vs: Vec<_> = variants.keys().map(
-                |vname| transform_variant_name(
-                    vname,
-                    self.params.variant_name_transform,
-                    self.params.language
-                )
+                |vname| transform_variant_name(vname, &self.params)
             ).collect();
 
             vs.sort();
@@ -168,6 +152,71 @@ impl<'a> Generator<'a> {
     }
 
     //
+    // Generic Type Writers
+    //
+    fn write_type(&self, wr: &mut io::Write, typ: &WkCell<Type>) -> io::Result<()> {
+        let rc = typ.as_rc().map_err(err)?;
+        let ptr = rc.borrow().map_err(err)?;
+
+        match *ptr {
+            Type::Bool  => write!(wr, "bool"),
+            Type::Int   => write!(wr, "int64"),
+            Type::Float => write!(wr, "float64"),
+            Type::Decimal(integral, fractional) => unimplemented!(),
+
+            Type::String => write!(wr, "string"),
+            Type::Blob   => write!(wr, "[]byte"),
+            Type::Date   => write!(wr, "time.Time"),
+
+            Type::Optional(ref wrapped) => self.write_optional_type(wr, wrapped),
+            Type::Unique(ref wrapped)   => self.write_type(wr, wrapped), // don't care
+            Type::Pointer(ref pointed)  => self.write_pointer_type(wr, pointed),
+            Type::Array(ref element)    => self.write_array_type(wr, element),
+            Type::Tuple(ref types)      => self.write_tuple_type(wr, types),
+
+            // Respect type name transform
+            Type::Enum(ref et)   => write!(
+                wr, "{}", transform_type_name(&et.name, self.params)
+            ),
+            Type::Struct(ref st) => write!(
+                wr, "{}", transform_type_name(&st.name, self.params)
+            ),
+            Type::Class(ref ct)  => write!(
+                wr, "{}", transform_type_name(&ct.name, self.params)
+            ),
+
+            Type::Function(ref ft) => unimplemented!(),
+            Type::Placeholder(ref name, kind) => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
+        }
+    }
+
+    fn write_optional_type(&self, wr: &mut io::Write, wrapped: &WkCell<Type>) -> io::Result<()> {
+        self.write_pointer_type(wr, wrapped)
+    }
+
+    fn write_pointer_type(&self, wr: &mut io::Write, pointed: &WkCell<Type>) -> io::Result<()> {
+        write!(wr, "*").and_then(|_| self.write_type(wr, pointed))
+    }
+
+    fn write_array_type(&self, wr: &mut io::Write, element: &WkCell<Type>) -> io::Result<()> {
+        write!(wr, "[]").and_then(|_| self.write_type(wr, element))
+    }
+
+    fn write_tuple_type(&self, wr: &mut io::Write, types: &[WkCell<Type>]) -> io::Result<()> {
+        write!(wr, "struct {{ ")?;
+
+        for (idx, typ) in types.iter().enumerate() {
+            write!(wr, "Field{} ", idx)?;
+            self.write_type(wr, typ)?;
+            write!(wr, "; ")?;
+        }
+
+        write!(wr, "}}")?;
+
+        Ok(())
+    }
+
+    //
     // Common Helpers
     //
 
@@ -178,17 +227,14 @@ impl<'a> Generator<'a> {
     }
 
     fn write_package_header(&self, wr: &mut io::Write) -> io::Result<()> {
+        // Respect namespace transform
         match self.params.namespace {
-            Some(ref namespace) => {
-                // Respect namespace transform
-                let namespace_name = transform_namespace(
-                    namespace,
-                    self.params.namespace_transform,
-                    self.params.language
-                );
-                write!(wr, "package {}\n\n", namespace_name)
-            },
-            None => Err(io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")),
+            Some(ref ns) => write!(
+                wr, "package {}\n\n", transform_namespace(ns, &self.params)
+            ),
+            None => Err(
+                io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
+            ),
         }
     }
 
@@ -211,60 +257,4 @@ impl<'a> Generator<'a> {
 
 fn err<E: Debug>(error: E) -> io::Error {
     io::Error::new(io::ErrorKind::Other, format!("{:#?}", error))
-}
-
-fn write_type(wr: &mut io::Write, typ: &WkCell<Type>) -> io::Result<()> {
-    let rc = typ.as_rc().map_err(err)?;
-    let ptr = rc.borrow().map_err(err)?;
-
-    match *ptr {
-        Type::Bool  => write!(wr, "bool"),
-        Type::Int   => write!(wr, "int64"),
-        Type::Float => write!(wr, "float64"),
-        Type::Decimal(integral, fractional) => unimplemented!(),
-
-        Type::String => write!(wr, "string"),
-        Type::Blob   => write!(wr, "[]byte"),
-        Type::Date   => write!(wr, "time.Time"),
-
-        Type::Optional(ref wrapped) => write_optional_type(wr, wrapped),
-        Type::Unique(ref wrapped)   => write_type(wr, wrapped), // don't care
-        Type::Pointer(ref pointed)  => write_pointer_type(wr, pointed),
-        Type::Array(ref element)    => write_array_type(wr, element),
-        Type::Tuple(ref types)      => write_tuple_type(wr, types),
-
-        // TODO(H2CO3): respect type name transform
-        Type::Enum(ref et)   => write!(wr, "{}", et.name),
-        Type::Struct(ref st) => write!(wr, "{}", st.name),
-        Type::Class(ref ct)  => write!(wr, "{}", ct.name),
-
-        Type::Function(ref ft) => unimplemented!(),
-        Type::Placeholder(ref name, kind) => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
-    }
-}
-
-fn write_optional_type(wr: &mut io::Write, wrapped: &WkCell<Type>) -> io::Result<()> {
-    write_pointer_type(wr, wrapped)
-}
-
-fn write_pointer_type(wr: &mut io::Write, pointed: &WkCell<Type>) -> io::Result<()> {
-    write!(wr, "*").and_then(|_| write_type(wr, pointed))
-}
-
-fn write_array_type(wr: &mut io::Write, element: &WkCell<Type>) -> io::Result<()> {
-    write!(wr, "[]").and_then(|_| write_type(wr, element))
-}
-
-fn write_tuple_type(wr: &mut io::Write, types: &[WkCell<Type>]) -> io::Result<()> {
-    write!(wr, "struct {{ ")?;
-
-    for (idx, typ) in types.iter().enumerate() {
-        write!(wr, "Field{} ", idx)?;
-        write_type(wr, typ)?;
-        write!(wr, "; ")?;
-    }
-
-    write!(wr, "}}")?;
-
-    Ok(())
 }
