@@ -1,0 +1,13 @@
+enum Sex {
+    Female,
+    Male,
+}
+
+class User {
+    legal_name:  String,
+    handle:      String!,
+    birth_date:  Date,
+    sex:         Sex,
+    profile_pic: File?,
+    biography:   String?,
+}

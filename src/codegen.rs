@@ -9,6 +9,7 @@
 use std::io;
 use std::rc::Rc;
 use std::cell::RefCell;
+use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase };
 use sqir::SQIR;
 use declgen;
 use schemagen;
@@ -44,7 +45,8 @@ pub enum DatabaseAccessMode {
 #[derive(Debug, Clone, Copy)]
 pub enum NameTransform {
     Identity,
-    SnakeCase, // isn't SnakeCase spelled with camel case ironic?
+    LowerSnakeCase, // isn't SnakeCase spelled with camel case ironic?
+    UpperSnakeCase,
     LowerCamelCase,
     UpperCamelCase,
 }
@@ -99,16 +101,16 @@ pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &mut Write
 pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     match params.database {
         DatabaseEngine::SQLite3 => schemagen::sqlite3::generate(sqir, params, wp),
-        DatabaseEngine::MongoDB => schemagen::mongo::generate(sqir, params, wp),
-        DatabaseEngine::MariaDB => schemagen::maria::generate(sqir, params, wp),
+        DatabaseEngine::MongoDB => schemagen::mongodb::generate(sqir, params, wp),
+        DatabaseEngine::MariaDB => schemagen::mariadb::generate(sqir, params, wp),
     }
 }
 
 pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     match params.database {
         DatabaseEngine::SQLite3 => querygen::sqlite3::generate(sqir, params, wp),
-        DatabaseEngine::MongoDB => querygen::mongo::generate(sqir, params, wp),
-        DatabaseEngine::MariaDB => querygen::maria::generate(sqir, params, wp),
+        DatabaseEngine::MongoDB => querygen::mongodb::generate(sqir, params, wp),
+        DatabaseEngine::MariaDB => querygen::mariadb::generate(sqir, params, wp),
     }
 }
 
@@ -162,14 +164,14 @@ fn default_type_name_transform(lang: Language) -> NameTransform {
 
 fn default_field_name_transform(lang: Language) -> NameTransform {
     match lang {
-        Language::Rust       => NameTransform::SnakeCase,
-        Language::C          => NameTransform::SnakeCase,
-        Language::CXX        => NameTransform::SnakeCase,
+        Language::Rust       => NameTransform::LowerSnakeCase,
+        Language::C          => NameTransform::LowerSnakeCase,
+        Language::CXX        => NameTransform::LowerSnakeCase,
         Language::ObjectiveC => NameTransform::LowerCamelCase,
         Language::Swift      => NameTransform::LowerCamelCase,
         Language::Go         => NameTransform::UpperCamelCase,
         Language::JavaScript => NameTransform::LowerCamelCase,
-        Language::Python     => NameTransform::SnakeCase,
+        Language::Python     => NameTransform::LowerSnakeCase,
         Language::Java       => NameTransform::LowerCamelCase,
     }
 }
@@ -190,14 +192,14 @@ fn default_variant_name_transform(lang: Language) -> NameTransform {
 
 fn default_func_name_transform(lang: Language) -> NameTransform {
     match lang {
-        Language::Rust       => NameTransform::SnakeCase,
-        Language::C          => NameTransform::SnakeCase,
-        Language::CXX        => NameTransform::SnakeCase,
+        Language::Rust       => NameTransform::LowerSnakeCase,
+        Language::C          => NameTransform::LowerSnakeCase,
+        Language::CXX        => NameTransform::LowerSnakeCase,
         Language::ObjectiveC => NameTransform::LowerCamelCase,
         Language::Swift      => NameTransform::LowerCamelCase,
         Language::Go         => NameTransform::UpperCamelCase,
         Language::JavaScript => NameTransform::LowerCamelCase,
-        Language::Python     => NameTransform::SnakeCase,
+        Language::Python     => NameTransform::LowerSnakeCase,
         Language::Java       => NameTransform::LowerCamelCase,
     }
 }
@@ -219,9 +221,10 @@ fn default_namespace_transform(lang: Language) -> NameTransform {
 fn transform_name(name: &str, transform: NameTransform) -> String {
     match transform {
         NameTransform::Identity       => name.to_owned(),
-        NameTransform::SnakeCase      => unimplemented!(),
-        NameTransform::LowerCamelCase => unimplemented!(),
-        NameTransform::UpperCamelCase => unimplemented!(),
+        NameTransform::LowerSnakeCase => name.to_snake_case(),
+        NameTransform::UpperSnakeCase => name.to_shouty_snake_case(),
+        NameTransform::LowerCamelCase => name.to_mixed_case(),
+        NameTransform::UpperCamelCase => name.to_camel_case(),
     }
 }
 

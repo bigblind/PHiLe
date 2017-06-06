@@ -7,5 +7,5 @@
 //
 
 pub mod sqlite3;
-pub mod mongo;
-pub mod maria;
+pub mod mongodb;
+pub mod mariadb;

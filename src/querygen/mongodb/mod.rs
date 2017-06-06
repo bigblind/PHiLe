@@ -1,5 +1,5 @@
 //
-// schemagen/maria/mod.rs
+// querygen/mongodb/mod.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)

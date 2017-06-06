@@ -1,0 +1,12 @@
+enum MediaType {
+    Text,
+    Image,
+    Audio,
+    Video,
+    Executable,
+}
+
+struct File {
+    type: MediaType,
+    data: Blob,
+}

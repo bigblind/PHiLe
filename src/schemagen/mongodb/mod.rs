@@ -1,5 +1,5 @@
 //
-// schemagen/mongo/mod.rs
+// schemagen/mongodb/mod.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)

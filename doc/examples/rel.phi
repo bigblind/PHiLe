@@ -1,8 +1,0 @@
-class Foo {
-  bars: [&Bar] *<->* foos,
-}
-
-class Bar {
-# foos: String, # scalar type => not a relation
-  foos: [&Foo] *<->+ bars,
-}

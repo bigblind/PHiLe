@@ -96,8 +96,8 @@ fn get_args() -> ProgramArgs {
 fn validate_database(dbname: &str) -> DatabaseEngine {
     match dbname {
         "sqlite3" => DatabaseEngine::SQLite3,
-        "mongo"   => DatabaseEngine::MongoDB,
-        "maria"   => DatabaseEngine::MariaDB,
+        "mongodb" => DatabaseEngine::MongoDB,
+        "mariadb" => DatabaseEngine::MariaDB,
         _         => panic!("Unsupported database engine: '{}'", dbname),
     }
 }
@@ -132,7 +132,8 @@ fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {
     transform.and_then(|name| match name {
         "default"  => None,
         "identity" => Some(NameTransform::Identity),
-        "snake"    => Some(NameTransform::SnakeCase),
+        "lowsnake" => Some(NameTransform::LowerSnakeCase),
+        "upsnake"  => Some(NameTransform::UpperSnakeCase),
         "lowcamel" => Some(NameTransform::LowerCamelCase),
         "upcamel"  => Some(NameTransform::UpperCamelCase),
         _          => panic!("Invalid name transform: '{}'", name),
