@@ -9,6 +9,8 @@
 use std::io;
 use std::fmt::Debug;
 use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::RefCell;
 use codegen::*;
 use sqir::*;
 use util::*;
@@ -41,27 +43,59 @@ impl<'a> Generator<'a> {
     fn generate_pod(mut self) -> io::Result<()> {
         // TODO(H2CO3): respect output file prefix
         // TODO(H2CO3): respect output directory
-        // TODO(H2CO3): one file per user-defined type
-        let wptr = (self.wp)("PHiLe_decls.go");
+        // For determinism, sort user-defined types by name
+        let types = self.types_sorted_by_name();
+        let wrs = self.writers_for_types(&types)?;
+
+        for typ in types {
+            match *typ.borrow().map_err(err)? {
+                Type::Struct(ref st) => {
+                    let wr = &mut *wrs[&st.name].try_borrow_mut().map_err(err)?;
+                    self.write_fields(wr, &st.name, &st.fields)?;
+                },
+                Type::Class(ref ct)  => {
+                    let wr = &mut *wrs[&ct.name].try_borrow_mut().map_err(err)?;
+                    self.write_fields(wr, &ct.name, &ct.fields)?;
+                },
+                Type::Enum(ref et)   => {
+                    let wr = &mut *wrs[&et.name].try_borrow_mut().map_err(err)?;
+                    self.write_variants(wr, &et.name, &et.variants)?;
+                },
+                _ => continue, // primitive named types need no declaration
+            }
+        }
+
+        Ok(())
+    }
+
+    fn writers_for_types(&mut self, types: &[RcCell<Type>]) -> io::Result<HashMap<String, Rc<RefCell<io::Write>>>> {
+        let mut writers = HashMap::with_capacity(types.len());
+
+        for typ in types {
+            let name = match *typ.borrow().map_err(err)? {
+                Type::Struct(ref st) => st.name.to_owned(),
+                Type::Class(ref ct)  => ct.name.to_owned(),
+                Type::Enum(ref et)   => et.name.to_owned(),
+                _ => continue, // primitive named types need no declaration
+            };
+
+            let writer = self.writer_with_preamble(&name)?;
+            writers.insert(name, writer);
+        }
+
+        Ok(writers)
+    }
+
+    fn writer_with_preamble(&mut self, name: &str) -> io::Result<Rc<RefCell<io::Write>>> {
+        // TODO(H2CO3): accord the file name with the _transformed_ type name...?!
+        let wptr = (self.wp)(&format!("{}.go", name));
         let mut wr = wptr.try_borrow_mut().map_err(err)?;
 
         self.write_package_header(&mut *wr)?;
         self.write_driver_imports(&mut *wr)?;
         self.write_stdlib_imports(&mut *wr)?;
 
-        // For determinism, sort user-defined types by name
-        let types = self.types_sorted_by_name();
-
-        for typ in &types {
-            match *typ.borrow().map_err(err)? {
-                Type::Struct(ref st) => self.write_fields(&mut *wr, &st.name, &st.fields)?,
-                Type::Class(ref ct)  => self.write_fields(&mut *wr, &ct.name, &ct.fields)?,
-                Type::Enum(ref et)   => self.write_variants(&mut *wr, &et.name, &et.variants)?,
-                _ => continue, // primitive named types need no declaration
-            }
-        }
-
-        Ok(())
+        Ok(wptr.clone())
     }
 
     // TODO(H2CO3): refactor
@@ -89,8 +123,8 @@ impl<'a> Generator<'a> {
             fs
         };
 
-        let maxlen = ordered_fields.iter().map(|&(ref name, _)| name.len()).max().unwrap_or(0);
-        let pad = " ".repeat(maxlen);
+        let max_len = ordered_fields.iter().map(|&(ref name, _)| name.len()).max().unwrap_or(0);
+        let pad = " ".repeat(max_len);
 
         for (fname, ftype) in ordered_fields {
             write!(wr, "    {}{} ", fname, &pad[fname.len()..])?;
@@ -119,6 +153,7 @@ impl<'a> Generator<'a> {
         // TODO(H2CO3): let the user choose whether
         // enum discriminators are strings or ints, for
         // a tradeoff between speed and maintainability.
+        // TODO(H2CO3): transform these field names...?!
         write!(wr, "\ntype {} struct {{\n", enum_name)?;
         write!(wr, "    Variant string\n")?;
         write!(wr, "    Value   interface{{}}\n")?;
@@ -127,22 +162,26 @@ impl<'a> Generator<'a> {
         // For determinism, sort variants by name.
         // Respect the variant name transform too.
         let ordered_variants = {
-            let mut vs: Vec<_> = variants.keys().map(
-                |vname| transform_variant_name(vname, &self.params)
-            ).collect();
-
+            let mut vs: Vec<_> = variants.keys().collect();
             vs.sort();
-
             vs
         };
 
-        let maxlen = ordered_variants.iter().map(String::len).max().unwrap_or(0);
-        let pad = " ".repeat(maxlen);
+        let max_len = ordered_variants.iter().map(|s| s.len()).max().unwrap_or(0);
+        let pad = " ".repeat(max_len);
 
         write!(wr, "\nconst (\n")?;
 
+        // Respect the variant name transform.
+        // For correctly prefixing each variant name, first
+        // they are prefixed with the name of the variant and
+        // an underscore, which is a word boundary according
+        // to the case transforms in the Heck crate. Then, the
+        // composed 'raw' variant name is transformed to obtain
+        // the final, correctly cased and prefixed variant name.
         for vname in ordered_variants {
-            let full_vname = enum_name.clone() + &vname;
+            let raw_vname = enum_name.clone() + "_" + vname;
+            let full_vname = transform_variant_name(&raw_vname, &self.params);
             write!(wr, "    {}{} = \"{}\"\n", full_vname, &pad[vname.len()..], full_vname)?;
         }
 
@@ -220,10 +259,10 @@ impl<'a> Generator<'a> {
     // Common Helpers
     //
 
-    fn types_sorted_by_name(&self) -> Vec<&RcCell<Type>> {
+    fn types_sorted_by_name(&self) -> Vec<RcCell<Type>> {
         let mut types: Vec<_> = self.sqir.named_types.iter().collect();
         types.sort_by_key(|&(name, _)| name);
-        types.iter().map(|&(_, typ)| typ).collect()
+        types.iter().map(|&(_, typ)| typ.clone()).collect()
     }
 
     fn write_package_header(&self, wr: &mut io::Write) -> io::Result<()> {

@@ -13,6 +13,7 @@ extern crate phile;
 use std::collections::HashMap;
 use std::str;
 use std::fs::File;
+use std::path::PathBuf;
 use std::error::Error;
 use std::time::Instant;
 use std::rc::Rc;
@@ -30,7 +31,7 @@ use phile::codegen::*;
 struct ProgramArgs {
     codegen_params:   CodegenParams,
     output_directory: String,
-    outfile_prefix:   Option<String>,
+    outfile_prefix:   String,
     migration_script: Option<String>,
     sources:          Vec<String>,
 }
@@ -87,7 +88,7 @@ fn get_args() -> ProgramArgs {
     ProgramArgs {
         codegen_params:   codegen_params,
         output_directory: args.value_of("outdir").unwrap_or(".").to_owned(),
-        outfile_prefix:   args.value_of("outprefix").map(str::to_owned),
+        outfile_prefix:   args.value_of("outprefix").unwrap_or("").to_owned(),
         migration_script: args.value_of("migrate").map(str::to_owned),
         sources:          args.values_of("sources").unwrap().map(str::to_owned).collect(),
     }
@@ -214,12 +215,15 @@ fn main() {
     //              and Unsize are stabilized (see issue #27732)
     let mut wp = {
         let mut files = HashMap::new();
+        let base_path = PathBuf::from(&args.output_directory);
+        let outfile_prefix = args.outfile_prefix.clone();
 
         // If the file exists, truncate it, otherwise create it.
         // We then cache the file handle so that later
         // passes don't overwrite the output of earlier ones.
         move |s: &str| files.entry(s.to_owned()).or_insert_with(|| {
-            let file = File::create(s).unwrap_or_else(
+            let path = base_path.join(outfile_prefix.clone() + s);
+            let file = File::create(path).unwrap_or_else(
                 |err| panic!("Error opening file '{}': {}", s, err.description())
             );
 
