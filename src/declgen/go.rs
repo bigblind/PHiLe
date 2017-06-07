@@ -41,8 +41,6 @@ pub fn generate_active_record(sqir: &SQIR, params: &CodegenParams, wp: &mut Writ
 
 impl<'a> Generator<'a> {
     fn generate_pod(mut self) -> io::Result<()> {
-        // TODO(H2CO3): respect output file prefix
-        // TODO(H2CO3): respect output directory
         // For determinism, sort user-defined types by name
         let types = self.types_sorted_by_name();
         let wrs = self.writers_for_types(&types)?;
@@ -214,15 +212,9 @@ impl<'a> Generator<'a> {
             Type::Tuple(ref types)      => self.write_tuple_type(wr, types),
 
             // Respect type name transform
-            Type::Enum(ref et)   => write!(
-                wr, "{}", transform_type_name(&et.name, self.params)
-            ),
-            Type::Struct(ref st) => write!(
-                wr, "{}", transform_type_name(&st.name, self.params)
-            ),
-            Type::Class(ref ct)  => write!(
-                wr, "{}", transform_type_name(&ct.name, self.params)
-            ),
+            Type::Enum(ref et)   => write!(wr, "{}", transform_type_name(&et.name, self.params)),
+            Type::Struct(ref st) => write!(wr, "{}", transform_type_name(&st.name, self.params)),
+            Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, self.params)),
 
             Type::Function(ref ft) => unimplemented!(),
             Type::Placeholder(ref name, kind) => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
