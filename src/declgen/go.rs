@@ -194,7 +194,7 @@ impl<'a> Generator<'a> {
             Type::Bool  => write!(wr, "bool"),
             Type::Int   => write!(wr, "int64"),
             Type::Float => write!(wr, "float64"),
-            Type::Decimal(integral, fractional) => unimplemented!(),
+            Type::Decimal { integral, fractional } => unimplemented!(),
 
             Type::String => write!(wr, "string"),
             Type::Blob   => write!(wr, "[]byte"),
@@ -212,7 +212,7 @@ impl<'a> Generator<'a> {
             Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, self.params)),
 
             Type::Function(ref ft) => unimplemented!(),
-            Type::Placeholder(ref name, kind) => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
+            Type::Placeholder { ref name, kind } => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
         }
     }
 

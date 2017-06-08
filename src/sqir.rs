@@ -19,7 +19,10 @@ pub enum Type {
     Bool,
     Int,
     Float,
-    Decimal(usize, usize), // integral digits, fractional digits
+    Decimal {
+        integral:   usize,
+        fractional: usize,
+    },
 
     String,
     Blob,
@@ -37,7 +40,10 @@ pub enum Type {
 
     Function(FunctionType),
 
-    Placeholder(String, PlaceholderKind),
+    Placeholder {
+        name: String,
+        kind: PlaceholderKind,
+    },
 }
 
 #[derive(Debug, Clone, Copy)]

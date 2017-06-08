@@ -154,7 +154,7 @@ impl SQIRGen {
 
             self.sqir.named_types.insert(
                 name.to_owned(),
-                RcCell::new(Type::Placeholder(name.to_owned(), kind))
+                RcCell::new(Type::Placeholder { name: name.to_owned(), kind })
             );
         }
 
@@ -454,7 +454,7 @@ impl SQIRGen {
                 format!("Class type '{}' not allowed without indirection", t.name),
                 node
             ),
-            Type::Placeholder(ref name, PlaceholderKind::Class) => sema_error(
+            Type::Placeholder { ref name, kind: PlaceholderKind::Class } => sema_error(
                 format!("Class type '{}' not allowed without indirection", name),
                 node
             ),
@@ -471,8 +471,8 @@ impl SQIRGen {
             // Placeholders representing struct and enum types are also OK,
             // because once typechecked on their own, valid structs and enums
             // can always be part of a class.
-            Type::Placeholder(_, PlaceholderKind::Struct) => Ok(()),
-            Type::Placeholder(_, PlaceholderKind::Enum)   => Ok(()),
+            Type::Placeholder { kind: PlaceholderKind::Struct, .. } => Ok(()),
+            Type::Placeholder { kind: PlaceholderKind::Enum, .. }   => Ok(()),
 
             // Function types are not allowed within user-defined types.
             Type::Function(_) => sema_error("Function type not allowed in user-defined type".to_owned(), node),
@@ -488,7 +488,7 @@ impl SQIRGen {
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
             Type::Bool | Type::Int | Type::Float   => Ok(()),
-            Type::Decimal(_, _)                    => Ok(()),
+            Type::Decimal { .. }                   => Ok(()),
             Type::String | Type::Blob | Type::Date => Ok(()),
         }
     }
@@ -587,7 +587,7 @@ impl SQIRGen {
 
             // Non-recursive (atomic/non-wrapping) types are always OK.
             Type::Bool | Type::Int | Type::Float   => Ok(()),
-            Type::Decimal(_, _)                    => Ok(()),
+            Type::Decimal { .. }                   => Ok(()),
             Type::String | Type::Blob | Type::Date => Ok(()),
 
             // Non-indirect, potentially recursive types
@@ -604,7 +604,7 @@ impl SQIRGen {
             ),
 
             // Occurs check is supposed to happen after type resolution
-            Type::Placeholder(ref name, _) => unreachable!(
+            Type::Placeholder { ref name, .. } => unreachable!(
                 "Placeholder type '{}' should have been resolved by now",
                 name
             ),
@@ -657,7 +657,7 @@ impl SQIRGen {
                 // (Placeholders to classes are also allowed, obviously.)
                 match *ptr {
                     Type::Class(_) => (),
-                    Type::Placeholder(_, PlaceholderKind::Class) => (),
+                    Type::Placeholder{ kind: PlaceholderKind::Class, .. } => (),
                     _ => return sema_error(
                         format!("Pointer to non-class type '{}'", format_type(pointed_type)),
                         decl
