@@ -25,7 +25,6 @@ use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
 use phile::codegen::*;
-use phile::util::CustomIOError;
 
 
 #[derive(Debug)]
@@ -166,19 +165,26 @@ fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
 //              and Unsize are stabilized (see issue #27732)
 // TODO(H2CO3): Rewrite this using impl WriterProvider (issue #34511)
 fn writer_provider_with_args(args: &ProgramArgs) -> Box<WriterProvider> {
-    let mut files = HashMap::new();
+    let mut files = HashMap::<_, Rc<RefCell<_>>>::new();
     let base_path = PathBuf::from(&args.output_directory);
     let outfile_prefix = args.outfile_prefix.clone();
 
     // If the file exists, truncate it, otherwise create it.
     // We then cache the file handle so that later
     // passes don't overwrite the output of earlier ones.
-    let wp = move |s: &str| files.entry(s.to_owned()).or_insert_with(|| {
-        let path = base_path.join(outfile_prefix.clone() + s);
-        let file = File::create(path).map_err(CustomIOError::from)?;
+    let wp = move |name: &str| {
+        if let Some(rc) = files.get(name) {
+            return Ok(rc.clone())
+        }
+
+        let path = base_path.join(outfile_prefix.clone() + name);
+        let file = File::create(path)?;
         let rc = Rc::new(RefCell::new(file)) as Rc<RefCell<io::Write>>;
+
+        files.insert(name.to_owned(), rc.clone());
+
         Ok(rc)
-    }).clone();
+    };
 
     Box::new(wp)
 }

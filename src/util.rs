@@ -6,9 +6,6 @@
 // on 02/05/2017
 //
 
-use std::io;
-use std::error::Error;
-use std::fmt::{ self, Display, Formatter };
 use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut, BorrowError, BorrowMutError };
 use std::hash::{ Hash, Hasher };
@@ -47,13 +44,7 @@ pub enum DerefError {
     Strongify,
 }
 
-#[derive(Debug)]
-pub struct CustomIOError {
-    pub error: io::Error,
-}
-
 pub type DerefResult<T> = Result<T, DerefError>;
-pub type CustomIOResult<T> = Result<T, CustomIOError>;
 
 
 impl<T> RcCell<T> {
@@ -116,41 +107,5 @@ impl<T> Clone for WkCell<T> {
         WkCell {
             ptr: self.ptr.clone()
         }
-    }
-}
-
-impl Clone for CustomIOError {
-    fn clone(&self) -> Self {
-        CustomIOError {
-            error: io::Error::new(self.error.kind(), self.error.description())
-        }
-    }
-}
-
-impl Error for CustomIOError {
-    fn description(&self) -> &str {
-        self.error.description()
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        self.error.cause()
-    }
-}
-
-impl Display for CustomIOError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.error.fmt(f)
-    }
-}
-
-impl From<io::Error> for CustomIOError {
-    fn from(error: io::Error) -> Self {
-        CustomIOError { error }
-    }
-}
-
-impl From<CustomIOError> for io::Error {
-    fn from(error: CustomIOError) -> Self {
-        error.error
     }
 }
