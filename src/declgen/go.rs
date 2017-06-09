@@ -86,7 +86,7 @@ impl<'a> Generator<'a> {
 
     fn writer_with_preamble(&mut self, name: &str) -> io::Result<Rc<RefCell<io::Write>>> {
         let file_name = name.to_owned() + ".go";
-        let wptr = (self.wp)(&file_name);
+        let wptr = (self.wp)(&file_name)?;
         self.write_header(&mut *wptr.try_borrow_mut().map_err(err)?)?;
         Ok(wptr)
     }

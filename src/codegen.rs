@@ -11,6 +11,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase };
 use sqir::SQIR;
+use util::CustomIOResult;
 use declgen;
 use schemagen;
 use querygen;
@@ -54,7 +55,7 @@ pub enum NameTransform {
 // TODO(H2CO3): rewrite this using RcCell once custom smart pointers
 //              can point to trait objects, i.e. when CoerceUnsized
 //              and Unsize are stabilized (see issue #27732)
-pub type WriterProvider = FnMut(&str) -> Rc<RefCell<io::Write>>;
+pub type WriterProvider = FnMut(&str) -> CustomIOResult<Rc<RefCell<io::Write>>>;
 
 #[derive(Debug)]
 pub struct CodegenParams {

@@ -25,6 +25,7 @@ use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
 use phile::codegen::*;
+use phile::util::CustomIOError;
 
 
 #[derive(Debug)]
@@ -51,6 +52,10 @@ macro_rules! stopwatch {
     })
 }
 
+
+//
+// Parsing Command-Line Arguments
+//
 
 fn get_args() -> ProgramArgs {
     let args = clap_app!(philec =>
@@ -141,6 +146,10 @@ fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {
     })
 }
 
+//
+// I/O
+//
+
 fn read_file(path: &str) -> io::Result<String> {
     let mut buf = String::new();
     let mut file = File::open(path)?;
@@ -151,6 +160,32 @@ fn read_file(path: &str) -> io::Result<String> {
 fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
     paths.iter().map(|p| read_file(p.as_ref())).collect()
 }
+
+// TODO(H2CO3): Rewrite this using RcCell once custom smart pointers
+//              can point to trait objects, i.e. when CoerceUnsized
+//              and Unsize are stabilized (see issue #27732)
+// TODO(H2CO3): Rewrite this using impl WriterProvider (issue #34511)
+fn writer_provider_with_args(args: &ProgramArgs) -> Box<WriterProvider> {
+    let mut files = HashMap::new();
+    let base_path = PathBuf::from(&args.output_directory);
+    let outfile_prefix = args.outfile_prefix.clone();
+
+    // If the file exists, truncate it, otherwise create it.
+    // We then cache the file handle so that later
+    // passes don't overwrite the output of earlier ones.
+    let wp = move |s: &str| files.entry(s.to_owned()).or_insert_with(|| {
+        let path = base_path.join(outfile_prefix.clone() + s);
+        let file = File::create(path).map_err(CustomIOError::from)?;
+        let rc = Rc::new(RefCell::new(file)) as Rc<RefCell<io::Write>>;
+        Ok(rc)
+    }).clone();
+
+    Box::new(wp)
+}
+
+//
+// Error Reporting
+//
 
 fn format_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> String {
     let file = files[location.src_idx].as_ref();
@@ -210,41 +245,22 @@ fn main() {
         )
     });
 
-    // TODO(H2CO3): rewrite this using RcCell once custom smart pointers
-    //              can point to trait objects, i.e. when CoerceUnsized
-    //              and Unsize are stabilized (see issue #27732)
-    let mut wp = {
-        let mut files = HashMap::new();
-        let base_path = PathBuf::from(&args.output_directory);
-        let outfile_prefix = args.outfile_prefix.clone();
-
-        // If the file exists, truncate it, otherwise create it.
-        // We then cache the file handle so that later
-        // passes don't overwrite the output of earlier ones.
-        move |s: &str| files.entry(s.to_owned()).or_insert_with(|| {
-            let path = base_path.join(outfile_prefix.clone() + s);
-            let file = File::create(path).unwrap_or_else(
-                |err| panic!("Error opening file '{}': {}", s, err.description())
-            );
-
-            Rc::new(RefCell::new(file))
-        }).clone() as Rc<RefCell<io::Write>>
-    };
+    let mut wp = writer_provider_with_args(&args);
 
     stopwatch!("Generating Declarations", {
-        generate_declarations(&sqir, &args.codegen_params, &mut wp).unwrap_or_else(
+        generate_declarations(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
             |error| panic!("Could not generate declarations: {}", error.description())
         )
     });
 
     stopwatch!("Generating Schema", {
-        generate_schema(&sqir, &args.codegen_params, &mut wp).unwrap_or_else(
+        generate_schema(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
             |error| panic!("Could not generate schema: {}", error.description())
         )
     });
 
     stopwatch!("Generating Queries", {
-        generate_queries(&sqir, &args.codegen_params, &mut wp).unwrap_or_else(
+        generate_queries(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
             |error| panic!("Could not generate queries: {}", error.description())
         )
     });
