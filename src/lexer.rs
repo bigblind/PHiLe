@@ -125,16 +125,16 @@ impl<'a> Lexer<'a> {
     fn lex_single_source(&mut self) -> Result<(), Location> {
         loop {
             match self.next() {
-                Ok(token)  => self.tokens.push(token),
-                Err(true)  => return Err(self.location),
-                Err(false) => return Ok(()),
+                Ok(Some(token)) => self.tokens.push(token),
+                Ok(None)        => return Ok(()),
+                Err(location)   => return Err(location),
             }
         }
     }
 
-    fn next(&mut self) -> Result<Token<'a>, bool> {
+    fn next(&mut self) -> Result<Option<Token<'a>>, Location> {
         if self.source.is_empty() {
-            return Err(false)
+            return Ok(None)
         }
 
         for &(kind, ref re) in &self.regexes {
@@ -148,10 +148,10 @@ impl<'a> Lexer<'a> {
                 self.location = end;
                 self.source = &self.source[m.end()..];
 
-                return Ok(token);
+                return Ok(Some(token));
             }
         }
 
-        Err(true)
+        Err(self.location)
     }
 }
