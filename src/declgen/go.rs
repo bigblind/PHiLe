@@ -31,8 +31,8 @@ pub fn generate_pod(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider
 // Active Record database access mode (not yet supported)
 //
 
-pub fn generate_active_record(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
-    access_mode_error(params)
+pub fn generate_active_record(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
+    unimplemented!()
 }
 
 //
@@ -194,7 +194,7 @@ impl<'a> Generator<'a> {
             Type::Bool  => write!(wr, "bool"),
             Type::Int   => write!(wr, "int64"),
             Type::Float => write!(wr, "float64"),
-            Type::Decimal { integral, fractional } => unimplemented!(),
+            Type::Decimal { .. } => unimplemented!(),
 
             Type::String => write!(wr, "string"),
             Type::Blob   => write!(wr, "[]byte"),
@@ -211,7 +211,7 @@ impl<'a> Generator<'a> {
             Type::Struct(ref st) => write!(wr, "{}", transform_type_name(&st.name, self.params)),
             Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, self.params)),
 
-            Type::Function(ref ft) => unimplemented!(),
+            Type::Function(_) => unimplemented!(),
             Type::Placeholder { ref name, kind } => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
         }
     }

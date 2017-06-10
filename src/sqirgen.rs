@@ -1055,11 +1055,11 @@ impl SQIRGen {
     // Function-level SQIR generation
     //
 
-    fn forward_declare_function(&mut self, func: &FunctionDecl) -> SemaResult<()> {
+    fn forward_declare_function(&mut self, _func: &FunctionDecl) -> SemaResult<()> {
         unimplemented!()
     }
 
-    fn generate_function(&mut self, func: &FunctionDecl) -> SemaResult<()> {
+    fn generate_function(&mut self, _func: &FunctionDecl) -> SemaResult<()> {
         unimplemented!()
     }
 }
