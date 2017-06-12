@@ -110,8 +110,7 @@ impl<'a> Generator<'a> {
                 (field_name, typ)
             }).collect();
 
-            fs.sort_by_key(|&(ref name, _)| name.clone());
-
+            fs.sort_by(|&(ref lname, _), &(ref rname, _)| lname.cmp(rname));
             fs
         };
 
@@ -153,28 +152,29 @@ impl<'a> Generator<'a> {
 
         // For determinism, sort variants by name.
         // Respect the variant name transform too.
-        let ordered_variants = {
-            let mut vs: Vec<_> = variants.keys().collect();
-            vs.sort();
-            vs
-        };
-
-        let max_len = ordered_variants.iter().map(|s| s.len()).max().unwrap_or(0);
-        let pad = " ".repeat(max_len);
-
-        writeln!(wr, "const (")?;
-
-        // Respect the variant name transform.
         // For correctly prefixing each variant name, first
         // they are prefixed with the name of the variant and
         // an underscore, which is a word boundary according
         // to the case transforms in the Heck crate. Then, the
         // composed 'raw' variant name is transformed to obtain
         // the final, correctly cased and prefixed variant name.
-        for vname in ordered_variants {
-            let raw_vname = enum_name.clone() + "_" + vname;
-            let full_vname = transform_variant_name(&raw_vname, &self.params);
-            writeln!(wr, "    {}{} = \"{}\"", full_vname, &pad[vname.len()..], full_vname)?;
+        let ordered_variants = {
+            let mut vs: Vec<_> = variants.keys().map(|vname| {
+                let full_vname = raw_enum_name.to_owned() + "_" + vname;
+                transform_variant_name(&full_vname, &self.params)
+            }).collect();
+
+            vs.sort();
+            vs
+        };
+
+        let max_len = ordered_variants.iter().map(String::len).max().unwrap_or(0);
+        let pad = " ".repeat(max_len);
+
+        writeln!(wr, "const (")?;
+
+        for vname in &ordered_variants {
+            writeln!(wr, "    {}{} = \"{}\"", vname, &pad[vname.len()..], vname)?;
         }
 
         writeln!(wr, ")\n")?;
