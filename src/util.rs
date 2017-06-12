@@ -7,8 +7,9 @@
 //
 
 use std::rc::{ Rc, Weak };
-use std::cell::{ RefCell, Ref, RefMut, BorrowError, BorrowMutError };
+use std::cell::{ RefCell, Ref, RefMut };
 use std::hash::{ Hash, Hasher };
+use error::{ DerefError, DerefResult };
 
 
 macro_rules! hash_map {
@@ -37,15 +38,6 @@ pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
 
-#[derive(Debug)]
-pub enum DerefError {
-    Borrow(BorrowError),
-    BorrowMut(BorrowMutError),
-    Strongify,
-}
-
-pub type DerefResult<T> = Result<T, DerefError>;
-
 
 impl<T> RcCell<T> {
     pub fn new(value: T) -> RcCell<T> {
@@ -55,11 +47,11 @@ impl<T> RcCell<T> {
     }
 
     pub fn borrow(&self) -> DerefResult<Ref<T>> {
-        self.ptr.try_borrow().map_err(|err| DerefError::Borrow(err))
+        self.ptr.try_borrow().map_err(DerefError::Borrow)
     }
 
     pub fn borrow_mut(&self) -> DerefResult<RefMut<T>> {
-        self.ptr.try_borrow_mut().map_err(|err| DerefError::BorrowMut(err))
+        self.ptr.try_borrow_mut().map_err(DerefError::BorrowMut)
     }
 
     pub fn as_weak(&self) -> WkCell<T> {

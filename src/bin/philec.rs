@@ -25,6 +25,7 @@ use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
 use phile::codegen::*;
+use phile::error::*;
 
 
 #[derive(Debug)]

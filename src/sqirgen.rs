@@ -7,25 +7,16 @@
 //
 
 use std::collections::HashMap;
-use std::error::Error;
 use util::*;
 use sqir::*;
-use lexer::*;
 use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, RelDecl };
+use error::{ SemaError, SemaResult };
 
-
-#[derive(Debug, Clone)]
-pub struct SemaError {
-    pub message: String,
-    pub range:   Option<Range>,
-}
 
 #[allow(missing_debug_implementations)]
 struct SQIRGen {
     sqir: SQIR,
 }
-
-pub type SemaResult<T> = Result<T, SemaError>;
 
 
 // This macro generates caching getter functions for types
@@ -91,21 +82,6 @@ fn format_type(t: &WkCell<Type>) -> String {
     };
 
     format!("{:#?}", *ptr)
-}
-
-impl From<DerefError> for SemaError {
-    fn from(err: DerefError) -> SemaError {
-        let message = match err {
-            DerefError::Borrow(be)    => format!("Cannot borrow RcCell: {}", be.description()),
-            DerefError::BorrowMut(be) => format!("Cannot mutably borrow RcCell: {}", be.description()),
-            DerefError::Strongify     => "No RcCell backing WkCell".to_owned(),
-        };
-
-        SemaError {
-            message: message,
-            range:   None,
-        }
-    }
 }
 
 impl SQIRGen {

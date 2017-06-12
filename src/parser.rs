@@ -9,21 +9,14 @@
 use std::slice;
 use lexer::{ Token, TokenKind, Range };
 use ast::*;
+use error::{ ParseError, SyntaxResult };
 
 
 struct Parser<'a> {
     tokens: slice::Iter<'a, Token<'a>>,
 }
 
-#[derive(Debug, Clone)]
-pub struct ParseError {
-    pub message: String,
-    pub range:   Option<Range>,
-}
-
-pub type SyntaxResult<T> = Result<T, ParseError>;
 pub type ParseResult<'a> = SyntaxResult<Node<'a>>;
-
 type LexResult<'a> = SyntaxResult<&'a Token<'a>>;
 
 

@@ -7,7 +7,6 @@
 //
 
 use std::io;
-use std::fmt::Debug;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -46,17 +45,17 @@ impl<'a> Generator<'a> {
         let wrs = self.writers_for_types(&types)?;
 
         for typ in types {
-            match *typ.borrow().map_err(err)? {
+            match *typ.borrow()? {
                 Type::Struct(ref st) => {
-                    let wr = &mut *wrs[&st.name].try_borrow_mut().map_err(err)?;
+                    let wr = &mut *wrs[&st.name].borrow_mut();
                     self.write_fields(wr, &st.name, &st.fields)?;
                 },
                 Type::Class(ref ct)  => {
-                    let wr = &mut *wrs[&ct.name].try_borrow_mut().map_err(err)?;
+                    let wr = &mut *wrs[&ct.name].borrow_mut();
                     self.write_fields(wr, &ct.name, &ct.fields)?;
                 },
                 Type::Enum(ref et)   => {
-                    let wr = &mut *wrs[&et.name].try_borrow_mut().map_err(err)?;
+                    let wr = &mut *wrs[&et.name].borrow_mut();
                     self.write_variants(wr, &et.name, &et.variants)?;
                 },
                 _ => continue, // primitive named types need no declaration
@@ -70,7 +69,7 @@ impl<'a> Generator<'a> {
         let mut writers = HashMap::with_capacity(types.len());
 
         for typ in types {
-            let name = match *typ.borrow().map_err(err)? {
+            let name = match *typ.borrow()? {
                 Type::Struct(ref st) => st.name.to_owned(),
                 Type::Class(ref ct)  => ct.name.to_owned(),
                 Type::Enum(ref et)   => et.name.to_owned(),
@@ -87,7 +86,7 @@ impl<'a> Generator<'a> {
     fn writer_with_preamble(&mut self, name: &str) -> io::Result<Rc<RefCell<io::Write>>> {
         let file_name = name.to_owned() + ".go";
         let wptr = (self.wp)(&file_name)?;
-        self.write_header(&mut *wptr.try_borrow_mut().map_err(err)?)?;
+        self.write_header(&mut *wptr.borrow_mut())?;
         Ok(wptr)
     }
 
@@ -187,8 +186,8 @@ impl<'a> Generator<'a> {
     // Generic Type Writers
     //
     fn write_type(&self, wr: &mut io::Write, typ: &WkCell<Type>) -> io::Result<()> {
-        let rc = typ.as_rc().map_err(err)?;
-        let ptr = rc.borrow().map_err(err)?;
+        let rc = typ.as_rc()?;
+        let ptr = rc.borrow()?;
 
         match *ptr {
             Type::Bool  => write!(wr, "bool"),
@@ -308,12 +307,4 @@ impl<'a> Generator<'a> {
 
         writeln!(wr)
     }
-}
-
-//
-// Free Functions
-//
-
-fn err<E: Debug>(error: E) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, format!("{:#?}", error))
 }
