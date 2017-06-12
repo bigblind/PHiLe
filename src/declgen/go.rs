@@ -270,14 +270,13 @@ impl<'a> Generator<'a> {
     // Namespace <-> package name
     // Respect namespace transform
     fn write_namespace(&self, wr: &mut io::Write) -> io::Result<()> {
-        match self.params.namespace {
-            Some(ref ns) => writeln!(
-                wr, "package {}\n", transform_namespace(ns, &self.params)
-            ),
-            None => Err(
-                io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
-            ),
-        }
+        let package_name = self.params.namespace.as_ref().map(
+            |ns| transform_namespace(ns, &self.params)
+        ).ok_or_else(
+            || io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
+        )?;
+
+        writeln!(wr, "package {}\n", package_name)
     }
 
     fn write_imports(&self, wr: &mut io::Write) -> io::Result<()> {

@@ -11,6 +11,20 @@ use codegen::*;
 use sqir::*;
 
 
-pub fn generate(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
-    unimplemented!()
+pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+    let wptr = wp("PHiLe-Context.go")?;
+    let mut wr = wptr.borrow_mut();
+    let package_name = params.namespace.as_ref().map(
+        |ns| transform_namespace(ns, params)
+    ).ok_or_else(
+        || io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
+    )?;
+
+    write!(
+        &mut *wr,
+        include_str!("go_template.txt"),
+        version = env!["CARGO_PKG_VERSION"],
+        authors = env!["CARGO_PKG_AUTHORS"],
+        namespace = package_name
+    )
 }
