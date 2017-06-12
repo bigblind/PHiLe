@@ -9,7 +9,7 @@
 use std::fmt;
 use std::fmt::{ Display, Formatter };
 use regex::Regex;
-use unicode_segmentation::UnicodeSegmentation;
+use util::grapheme_count;
 
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -53,10 +53,6 @@ struct Lexer<'a> {
 
 pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>, Location> {
     Lexer::new().lex(sources)
-}
-
-fn grapheme_count(lexeme: &str) -> usize {
-    lexeme.graphemes(true).count()
 }
 
 impl Location {

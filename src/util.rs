@@ -10,6 +10,7 @@ use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut };
 use std::hash::{ Hash, Hasher };
 use error::{ DerefError, DerefResult };
+use unicode_segmentation::UnicodeSegmentation;
 
 
 macro_rules! hash_map {
@@ -38,6 +39,10 @@ pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
 
+
+pub fn grapheme_count(string: &str) -> usize {
+    string.graphemes(true).count()
+}
 
 impl<T> RcCell<T> {
     pub fn new(value: T) -> RcCell<T> {

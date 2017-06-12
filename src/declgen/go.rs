@@ -104,21 +104,25 @@ impl<'a> Generator<'a> {
         // For determinism, sort fields by name.
         // Respect the field name transform too.
         // TODO(H2CO3): For efficiency, sort fields by alignment.
-        let ordered_fields = {
+        let sorted_fields = {
             let mut fs: Vec<_> = fields.iter().map(|(fname, typ)| {
                 let field_name = transform_field_name(fname, &self.params);
                 (field_name, typ)
             }).collect();
 
-            fs.sort_by(|&(ref lname, _), &(ref rname, _)| lname.cmp(rname));
+            fs.sort_by(|lhs, rhs| Ord::cmp(&lhs.0, &rhs.0));
             fs
         };
 
-        let max_len = ordered_fields.iter().map(|&(ref name, _)| name.len()).max().unwrap_or(0);
+        let max_len = sorted_fields.iter()
+            .map(|&(ref name, _)| grapheme_count(name))
+            .max().unwrap_or(0);
+
         let pad = " ".repeat(max_len);
 
-        for (fname, ftype) in ordered_fields {
-            write!(wr, "    {}{} ", fname, &pad[fname.len()..])?;
+        // Indexing `pad` with grapheme counts is safe because it's ASCII-only.
+        for (fname, ftype) in sorted_fields {
+            write!(wr, "    {}{} ", fname, &pad[grapheme_count(&fname)..])?;
             self.write_type(wr, ftype)?;
             writeln!(wr)?;
         }
@@ -158,23 +162,23 @@ impl<'a> Generator<'a> {
         // to the case transforms in the Heck crate. Then, the
         // composed 'raw' variant name is transformed to obtain
         // the final, correctly cased and prefixed variant name.
-        let ordered_variants = {
+        let sorted_variants = {
             let mut vs: Vec<_> = variants.keys().map(|vname| {
-                let full_vname = raw_enum_name.to_owned() + "_" + vname;
-                transform_variant_name(&full_vname, &self.params)
+                let variant_name = raw_enum_name.to_owned() + "_" + vname;
+                transform_variant_name(&variant_name, &self.params)
             }).collect();
 
             vs.sort();
             vs
         };
 
-        let max_len = ordered_variants.iter().map(String::len).max().unwrap_or(0);
+        let max_len = sorted_variants.iter().map(String::len).max().unwrap_or(0);
         let pad = " ".repeat(max_len);
 
         writeln!(wr, "const (")?;
 
-        for vname in &ordered_variants {
-            writeln!(wr, "    {}{} = \"{}\"", vname, &pad[vname.len()..], vname)?;
+        for vname in &sorted_variants {
+            writeln!(wr, "    {}{} = \"{}\"", vname, &pad[grapheme_count(vname)..], vname)?;
         }
 
         writeln!(wr, ")\n")?;
