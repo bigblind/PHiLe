@@ -40,6 +40,7 @@ fn is_keyword(lexeme: &str) -> bool {
         "class",
         "enum",
         "fn",
+        "impl",
     ];
 
     keywords.contains(&lexeme)
@@ -146,16 +147,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_toplevel(&mut self) -> ParseResult<'a> {
-        let error = self.expectation_error("struct, class, enum or fn");
+        let error = self.expectation_error("struct, class, enum, fn or impl");
         let token = self.next_token().ok_or_else(|| error.clone())?;
 
         match token.value {
             "struct" | "class" => self.parse_struct_or_class(),
             "enum"             => self.parse_enum(),
             "fn"               => self.parse_function(),
+            "impl"             => self.parse_impl(),
             _                  => Err(error),
         }
     }
+
+    //
+    // User-defined Type Definitions
+    //
 
     fn parse_struct_or_class(&mut self) -> ParseResult<'a> {
         let mut fields = vec![];
@@ -276,9 +282,36 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
+    //
+    // Functions and Type Implementations
+    //
+
     fn parse_function(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
+
+    fn parse_impl(&mut self) -> ParseResult<'a> {
+        let mut functions = vec![];
+        let impl_keyword = self.expect("impl")?;
+        let name = self.expect_identifier()?.value;
+
+        self.expect("{")?;
+
+        while self.is_at("fn") {
+            functions.push(self.parse_function()?);
+        }
+
+        let close_brace = self.expect("}")?;
+        let range = token_range(impl_keyword, close_brace);
+        let value = NodeValue::Impl(Impl { name, functions });
+        let node = Node { range, value };
+
+        Ok(node)
+    }
+
+    //
+    // Built-in Type Declarations
+    //
 
     fn parse_type(&mut self) -> ParseResult<'a> {
         self.parse_postfix_type()

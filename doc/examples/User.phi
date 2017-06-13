@@ -11,3 +11,15 @@ class User {
     profile_pic: File?,
     biography:   String?,
 }
+
+impl User {
+    fn all_adults() -> [&Self] {
+        let now = Date::now();
+        let seconds_per_year = 356.24 * 24 * 60 * 60;
+        Self.find(|u| now - u.birth_date >= 18 * seconds_per_year)
+    }
+
+    fn display_name(&self) -> String {
+        self.legal_name + "(" + self.handle + ")"
+    }
+}

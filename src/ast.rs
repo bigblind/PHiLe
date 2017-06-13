@@ -18,7 +18,8 @@ pub enum NodeValue<'a> {
     ClassDecl(ClassDecl<'a>),
     Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
-    FunctionDecl(FunctionDecl),
+    FunctionDecl(FunctionDecl<'a>),
+    Impl(Impl<'a>),
 
     // Types
     PointerType(Box<Node<'a>>),
@@ -74,6 +75,12 @@ pub struct Variant<'a> {
 
 #[allow(missing_copy_implementations)]
 #[derive(Debug)]
-pub struct FunctionDecl {
-    // TODO(H2CO3): implement
+pub struct FunctionDecl<'a> {
+    pub name: &'a str,
+}
+
+#[derive(Debug)]
+pub struct Impl<'a> {
+    pub name:      &'a str,
+    pub functions: Vec<Node<'a>>, // FunctionDecl nodes
 }
