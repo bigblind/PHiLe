@@ -287,9 +287,26 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_function(&mut self) -> ParseResult<'a> {
-        let mut arguments = vec![];
         let fn_keyword = self.expect("fn")?;
         let name = self.expect_identifier()?.value;
+        let arguments = self.parse_decl_args()?;
+        let return_type = match self.accept("->") {
+            Some(_) => Some(Box::new(self.parse_type()?)),
+            None    => None,
+        };
+        let body = Box::new(self.parse_block()?);
+        let range = body.range.map(
+            |r| Range { begin: fn_keyword.range.begin, .. r }
+        );
+        let decl = FuncDecl { name, arguments, return_type, body };
+        let value = NodeValue::FuncDecl(decl);
+        let node = Node { range, value };
+
+        Ok(node)
+    }
+
+    fn parse_decl_args(&mut self) -> SyntaxResult<Vec<Node<'a>>> {
+        let mut arguments = vec![];
 
         self.expect("(")?;
 
@@ -303,28 +320,7 @@ impl<'a> Parser<'a> {
 
         self.expect(")")?;
 
-        let return_type = match self.accept("->") {
-            Some(_) => Some(Box::new(self.parse_type()?)),
-            None    => None,
-        };
-
-        let body = Box::new(self.parse_block()?);
-        let range = body.range.map(
-            |r| Range { begin: fn_keyword.range.begin, .. r }
-        );
-        let decl = FuncDecl { name, return_type, arguments, body };
-        let value = NodeValue::FuncDecl(decl);
-        let node = Node { range, value };
-
-        Ok(node)
-    }
-
-    fn parse_vardecl(&mut self) -> ParseResult<'a> {
-        unimplemented!()
-    }
-
-    fn parse_block(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        Ok(arguments)
     }
 
     fn parse_impl(&mut self) -> ParseResult<'a> {
@@ -344,6 +340,18 @@ impl<'a> Parser<'a> {
         let node = Node { range, value };
 
         Ok(node)
+    }
+
+    //
+    // Expressions and Statements
+    //
+
+    fn parse_vardecl(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_block(&mut self) -> ParseResult<'a> {
+        unimplemented!()
     }
 
     //

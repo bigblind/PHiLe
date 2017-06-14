@@ -80,8 +80,8 @@ pub struct Variant<'a> {
 #[derive(Debug)]
 pub struct FuncDecl<'a> {
     pub name:        &'a str,
-    pub return_type: Option<Box<Node<'a>>>, // type node
     pub arguments:   Vec<Node<'a>>,         // VarDecl nodes
+    pub return_type: Option<Box<Node<'a>>>, // type node
     pub body:        Box<Node<'a>>,         // Block node
 }
 
