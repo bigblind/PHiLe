@@ -287,6 +287,43 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_function(&mut self) -> ParseResult<'a> {
+        let mut arguments = vec![];
+        let fn_keyword = self.expect("fn")?;
+        let name = self.expect_identifier()?.value;
+
+        self.expect("(")?;
+
+        while self.has_tokens() && !self.is_at(")") {
+            arguments.push(self.parse_vardecl()?);
+
+            if !self.is_at(")") {
+                self.expect(",")?;
+            }
+        }
+
+        self.expect(")")?;
+
+        let return_type = match self.accept("->") {
+            Some(_) => Some(Box::new(self.parse_type()?)),
+            None    => None,
+        };
+
+        let body = Box::new(self.parse_block()?);
+        let range = body.range.map(
+            |r| Range { begin: fn_keyword.range.begin, .. r }
+        );
+        let decl = FuncDecl { name, return_type, arguments, body };
+        let value = NodeValue::FuncDecl(decl);
+        let node = Node { range, value };
+
+        Ok(node)
+    }
+
+    fn parse_vardecl(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_block(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 

@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use util::*;
 use sqir::*;
-use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FunctionDecl, RelDecl };
+use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, FuncDecl, RelDecl };
 use error::{ SemaError, SemaResult };
 
 
@@ -233,7 +233,7 @@ impl SQIRGen {
     fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
             match child.value {
-                NodeValue::FunctionDecl(ref f) => self.forward_declare_function(&f)?,
+                NodeValue::FuncDecl(ref f) => self.forward_declare_function(&f)?,
                 _ => continue,
             }
         }
@@ -245,7 +245,7 @@ impl SQIRGen {
     fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
             match child.value {
-                NodeValue::FunctionDecl(ref f) => self.generate_function(&f)?,
+                NodeValue::FuncDecl(ref f) => self.generate_function(&f)?,
                 _ => continue,
             }
         }
@@ -1031,11 +1031,11 @@ impl SQIRGen {
     // Function-level SQIR generation
     //
 
-    fn forward_declare_function(&mut self, _func: &FunctionDecl) -> SemaResult<()> {
+    fn forward_declare_function(&mut self, _func: &FuncDecl) -> SemaResult<()> {
         unimplemented!()
     }
 
-    fn generate_function(&mut self, _func: &FunctionDecl) -> SemaResult<()> {
+    fn generate_function(&mut self, _func: &FuncDecl) -> SemaResult<()> {
         unimplemented!()
     }
 }

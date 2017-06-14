@@ -18,8 +18,9 @@ pub enum NodeValue<'a> {
     ClassDecl(ClassDecl<'a>),
     Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
-    FunctionDecl(FunctionDecl<'a>),
+    FuncDecl(FuncDecl<'a>),
     Impl(Impl<'a>),
+    VarDecl(VarDecl<'a>),
 
     // Types
     PointerType(Box<Node<'a>>),
@@ -28,6 +29,9 @@ pub enum NodeValue<'a> {
     TupleType(Vec<Node<'a>>),
     ArrayType(Box<Node<'a>>),
     NamedType(&'a str),
+
+    // Expressions
+    Block(Vec<Node<'a>>),
 }
 
 #[derive(Debug)]
@@ -73,14 +77,23 @@ pub struct Variant<'a> {
     pub type_decl: Option<Node<'a>>,
 }
 
-#[allow(missing_copy_implementations)]
 #[derive(Debug)]
-pub struct FunctionDecl<'a> {
-    pub name: &'a str,
+pub struct FuncDecl<'a> {
+    pub name:        &'a str,
+    pub return_type: Option<Box<Node<'a>>>, // type node
+    pub arguments:   Vec<Node<'a>>,         // VarDecl nodes
+    pub body:        Box<Node<'a>>,         // Block node
 }
 
 #[derive(Debug)]
 pub struct Impl<'a> {
     pub name:      &'a str,
     pub functions: Vec<Node<'a>>, // FunctionDecl nodes
+}
+
+#[derive(Debug)]
+pub struct VarDecl<'a> {
+    pub name:      &'a str,
+    pub type_decl: Option<Box<Node<'a>>>,
+    pub init_expr: Option<Box<Node<'a>>>,
 }
