@@ -41,6 +41,7 @@ fn is_keyword(lexeme: &str) -> bool {
         "enum",
         "fn",
         "impl",
+        "let",
     ];
 
     keywords.contains(&lexeme)
@@ -305,13 +306,14 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn parse_decl_args(&mut self) -> SyntaxResult<Vec<Node<'a>>> {
+    fn parse_decl_args(&mut self) -> SyntaxResult<Vec<FuncArg<'a>>> {
         let mut arguments = vec![];
 
         self.expect("(")?;
 
         while self.has_tokens() && !self.is_at(")") {
-            arguments.push(self.parse_vardecl()?);
+            // TODO(H2CO3): parse one function argument
+            unimplemented!();
 
             if !self.is_at(")") {
                 self.expect(",")?;
@@ -346,12 +348,66 @@ impl<'a> Parser<'a> {
     // Expressions and Statements
     //
 
+    fn parse_stmt(&mut self) -> ParseResult<'a> {
+        if self.is_at("let") {
+            self.parse_vardecl()
+        } else {
+            self.parse_expr_stmt()
+        }
+    }
+
     fn parse_vardecl(&mut self) -> ParseResult<'a> {
+        let let_keyword = self.expect("let")?;
+        let name_tok = self.expect_identifier()?;
+
+        let type_decl = match self.accept(":") {
+            Some(_) => Some(Box::new(self.parse_type()?)),
+            None    => None,
+        };
+        let init_expr = match self.accept("=") {
+            Some(_) => Some(Box::new(self.parse_expr()?)),
+            None    => None,
+        };
+
+        let semicolon = self.expect(";")?;
+        let name = name_tok.value;
+        let range = token_range(let_keyword, semicolon);
+        let decl = VarDecl { name, type_decl, init_expr };
+        let value = NodeValue::VarDecl(decl);
+        let node = Node { range, value };
+
+        Ok(node)
+    }
+
+    fn parse_expr_stmt(&mut self) -> ParseResult<'a> {
+        let expr = self.parse_expr()?;
+
+        // TODO(H2CO3): if the expression ends with a block,
+        // i.e., it is either a block, an if, a match, a for
+        // or while loop, a lambda/fn with block body, etc. (!!!),
+        // then the terminating semicolon is optional.
+        // It is also optional after the last statement in a block.
+        unimplemented!()
+    }
+
+    fn parse_expr(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 
     fn parse_block(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let mut items = vec![];
+        let open_brace = self.expect("{")?;
+
+        while self.has_tokens() && !self.is_at("}") {
+            items.push(self.parse_stmt()?);
+        }
+
+        let close_brace = self.expect("}")?;
+        let range = token_range(open_brace, close_brace);
+        let value = NodeValue::Block(items);
+        let node = Node { range, value };
+
+        Ok(node)
     }
 
     //

@@ -6,8 +6,7 @@
 // on 07/04/2017
 //
 
-use std::fmt;
-use std::fmt::{ Display, Formatter };
+use std::fmt::{ self, Display, Formatter };
 use regex::Regex;
 use util::grapheme_count;
 
@@ -98,7 +97,7 @@ impl<'a> Lexer<'a> {
                 (TokenKind::Comment,        Regex::new(r"^#[^\n]*\n?").unwrap()),
                 (TokenKind::Word,           Regex::new(r"^[\w_][\w\d_]*").unwrap()),
                 (TokenKind::NumericLiteral, Regex::new(r"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|(\d+(\.\d+([eE][\+\-]?\d+)?)?))").unwrap()),
-                (TokenKind::Punctuation,    Regex::new(r"^(\(|\)|\[|\]|\{|\}|[!\?\*\+]?<\->[!\?\*\+]?|([<>\+\-\*/%&\|\^!=]=?)|\+\+|\-\-|&&|\|\||~|\.|,|\?|::?|;)").unwrap()),
+                (TokenKind::Punctuation,    Regex::new(r"^(\(|\)|\[|\]|\{|\}|[!\?\*\+]?<\->[!\?\*\+]?|\->|=>|([<>\+\-\*/%&\|\^!=]=?)|&&|\|\||~|\.|,|\?|::?|;)").unwrap()),
                 (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\"]|\\["'nrtb]|\\x[[:xdigit:]]{2}|\\U[[:xdigit:]]{8})*""#).unwrap()),
             ],
         }
