@@ -9,9 +9,6 @@
 use lexer::Range;
 
 
-// TODO(H2CO3): rewrite NodeValue variants so that boxing always
-// occurs in the variant's associated value itself rather than
-// in the wrapped struct, so as to save a few heap allocations
 #[derive(Debug)]
 pub enum NodeValue<'a> {
     // Declarations / Definitions
@@ -21,17 +18,17 @@ pub enum NodeValue<'a> {
     ClassDecl(ClassDecl<'a>),
     Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
-    FuncDecl(FuncDecl<'a>),
+    FuncDecl(Box<FuncDecl<'a>>),
     FuncArg(FuncArg<'a>),
     Impl(Impl<'a>),
 
     // Statements
-    VarDecl(VarDecl<'a>),
+    VarDecl(Box<VarDecl<'a>>),
     EmptyStmt, // just a semicolon
     Semi(Box<Node<'a>>), // expression statement with trailing semicolon
 
     // Expressions
-    If(If<'a>),
+    If(Box<If<'a>>),
     Match(Match<'a>),
     Block(Vec<Node<'a>>),
 
@@ -90,9 +87,9 @@ pub struct Variant<'a> {
 #[derive(Debug)]
 pub struct FuncDecl<'a> {
     pub name:        &'a str,
-    pub arguments:   Vec<Node<'a>>,         // FuncArg nodes
-    pub return_type: Option<Box<Node<'a>>>, // type node
-    pub body:        Box<Node<'a>>,         // Block node
+    pub arguments:   Vec<Node<'a>>,    // FuncArg nodes
+    pub return_type: Option<Node<'a>>, // type node
+    pub body:        Node<'a>,         // Block node
 }
 
 #[derive(Debug)]
@@ -110,15 +107,15 @@ pub struct Impl<'a> {
 #[derive(Debug)]
 pub struct VarDecl<'a> {
     pub name:      &'a str,
-    pub type_decl: Option<Box<Node<'a>>>,
-    pub init_expr: Option<Box<Node<'a>>>,
+    pub type_decl: Option<Node<'a>>,
+    pub init_expr: Option<Node<'a>>,
 }
 
 #[derive(Debug)]
 pub struct If<'a> {
-    pub condition: Box<Node<'a>>,
-    pub then_arm:  Box<Node<'a>>,
-    pub else_arm:  Option<Box<Node<'a>>>,
+    pub condition: Node<'a>,
+    pub then_arm:  Node<'a>,
+    pub else_arm:  Option<Node<'a>>,
 }
 
 #[derive(Debug)]

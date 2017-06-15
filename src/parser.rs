@@ -295,15 +295,15 @@ impl<'a> Parser<'a> {
         let name = self.expect_identifier()?.value;
         let arguments = self.parse_decl_args()?;
         let return_type = match self.accept("->") {
-            Some(_) => Some(Box::new(self.parse_type()?)),
+            Some(_) => Some(self.parse_type()?),
             None    => None,
         };
-        let body = Box::new(self.parse_block()?);
+        let body = self.parse_block()?;
         let range = body.range.map(
             |r| Range { begin: fn_keyword.range.begin, .. r }
         );
         let decl = FuncDecl { name, arguments, return_type, body };
-        let value = NodeValue::FuncDecl(decl);
+        let value = NodeValue::FuncDecl(Box::new(decl));
 
         Ok(Node { range, value })
     }
@@ -379,11 +379,11 @@ impl<'a> Parser<'a> {
         let name_tok = self.expect_identifier()?;
 
         let type_decl = match self.accept(":") {
-            Some(_) => Some(Box::new(self.parse_type()?)),
+            Some(_) => Some(self.parse_type()?),
             None    => None,
         };
         let init_expr = match self.accept("=") {
-            Some(_) => Some(Box::new(self.parse_expr()?)),
+            Some(_) => Some(self.parse_expr()?),
             None    => None,
         };
 
@@ -391,7 +391,7 @@ impl<'a> Parser<'a> {
         let name = name_tok.value;
         let range = token_range(let_keyword, semicolon);
         let decl = VarDecl { name, type_decl, init_expr };
-        let value = NodeValue::VarDecl(decl);
+        let value = NodeValue::VarDecl(Box::new(decl));
 
         Ok(Node { range, value })
     }
@@ -436,15 +436,15 @@ impl<'a> Parser<'a> {
     // TODO(H2CO3): this is ugly, refactor
     fn parse_if(&mut self) -> ParseResult<'a> {
         let if_keyword = self.expect("if")?;
-        let condition = Box::new(self.parse_expr()?);
-        let then_arm = Box::new(self.parse_block()?);
+        let condition = self.parse_expr()?;
+        let then_arm = self.parse_block()?;
         let else_arm = if self.accept("else").is_some() {
             let expr = if self.is_at("if") {
                 self.parse_if()?
             } else {
                 self.parse_block()?
             };
-            Some(Box::new(expr))
+            Some(expr)
         } else {
             None
         };
@@ -452,7 +452,8 @@ impl<'a> Parser<'a> {
         let range = else_arm.as_ref().unwrap_or(&then_arm).range.map(
             |r| Range { begin: if_keyword.range.begin, .. r }
         );
-        let value = NodeValue::If(If { condition, then_arm, else_arm });
+        let if_decl = If { condition, then_arm, else_arm };
+        let value = NodeValue::If(Box::new(if_decl));
 
         Ok(Node { range, value })
     }
