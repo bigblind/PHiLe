@@ -306,14 +306,21 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn parse_decl_args(&mut self) -> SyntaxResult<Vec<FuncArg<'a>>> {
-        let mut arguments = vec![];
+    fn parse_decl_args(&mut self) -> SyntaxResult<Vec<Node<'a>>> {
+        let mut args = vec![];
 
         self.expect("(")?;
 
         while self.has_tokens() && !self.is_at(")") {
-            // TODO(H2CO3): parse one function argument
-            unimplemented!();
+            let name_tok = self.expect_identifier()?;
+            self.expect(":")?;
+            let type_decl = Box::new(self.parse_type()?);
+
+            let name = name_tok.value;
+            let range = Some(name_tok.range); // TODO(H2CO3): this is a lie
+            let value = NodeValue::FuncArg(FuncArg { name, type_decl });
+
+            args.push(Node { range, value });
 
             if !self.is_at(")") {
                 self.expect(",")?;
@@ -322,7 +329,7 @@ impl<'a> Parser<'a> {
 
         self.expect(")")?;
 
-        Ok(arguments)
+        Ok(args)
     }
 
     fn parse_impl(&mut self) -> ParseResult<'a> {
