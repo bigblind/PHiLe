@@ -633,7 +633,7 @@ impl SQIRGen {
                 // (Placeholders to classes are also allowed, obviously.)
                 match *ptr {
                     Type::Class(_) => (),
-                    Type::Placeholder{ kind: PlaceholderKind::Class, .. } => (),
+                    Type::Placeholder { kind: PlaceholderKind::Class, .. } => (),
                     _ => return sema_error(
                         format!("Pointer to non-class type '{}'", format_type(pointed_type)),
                         decl

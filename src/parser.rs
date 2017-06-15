@@ -42,6 +42,8 @@ fn is_keyword(lexeme: &str) -> bool {
         "fn",
         "impl",
         "let",
+        "if",
+        "match",
     ];
 
     keywords.contains(&lexeme)
@@ -301,9 +303,8 @@ impl<'a> Parser<'a> {
         );
         let decl = FuncDecl { name, arguments, return_type, body };
         let value = NodeValue::FuncDecl(decl);
-        let node = Node { range, value };
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn parse_decl_args(&mut self) -> SyntaxResult<Vec<Node<'a>>> {
@@ -346,20 +347,29 @@ impl<'a> Parser<'a> {
         let close_brace = self.expect("}")?;
         let range = token_range(impl_keyword, close_brace);
         let value = NodeValue::Impl(Impl { name, functions });
-        let node = Node { range, value };
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     //
-    // Expressions and Statements
+    // Statements
     //
 
     fn parse_stmt(&mut self) -> ParseResult<'a> {
-        if self.is_at("let") {
-            self.parse_vardecl()
-        } else {
-            self.parse_expr_stmt()
+        let tok = self.next_token().ok_or_else(
+            || self.expectation_error("statement")
+        )?;
+
+        // parse "stmt at toplevel, expr elsewhere" constructs too
+        // TODO(H2CO3): if we ever introduce loops (loop, while, for),
+        // those should probably be added here as well.
+        match tok.value {
+            "let"   => self.parse_vardecl(),
+            "if"    => self.parse_if(),
+            "match" => self.parse_match(),
+            "{"     => self.parse_block(),
+            ";"     => self.parse_empty_stmt(),
+            _       => self.parse_expr_stmt(),
         }
     }
 
@@ -381,23 +391,52 @@ impl<'a> Parser<'a> {
         let range = token_range(let_keyword, semicolon);
         let decl = VarDecl { name, type_decl, init_expr };
         let value = NodeValue::VarDecl(decl);
-        let node = Node { range, value };
 
-        Ok(node)
+        Ok(Node { range, value })
+    }
+
+    fn parse_empty_stmt(&mut self) -> ParseResult<'a> {
+        self.expect(";").map(|semi| Node {
+            range: Some(semi.range),
+            value: NodeValue::EmptyStmt,
+        })
     }
 
     fn parse_expr_stmt(&mut self) -> ParseResult<'a> {
         let expr = self.parse_expr()?;
 
-        // TODO(H2CO3): if the expression ends with a block,
-        // i.e., it is either a block, an if, a match, a for
-        // or while loop, a lambda/fn with block body, etc. (!!!),
-        // then the terminating semicolon is optional.
-        // It is also optional after the last statement in a block.
+        // If the expression ends with a block, i.e., if it is either
+        // a block, an if, a match, a for or while loop (?), a lambda/fn
+        // with block body, etc. (!!!), then the terminating semicolon
+        // is optional. This is already taken care of by parse_stmt().
+        // The semi is also optional after the last statement in a block.
+        // TODO(H2CO3): figure out how to check if this is the last stmt
+        let has_trailing_semi = { unimplemented!(/* ??? */) };
+
+        let node = if has_trailing_semi {
+            let range = expr.range; // TODO(H2CO3): include semicolon
+            let value = NodeValue::Semi(Box::new(expr));
+            Node { range, value }
+        } else {
+            expr
+        };
+
+        Ok(node)
+    }
+
+    //
+    // Expressions
+    //
+
+    fn parse_expr(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 
-    fn parse_expr(&mut self) -> ParseResult<'a> {
+    fn parse_if(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_match(&mut self) -> ParseResult<'a> {
         unimplemented!()
     }
 
@@ -412,9 +451,8 @@ impl<'a> Parser<'a> {
         let close_brace = self.expect("}")?;
         let range = token_range(open_brace, close_brace);
         let value = NodeValue::Block(items);
-        let node = Node { range, value };
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     //

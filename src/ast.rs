@@ -21,7 +21,16 @@ pub enum NodeValue<'a> {
     FuncDecl(FuncDecl<'a>),
     FuncArg(FuncArg<'a>),
     Impl(Impl<'a>),
+
+    // Statements
     VarDecl(VarDecl<'a>),
+    EmptyStmt, // just a semicolon
+    Semi(Box<Node<'a>>), // expression statement with trailing semicolon
+
+    // Expressions
+    If(If<'a>),
+    Match(Match<'a>),
+    Block(Vec<Node<'a>>),
 
     // Types
     PointerType(Box<Node<'a>>),
@@ -30,9 +39,6 @@ pub enum NodeValue<'a> {
     TupleType(Vec<Node<'a>>),
     ArrayType(Box<Node<'a>>),
     NamedType(&'a str),
-
-    // Expressions
-    Block(Vec<Node<'a>>),
 }
 
 #[derive(Debug)]
@@ -103,4 +109,17 @@ pub struct VarDecl<'a> {
     pub name:      &'a str,
     pub type_decl: Option<Box<Node<'a>>>,
     pub init_expr: Option<Box<Node<'a>>>,
+}
+
+#[derive(Debug)]
+pub struct If<'a> {
+    pub condition: Box<Node<'a>>,
+    pub then_arm:  Box<Node<'a>>,
+    pub else_arm:  Option<Box<Node<'a>>>,
+}
+
+#[derive(Debug)]
+pub struct Match<'a> {
+    pub discriminant: Box<Node<'a>>,
+    pub arms:         Vec<Node<'a>>,
 }
