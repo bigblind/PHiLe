@@ -9,6 +9,9 @@
 use lexer::Range;
 
 
+// TODO(H2CO3): rewrite NodeValue variants so that boxing always
+// occurs in the variant's associated value itself rather than
+// in the wrapped struct, so as to save a few heap allocations
 #[derive(Debug)]
 pub enum NodeValue<'a> {
     // Declarations / Definitions

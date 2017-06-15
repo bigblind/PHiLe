@@ -43,6 +43,7 @@ fn is_keyword(lexeme: &str) -> bool {
         "impl",
         "let",
         "if",
+        "else",
         "match",
     ];
 
@@ -403,20 +404,20 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr_stmt(&mut self) -> ParseResult<'a> {
-        let expr = self.parse_expr()?;
-
         // If the expression ends with a block, i.e., if it is either
         // a block, an if, a match, a for or while loop (?), a lambda/fn
         // with block body, etc. (!!!), then the terminating semicolon
         // is optional. This is already taken care of by parse_stmt().
         // The semi is also optional after the last statement in a block.
-        // TODO(H2CO3): figure out how to check if this is the last stmt
-        let has_trailing_semi = { unimplemented!(/* ??? */) };
+        let expr = self.parse_expr()?;
 
-        let node = if has_trailing_semi {
+        let node = if self.accept(";").is_some() {
             let range = expr.range; // TODO(H2CO3): include semicolon
             let value = NodeValue::Semi(Box::new(expr));
             Node { range, value }
+        } else if !self.is_at("}") {
+            // no trailing semi but not the last statement of block
+            return Err(self.expectation_error("} or ;"))
         } else {
             expr
         };
@@ -432,8 +433,28 @@ impl<'a> Parser<'a> {
         unimplemented!()
     }
 
+    // TODO(H2CO3): this is ugly, refactor
     fn parse_if(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let if_keyword = self.expect("if")?;
+        let condition = Box::new(self.parse_expr()?);
+        let then_arm = Box::new(self.parse_block()?);
+        let else_arm = if self.accept("else").is_some() {
+            let expr = if self.is_at("if") {
+                self.parse_if()?
+            } else {
+                self.parse_block()?
+            };
+            Some(Box::new(expr))
+        } else {
+            None
+        };
+
+        let range = else_arm.as_ref().unwrap_or(&then_arm).range.map(
+            |r| Range { begin: if_keyword.range.begin, .. r }
+        );
+        let value = NodeValue::If(If { condition, then_arm, else_arm });
+
+        Ok(Node { range, value })
     }
 
     fn parse_match(&mut self) -> ParseResult<'a> {
