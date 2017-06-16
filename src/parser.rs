@@ -61,12 +61,6 @@ fn is_keyword(lexeme: &str) -> bool {
     keywords.contains(&lexeme)
 }
 
-// Generic helpers for parsing binary expressions
-macro_rules! define_binop_parser {
-    ($name: ident, assoc: left, tokens: $ops: expr, subexpr: $subexpr: ident) => {
-    }
-}
-
 impl<'a> Parser<'a> {
     fn new(tokens: &'a [Token]) -> Parser<'a> {
         Parser { tokens: tokens.iter() }
