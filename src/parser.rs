@@ -33,6 +33,14 @@ fn token_range(first: &Token, last: &Token) -> Option<Range> {
     )
 }
 
+fn node_range(first: &Node, last: &Node) -> Option<Range> {
+    first.range.and_then(
+        |b| last.range.map(
+            |e| Range { begin: b.begin, end: e.end }
+        )
+    )
+}
+
 fn is_keyword(lexeme: &str) -> bool {
     #[allow(non_upper_case_globals)]
     static keywords: &[&str] = &[
@@ -51,6 +59,12 @@ fn is_keyword(lexeme: &str) -> bool {
     ];
 
     keywords.contains(&lexeme)
+}
+
+// Generic helpers for parsing binary expressions
+macro_rules! define_binop_parser {
+    ($name: ident, assoc: left, tokens: $ops: expr, subexpr: $subexpr: ident) => {
+    }
 }
 
 impl<'a> Parser<'a> {
@@ -433,35 +447,67 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_assign_expr()
     }
 
     fn parse_assign_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_binop_rightassoc(
+            &["=", "+=", "-=", "*=", "/=", "%="],
+            Self::parse_cond_expr
+        )
     }
 
     fn parse_cond_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let condition = self.parse_logic_or_expr()?;
+
+        if self.accept("?").is_none() {
+            return Ok(condition)
+        }
+
+        let true_val = self.parse_expr()?;
+        self.expect(":")?;
+        let false_val = self.parse_cond_expr()?;
+
+        let range = node_range(&condition, &false_val);
+        let expr = CondExpr { condition, true_val, false_val };
+        let value = NodeValue::CondExpr(Box::new(expr));
+
+        Ok(Node { range, value })
     }
 
     fn parse_logic_or_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_binop_leftassoc(
+            &["||"],
+            Self::parse_logic_and_expr
+        )
     }
 
     fn parse_logic_and_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_binop_leftassoc(
+            &["&&"],
+            Self::parse_comparison_expr
+        )
     }
 
     fn parse_comparison_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_binop_leftassoc(
+            &["==", "!=", "<", ">", "<=", ">="],
+            Self::parse_additive_expr
+        )
     }
 
     fn parse_additive_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_binop_leftassoc(
+            &["+", "-"],
+            Self::parse_multiplicative_expr
+        )
     }
 
     fn parse_multiplicative_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        self.parse_binop_leftassoc(
+            &["*", "/", "%"],
+            Self::parse_prefix_expr
+        )
     }
 
     fn parse_prefix_expr(&mut self) -> ParseResult<'a> {
@@ -477,11 +523,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_member_access_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        unimplemented!() // foo.bar
     }
 
     fn parse_qual_access_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!() // Foo::bar
+        unimplemented!() // Foo::Bar
     }
 
     fn parse_func_call_expr(&mut self) -> ParseResult<'a> {
@@ -554,6 +600,46 @@ impl<'a> Parser<'a> {
         let value = NodeValue::Block(items);
 
         Ok(Node { range, value })
+    }
+
+    //
+    // Helpers for parsing expressions with binary infix operators
+    //
+
+    fn parse_binop_leftassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ParseResult<'a>
+        where F: Fn(&mut Self) -> ParseResult<'a> {
+
+        let mut lhs = subexpr(self)?;
+
+        while let Some(tok) = self.accept_one_of(tokens) {
+            let rhs = subexpr(self)?;
+            let range = node_range(&lhs, &rhs);
+            let op = tok.value;
+            let expr = BinaryOp { op, lhs, rhs };
+            let value = NodeValue::BinaryOp(Box::new(expr));
+
+            lhs = Node { range, value };
+        }
+
+        Ok(lhs)
+    }
+
+    fn parse_binop_rightassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ParseResult<'a>
+        where F: Fn(&mut Self) -> ParseResult<'a> {
+
+        let lhs = subexpr(self)?;
+
+        if let Some(tok) = self.accept_one_of(tokens) {
+            let rhs = self.parse_binop_rightassoc(tokens, subexpr)?;
+            let range = node_range(&lhs, &rhs);
+            let op = tok.value;
+            let expr = BinaryOp { op, lhs, rhs };
+            let value = NodeValue::BinaryOp(Box::new(expr));
+
+            Ok(Node { range, value })
+        } else {
+            Ok(lhs)
+        }
     }
 
     //

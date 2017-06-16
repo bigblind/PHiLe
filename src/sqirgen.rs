@@ -598,8 +598,8 @@ impl SQIRGen {
     }
 
     fn ensure_transitive_noncontainment_multi<'a, I>(&self, root: &WkCell<Type>, types: I) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a WkCell<Type>>
-    {
+        where I: IntoIterator<Item = &'a WkCell<Type>> {
+
         types.into_iter().map(
             |t| self.ensure_transitive_noncontainment(root, t)
         ).collect::<SemaResult<Vec<_>>>().and(Ok(()))

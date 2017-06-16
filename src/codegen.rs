@@ -168,7 +168,9 @@ fn transform_name<D>(
     transform: Option<NameTransform>,
     lang: Language,
     default: D
-) -> String where D: FnOnce(Language) -> NameTransform {
+) -> String
+    where D: FnOnce(Language) -> NameTransform {
+
     match transform.unwrap_or_else(|| default(lang)) {
         NameTransform::Identity       => name.to_owned(),
         NameTransform::LowerSnakeCase => name.to_snake_case(),
