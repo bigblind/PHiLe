@@ -480,12 +480,12 @@ impl<'a> Parser<'a> {
         unimplemented!()
     }
 
-    fn parse_func_call_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+    fn parse_qual_access_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!() // Foo::bar
     }
 
-    fn parse_qual_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!() // Foo::bar
+    fn parse_func_call_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
     }
 
     fn parse_term_expr(&mut self) -> ParseResult<'a> {

@@ -37,6 +37,7 @@ pub enum NodeValue<'a> {
 
     Subscript(Box<Subscript<'a>>),  // }
     MemberAccess(MemberAccess<'a>), // } Postfix ops
+    QualAccess(QualAccess<'a>),     // }
     FuncCall(FuncCall<'a>),         // }
 
     NilLiteral,
@@ -155,6 +156,12 @@ pub struct Subscript<'a> {
 
 #[derive(Debug)]
 pub struct MemberAccess<'a> {
+    pub base:   Box<Node<'a>>,
+    pub member: &'a str,
+}
+
+#[derive(Debug)]
+pub struct QualAccess<'a> {
     pub base:   Box<Node<'a>>,
     pub member: &'a str,
 }
