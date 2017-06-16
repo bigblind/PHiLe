@@ -27,7 +27,29 @@ pub enum NodeValue<'a> {
     EmptyStmt, // just a semicolon
     Semi(Box<Node<'a>>), // expression statement with trailing semicolon
 
-    // Expressions
+    // Expressions, in ascending order of precedence
+    CondExpr(Box<CondExpr<'a>>), // ?: Elvis operator
+    BinaryOp(Box<BinaryOp<'a>>),
+
+    UnaryPlus(Box<Node<'a>>),    // }
+    UnaryMinus(Box<Node<'a>>),   // } Prefix ops
+    LogicNot(Box<Node<'a>>),     // }
+
+    Subscript(Box<Subscript<'a>>),  // }
+    MemberAccess(MemberAccess<'a>), // } Postfix ops
+    FuncCall(FuncCall<'a>),         // }
+
+    NilLiteral,
+    BoolLiteral(bool),
+    IntLiteral(u64),
+    FloatLiteral(f64),
+    StringLiteral(String), // unescaped
+    Identifier(&'a str),
+
+    TupleLiteral(Vec<Node<'a>>),
+    ArrayLiteral(Vec<Node<'a>>),
+    StructLiteral(StructLiteral<'a>),
+    FuncLiteral(FuncLiteral<'a>),
     If(Box<If<'a>>),
     Match(Match<'a>),
     Block(Vec<Node<'a>>),
@@ -109,6 +131,51 @@ pub struct VarDecl<'a> {
     pub name:      &'a str,
     pub type_decl: Option<Node<'a>>,
     pub init_expr: Option<Node<'a>>,
+}
+
+#[derive(Debug)]
+pub struct CondExpr<'a> {
+    pub condition: Node<'a>,
+    pub true_val:  Node<'a>,
+    pub false_val: Node<'a>,
+}
+
+#[derive(Debug)]
+pub struct BinaryOp<'a> {
+    pub op:  &'a str,
+    pub lhs: Node<'a>,
+    pub rhs: Node<'a>,
+}
+
+#[derive(Debug)]
+pub struct Subscript<'a> {
+    pub base:  Node<'a>,
+    pub index: Node<'a>,
+}
+
+#[derive(Debug)]
+pub struct MemberAccess<'a> {
+    pub base:   Box<Node<'a>>,
+    pub member: &'a str,
+}
+
+#[derive(Debug)]
+pub struct FuncCall<'a> {
+    pub function:  Box<Node<'a>>,
+    pub arguments: Vec<Node<'a>>,
+}
+
+#[derive(Debug)]
+pub struct StructLiteral<'a> {
+    pub name:   &'a str,
+    pub fields: Vec<(&'a str, Node<'a>)>,
+}
+
+#[allow(missing_copy_implementations)]
+#[derive(Debug)]
+pub struct FuncLiteral<'a> {
+    // TODO(H2CO3): implement
+    dummy: &'a usize,
 }
 
 #[derive(Debug)]

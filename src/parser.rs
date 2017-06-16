@@ -45,6 +45,9 @@ fn is_keyword(lexeme: &str) -> bool {
         "if",
         "else",
         "match",
+        "nil",
+        "true",
+        "false",
     ];
 
     keywords.contains(&lexeme)
@@ -433,6 +436,82 @@ impl<'a> Parser<'a> {
         unimplemented!()
     }
 
+    fn parse_assign_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_cond_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_logic_or_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_logic_and_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_comparison_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_additive_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_multiplicative_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_prefix_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_postfix_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_subscript_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_member_access_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_func_call_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_qual_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!() // Foo::bar
+    }
+
+    fn parse_term_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_atomic_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!() // literals and single identifiers
+    }
+
+    fn parse_tuple_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_array_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_struct_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
+    fn parse_func_expr(&mut self) -> ParseResult<'a> {
+        unimplemented!()
+    }
+
     // TODO(H2CO3): this is ugly, refactor
     fn parse_if(&mut self) -> ParseResult<'a> {
         let if_keyword = self.expect("if")?;
@@ -452,8 +531,8 @@ impl<'a> Parser<'a> {
         let range = else_arm.as_ref().unwrap_or(&then_arm).range.map(
             |r| Range { begin: if_keyword.range.begin, .. r }
         );
-        let if_decl = If { condition, then_arm, else_arm };
-        let value = NodeValue::If(Box::new(if_decl));
+        let if_expr = If { condition, then_arm, else_arm };
+        let value = NodeValue::If(Box::new(if_expr));
 
         Ok(Node { range, value })
     }
