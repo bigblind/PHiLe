@@ -158,12 +158,9 @@ impl<'a> Parser<'a> {
             (Some(first), Some(last)) => token_range(first, last),
             (_, _)                    => None,
         };
-        let node = Node {
-            range: range,
-            value: NodeValue::Program(children),
-        };
+        let value = NodeValue::Program(children);
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn parse_toplevel(&mut self) -> ParseResult<'a> {
@@ -197,6 +194,7 @@ impl<'a> Parser<'a> {
 
         let close_brace = self.expect("}")?;
 
+        let range = token_range(keyword, close_brace);
         let value = match keyword.value {
             "struct" => NodeValue::StructDecl(
                 StructDecl { name, fields }
@@ -206,12 +204,8 @@ impl<'a> Parser<'a> {
             ),
             lexeme => unreachable!("Forgot to handle '{}'", lexeme),
         };
-        let node = Node {
-            range: token_range(keyword, close_brace),
-            value: value,
-        };
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn parse_field(&mut self) -> ParseResult<'a> {
@@ -222,12 +216,10 @@ impl<'a> Parser<'a> {
         let comma = self.expect(",")?;
 
         let field = Field { name, type_decl, relation };
-        let node = Node {
-            range: token_range(name_tok, comma),
-            value: NodeValue::Field(Box::new(field)),
-        };
+        let range = token_range(name_tok, comma);
+        let value = NodeValue::Field(Box::new(field));
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<RelDecl<'a>>> {
@@ -270,12 +262,10 @@ impl<'a> Parser<'a> {
         let close_brace = self.expect("}")?;
 
         let decl = EnumDecl { name, variants };
-        let node = Node {
-            range: token_range(enum_keyword, close_brace),
-            value: NodeValue::EnumDecl(decl),
-        };
+        let range = token_range(enum_keyword, close_brace);
+        let value = NodeValue::EnumDecl(decl);
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn parse_variant(&mut self) -> ParseResult<'a> {
@@ -294,12 +284,10 @@ impl<'a> Parser<'a> {
         let comma = self.expect(",")?;
 
         let variant = Variant { name, type_decl };
-        let node = Node {
-            range: token_range(name_tok, comma),
-            value: NodeValue::Variant(Box::new(variant)),
-        };
+        let range = token_range(name_tok, comma);
+        let value = NodeValue::Variant(Box::new(variant));
 
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     //
@@ -720,15 +708,11 @@ impl<'a> Parser<'a> {
         match self.accept("&") {
             Some(token) => {
                 let child = self.parse_prefix_type()?;
-                let range = Range {
-                    begin: token.range.begin,
-                    end:   child.range.map_or(token.range.end, |r| r.end),
-                };
-                let node = Node {
-                    range: Some(range),
-                    value: NodeValue::PointerType(Box::new(child)),
-                };
-                Ok(node)
+                let begin = token.range.begin;
+                let end = child.range.map_or(token.range.end, |r| r.end);
+                let range = Some(Range { begin, end });
+                let value = NodeValue::PointerType(Box::new(child));
+                Ok(Node { range, value })
             },
             None => self.parse_term_type(),
         }
@@ -756,36 +740,27 @@ impl<'a> Parser<'a> {
         }
 
         let close_paren = self.expect(")")?;
+        let range = token_range(open_paren, close_paren);
+        let value = NodeValue::TupleType(items);
 
-        let node = Node {
-            range: token_range(open_paren, close_paren),
-            value: NodeValue::TupleType(items),
-        };
-
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn parse_array_type(&mut self) -> ParseResult<'a> {
         let open_bracket = self.expect("[")?;
         let element_type = self.parse_type()?;
         let close_bracket = self.expect("]")?;
+        let range = token_range(open_bracket, close_bracket);
+        let value = NodeValue::ArrayType(Box::new(element_type));
 
-        let node = Node {
-            range: token_range(open_bracket, close_bracket),
-            value: NodeValue::ArrayType(Box::new(element_type)),
-        };
-
-        Ok(node)
+        Ok(Node { range, value })
     }
 
     fn parse_named_type(&mut self) -> ParseResult<'a> {
         let token = self.expect_identifier()?;
+        let range = Some(token.range);
+        let value = NodeValue::NamedType(token.value);
 
-        let node = Node {
-            range: Some(token.range),
-            value: NodeValue::NamedType(token.value),
-        };
-
-        Ok(node)
+        Ok(Node { range, value })
     }
 }
