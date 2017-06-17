@@ -297,7 +297,9 @@ impl<'a> Parser<'a> {
     fn parse_function(&mut self) -> ParseResult<'a> {
         let fn_keyword = self.expect("fn")?;
         let name = self.expect_identifier()?.value;
-        let arguments = self.parse_decl_args()?;
+        let (arguments, _) = self.parse_paren_delim(
+            "(", Self::parse_decl_arg, ",", ")"
+        )?;
         let return_type = match self.accept("->") {
             Some(_) => Some(self.parse_type()?),
             None    => None,
@@ -312,30 +314,18 @@ impl<'a> Parser<'a> {
         Ok(Node { range, value })
     }
 
-    fn parse_decl_args(&mut self) -> SyntaxResult<Vec<Node<'a>>> {
-        let mut args = vec![];
+    fn parse_decl_arg(&mut self) -> ParseResult<'a> {
+        let name_tok = self.expect_identifier()?;
+        self.expect(":")?;
+        let type_decl = Box::new(self.parse_type()?);
 
-        self.expect("(")?;
+        let name = name_tok.value;
+        let range = type_decl.range.map(
+            |r| Range { begin: name_tok.range.begin, .. r }
+        );
+        let value = NodeValue::FuncArg(FuncArg { name, type_decl });
 
-        while self.has_tokens() && !self.is_at(")") {
-            let name_tok = self.expect_identifier()?;
-            self.expect(":")?;
-            let type_decl = Box::new(self.parse_type()?);
-
-            let name = name_tok.value;
-            let range = Some(name_tok.range); // TODO(H2CO3): this is a lie
-            let value = NodeValue::FuncArg(FuncArg { name, type_decl });
-
-            args.push(Node { range, value });
-
-            if !self.is_at(")") {
-                self.expect(",")?;
-            }
-        }
-
-        self.expect(")")?;
-
-        Ok(args)
+        Ok(Node { range, value })
     }
 
     fn parse_impl(&mut self) -> ParseResult<'a> {
@@ -553,7 +543,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_func_call_expr(&mut self, callee: Node<'a>) -> ParseResult<'a> {
-        let (arguments, arg_range) = self.parse_expr_list()?;
+        let (arguments, arg_range) = self.parse_paren_delim(
+            "(", Self::parse_expr, ",", ")"
+        )?;
         let range = callee.range.and_then(
             |cr| arg_range.map(|ar| Range { begin: cr.begin, end: ar.end })
         );
@@ -620,13 +612,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_tuple_expr(&mut self) -> ParseResult<'a> {
-        let (exprs, range) = self.parse_expr_list()?;
+        let (exprs, range) = self.parse_paren_delim("(", Self::parse_expr, ",", ")")?;
         let value = NodeValue::TupleLiteral(exprs);
         Ok(Node { range, value })
     }
 
     fn parse_array_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let (exprs, range) = self.parse_paren_delim("[", Self::parse_expr, ",", "]")?;
+        let value = NodeValue::ArrayLiteral(exprs);
+        Ok(Node { range, value })
     }
 
     fn parse_struct_expr(&mut self) -> ParseResult<'a> {
@@ -721,11 +715,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // Helper for parsing parenthesized, comma-separated expressions
-    fn parse_expr_list(&mut self) -> SyntaxResult<(Vec<Node<'a>>, Option<Range>)> {
-        unimplemented!()
-    }
-
     //
     // Built-in Type Declarations
     //
@@ -776,21 +765,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_tuple_type(&mut self) -> ParseResult<'a> {
-        let mut items = vec![];
-        let open_paren = self.expect("(")?;
-
-        while self.has_tokens() && !self.is_at(")") {
-            items.push(self.parse_type()?);
-
-            if !self.is_at(")") {
-                self.expect(",")?;
-            }
-        }
-
-        let close_paren = self.expect(")")?;
-        let range = token_range(open_paren, close_paren);
+        let (items, range) = self.parse_paren_delim("(", Self::parse_type, ",", ")")?;
         let value = NodeValue::TupleType(items);
-
         Ok(Node { range, value })
     }
 
@@ -835,5 +811,32 @@ impl<'a> Parser<'a> {
             },
             None => subexpr(self),
         }
+    }
+
+    fn parse_paren_delim<F>(
+        &mut self,
+        open:    &str,
+        subexpr: F,
+        delim:   &str,
+        close:   &str
+    ) -> SyntaxResult<(Vec<Node<'a>>, Option<Range>)>
+        where F: Fn(&mut Self) -> ParseResult<'a> {
+
+        let mut items = vec![];
+        let open_tok = self.expect(open)?;
+
+        while self.has_tokens() && !self.is_at(close) {
+            items.push(subexpr(self)?);
+
+            if self.accept(delim).is_none() && !self.is_at(close) {
+                let err_msg = format!("{} or {}", delim, close);
+                return Err(self.expectation_error(&err_msg));
+            }
+        }
+
+        let close_tok = self.expect(close)?;
+        let range = token_range(open_tok, close_tok);
+
+        Ok((items, range))
     }
 }
