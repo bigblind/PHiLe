@@ -149,9 +149,9 @@ pub struct SQIR {
 
 // This is to be used ONLY when you know you have a Class type
 pub fn unwrap_class_name(class: &RcCell<Type>) -> String {
-    match *class.borrow().expect("Cannot borrow Type::Class!?") {
+    match *class.borrow().expect("Cannot borrow Type::Class?!") {
         Type::Class(ref c) => c.name.clone(),
-        _ => unreachable!("Non-class class type!?"),
+        _ => unreachable!("Non-class class type?!"),
     }
 }
 

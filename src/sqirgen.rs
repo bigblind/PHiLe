@@ -640,7 +640,7 @@ impl SQIRGen {
                     ),
                 }
             },
-            _ => unreachable!("Non-pointer pointer type!?"),
+            _ => unreachable!("Non-pointer pointer type?!"),
         }
 
         Ok(pointer_type)
@@ -664,7 +664,7 @@ impl SQIRGen {
                     _ => (),
                 }
             },
-            _ => unreachable!("Non-unique unique type!?"),
+            _ => unreachable!("Non-unique unique type?!"),
         }
 
         Ok(unique_type)
@@ -753,7 +753,7 @@ impl SQIRGen {
 
         let class = match *class_type {
             Type::Class(ref c) => c,
-            _ => unreachable!("Non-class class type!?"),
+            _ => unreachable!("Non-class class type?!"),
         };
 
         let field_type_rc = class.fields[field.name].as_rc()?;
@@ -833,7 +833,7 @@ impl SQIRGen {
                     node
                 )
             },
-            _ => unreachable!("Non-class Class type!?"),
+            _ => unreachable!("Non-class Class type?!"),
         }
 
         // The rest of the validation is a separate task,
