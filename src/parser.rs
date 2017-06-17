@@ -498,26 +498,50 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_prefix_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let node_ctors: &[&Fn(Box<Node<'a>>) -> NodeValue] = &[
+            &NodeValue::UnaryPlus,
+            &NodeValue::UnaryMinus,
+            &NodeValue::LogicNot,
+        ];
+        self.parse_prefix(
+            &["+", "-", "~"],
+            node_ctors,
+            Self::parse_postfix_expr
+        )
     }
 
     fn parse_postfix_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let mut node = self.parse_term_expr()?;
+
+        while let Some(token) = self.next_token() {
+            node = match token.value {
+                "." | "::" => self.parse_member_access_expr(node)?,
+                "["        => self.parse_subscript_expr(node)?,
+                "("        => self.parse_func_call_expr(node)?,
+                _          => break,
+            };
+        }
+
+        Ok(node)
     }
 
-    fn parse_subscript_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
-    }
-
-    fn parse_member_access_expr(&mut self) -> ParseResult<'a> {
+    fn parse_member_access_expr(&mut self, base: Node<'a>) -> ParseResult<'a> {
         unimplemented!() // foo.bar
     }
 
-    fn parse_qual_access_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!() // Foo::Bar
+    fn parse_subscript_expr(&mut self, base: Node<'a>) -> ParseResult<'a> {
+        self.expect("[")?;
+
+        let index = self.parse_expr()?;
+        let close_bracket = self.expect("]")?;
+        let range = base.range.map(|r| Range { end: close_bracket.range.end, .. r });
+        let expr = Subscript { base, index };
+        let value = NodeValue::Subscript(Box::new(expr));
+
+        Ok(Node { range, value })
     }
 
-    fn parse_func_call_expr(&mut self) -> ParseResult<'a> {
+    fn parse_func_call_expr(&mut self, function: Node<'a>) -> ParseResult<'a> {
         unimplemented!()
     }
 
@@ -710,18 +734,11 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_prefix_type(&mut self) -> ParseResult<'a> {
-        // currently, & is the only prefix type operator
-        match self.accept("&") {
-            Some(token) => {
-                let child = self.parse_prefix_type()?;
-                let begin = token.range.begin;
-                let end = child.range.map_or(token.range.end, |r| r.end);
-                let range = Some(Range { begin, end });
-                let value = NodeValue::PointerType(Box::new(child));
-                Ok(Node { range, value })
-            },
-            None => self.parse_term_type(),
-        }
+        self.parse_prefix(
+            &["&"],
+            &[&NodeValue::PointerType],
+            Self::parse_term_type
+        )
     }
 
     fn parse_term_type(&mut self) -> ParseResult<'a> {
@@ -768,5 +785,30 @@ impl<'a> Parser<'a> {
         let value = NodeValue::NamedType(token.value);
 
         Ok(Node { range, value })
+    }
+
+    //
+    // Generic helpers for parsing either expressions or types
+    //
+
+    fn parse_prefix<N, S>(&mut self, tokens: &[&str], nodes: &[N], subexpr: S) -> ParseResult<'a>
+        where N: Fn(Box<Node<'a>>) -> NodeValue<'a>,
+              S: FnOnce(&mut Self) -> ParseResult<'a> {
+
+        assert!(tokens.len() == nodes.len());
+
+        match self.accept_one_of(tokens) {
+            Some(token) => {
+                let child = self.parse_prefix(tokens, nodes, subexpr)?;
+                let begin = token.range.begin;
+                let end = child.range.map_or(token.range.end, |r| r.end);
+                let range = Some(Range { begin, end });
+                let index = tokens.iter().position(|v| *v == token.value).unwrap();
+                let value = nodes[index](Box::new(child));
+
+                Ok(Node { range, value })
+            },
+            None => subexpr(self),
+        }
     }
 }
