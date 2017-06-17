@@ -95,7 +95,7 @@ impl<'a> Lexer<'a> {
             regexes:  [
                 (TokenKind::Whitespace,     Regex::new(r"^\s+").unwrap()),
                 (TokenKind::Comment,        Regex::new(r"^#[^\n]*\n?").unwrap()),
-                (TokenKind::Word,           Regex::new(r"^[\w_][\w\d_]*").unwrap()),
+                (TokenKind::Word,           Regex::new(r"^[\p{Alphabetic}\p{M}\p{Pc}\p{Join_Control}_][\w_]*").unwrap()),
                 (TokenKind::NumericLiteral, Regex::new(r"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|(\d+(\.\d+([eE][\+\-]?\d+)?)?))").unwrap()),
                 (TokenKind::Punctuation,    Regex::new(r"^(\(|\)|\[|\]|\{|\}|[!\?\*\+]?<\->[!\?\*\+]?|\->|=>|&&|\|\||([<>\+\-\*/%&\|\^!=]=?)|~|\.{1,3}|,|\?|::?|;)").unwrap()),
                 (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\"]|\\["'nrtb]|\\x[[:xdigit:]]{2}|\\U[[:xdigit:]]{8})*""#).unwrap()),
