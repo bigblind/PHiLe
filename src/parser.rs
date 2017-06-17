@@ -523,11 +523,17 @@ impl<'a> Parser<'a> {
 
     // TODO(H2CO3): parse struct literals and closures
     fn parse_term_expr(&mut self) -> ParseResult<'a> {
-        match self.next_token().map(|t| t.value) {
-            Some("(") => self.parse_tuple_expr(),
-            Some("[") => self.parse_array_expr(),
-            Some(_)   => self.parse_atomic_expr(),
-            None      => Err(self.expectation_error("a term")),
+        let token = self.next_token().ok_or_else(
+            || self.expectation_error("a term")
+        )?;
+
+        match token.value {
+            "if"    => self.parse_if(),
+            "match" => self.parse_match(),
+            "("     => self.parse_tuple_expr(),
+            "["     => self.parse_array_expr(),
+            "{"     => self.parse_block(),
+            _       => self.parse_atomic_expr(),
         }
     }
 
