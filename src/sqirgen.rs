@@ -833,7 +833,7 @@ impl SQIRGen {
                     node
                 )
             },
-            _ => unreachable!("Non-class Class type?!"),
+            _ => unreachable!("Non-class class type?!"),
         }
 
         // The rest of the validation is a separate task,

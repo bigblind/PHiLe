@@ -552,8 +552,15 @@ impl<'a> Parser<'a> {
         Ok(Node { range, value })
     }
 
-    fn parse_func_call_expr(&mut self, function: Node<'a>) -> ParseResult<'a> {
-        unimplemented!()
+    fn parse_func_call_expr(&mut self, callee: Node<'a>) -> ParseResult<'a> {
+        let (arguments, arg_range) = self.parse_expr_list()?;
+        let range = callee.range.and_then(
+            |cr| arg_range.map(|ar| Range { begin: cr.begin, end: ar.end })
+        );
+        let function = Box::new(callee);
+        let value = NodeValue::FuncCall(FuncCall { function, arguments });
+
+        Ok(Node { range, value })
     }
 
     // TODO(H2CO3): parse struct literals and closures
@@ -613,7 +620,9 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_tuple_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let (exprs, range) = self.parse_expr_list()?;
+        let value = NodeValue::TupleLiteral(exprs);
+        Ok(Node { range, value })
     }
 
     fn parse_array_expr(&mut self) -> ParseResult<'a> {
@@ -710,6 +719,11 @@ impl<'a> Parser<'a> {
         } else {
             Ok(lhs)
         }
+    }
+
+    // Helper for parsing parenthesized, comma-separated expressions
+    fn parse_expr_list(&mut self) -> SyntaxResult<(Vec<Node<'a>>, Option<Range>)> {
+        unimplemented!()
     }
 
     //
