@@ -9,7 +9,7 @@
 use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut };
 use std::hash::{ Hash, Hasher };
-use error::{ DerefError, DerefResult };
+use error::{ DerefError, DerefResult, SyntaxResult };
 use unicode_segmentation::UnicodeSegmentation;
 
 
@@ -42,6 +42,14 @@ pub struct WkCell<T: ?Sized> {
 
 pub fn grapheme_count(string: &str) -> usize {
     string.graphemes(true).count()
+}
+
+pub fn unescape_string_literal(string: &str) -> SyntaxResult<String> {
+    if string.contains('\\') {
+        unimplemented!()
+    } else {
+        Ok(string.to_owned())
+    }
 }
 
 impl<T> RcCell<T> {

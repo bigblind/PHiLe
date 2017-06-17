@@ -8,6 +8,7 @@
 
 use std::io;
 use std::error::Error;
+use std::num::{ ParseIntError, ParseFloatError };
 use std::fmt::{ self, Debug, Display, Formatter };
 use std::cell::{ BorrowError, BorrowMutError };
 use lexer::Range;
@@ -21,7 +22,7 @@ pub enum DerefError {
 }
 
 #[derive(Debug, Clone)]
-pub struct ParseError {
+pub struct SyntaxError {
     pub message: String,
     pub range:   Option<Range>,
 }
@@ -33,7 +34,7 @@ pub struct SemaError {
 }
 
 pub type DerefResult<T>  = Result<T, DerefError>;
-pub type SyntaxResult<T> = Result<T, ParseError>;
+pub type SyntaxResult<T> = Result<T, SyntaxError>;
 pub type SemaResult<T>   = Result<T, SemaError>;
 
 
@@ -67,17 +68,35 @@ impl From<DerefError> for io::Error {
     }
 }
 
-impl Error for ParseError {
+impl Error for SyntaxError {
     fn description(&self) -> &str {
         &self.message
     }
 }
 
-impl Display for ParseError {
+impl Display for SyntaxError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "Syntax error")?;
         write_range(f, self.range)?;
         write!(f, ": {}", self.message)
+    }
+}
+
+impl From<ParseIntError> for SyntaxError {
+    fn from(error: ParseIntError) -> Self {
+        SyntaxError {
+            message: error.description().to_owned(),
+            range:   None,
+        }
+    }
+}
+
+impl From<ParseFloatError> for SyntaxError {
+    fn from(error: ParseFloatError) -> Self {
+        SyntaxError {
+            message: error.description().to_owned(),
+            range:   None,
+        }
     }
 }
 

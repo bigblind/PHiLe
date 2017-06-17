@@ -9,7 +9,8 @@
 use std::slice;
 use lexer::{ Token, TokenKind, Range };
 use ast::*;
-use error::{ ParseError, SyntaxResult };
+use error::{ SyntaxError, SyntaxResult };
+use util::unescape_string_literal;
 
 
 struct Parser<'a> {
@@ -72,11 +73,11 @@ impl<'a> Parser<'a> {
         self.tokens.len() > 0
     }
 
-    fn expectation_error(&self, expected: &str) -> ParseError {
+    fn expectation_error(&self, expected: &str) -> SyntaxError {
         let token = self.next_token();
         let actual = token.map_or("end of input", |t| t.value);
 
-        ParseError {
+        SyntaxError {
             message: format!("Expected '{}'; found '{}'", expected, actual),
             range:   token.map(|t| t.range),
         }
@@ -128,6 +129,10 @@ impl<'a> Parser<'a> {
         self.accept_identifier().ok_or_else(
             || self.expectation_error("identifier")
         )
+    }
+
+    fn accept_of_kind(&mut self, kind: TokenKind) -> Option<&'a Token<'a>> {
+        self.accept_by(|token| token.kind == kind)
     }
 
     fn is_at(&self, lexeme: &str) -> bool {
@@ -533,7 +538,43 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_atomic_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!() // literals and single identifiers
+        if let Some(token) = self.accept_one_of(&["nil", "true", "false"]) {
+            let range = Some(token.range);
+            let value = match token.value {
+                "nil"   => NodeValue::NilLiteral,
+                "true"  => NodeValue::BoolLiteral(true),
+                "false" => NodeValue::BoolLiteral(false),
+                lexeme  => unreachable!("forgot to handle '{}'", lexeme),
+            };
+            return Ok(Node { range, value });
+        }
+
+        // If the lexeme contains a decimal point or an exponent,
+        // then it's floating-point, otherwise it's an integer.
+        if let Some(token) = self.accept_of_kind(TokenKind::NumericLiteral) {
+            let range = Some(token.range);
+            let value = if token.value.contains(|c| "eE.".contains(c)) {
+                NodeValue::FloatLiteral(token.value.parse()?)
+            } else {
+                NodeValue::IntLiteral(token.value.parse()?)
+            };
+            return Ok(Node { range, value });
+        }
+
+        if let Some(token) = self.accept_of_kind(TokenKind::StringLiteral) {
+            let s = unescape_string_literal(token.value)?;
+            let range = Some(token.range);
+            let value = NodeValue::StringLiteral(s);
+            return Ok(Node { range, value });
+        }
+
+        if let Some(token) = self.accept_identifier() {
+            let range = Some(token.range);
+            let value = NodeValue::Identifier(token.value);
+            return Ok(Node { range, value });
+        }
+
+        Err(self.expectation_error("literal or identifier"))
     }
 
     fn parse_tuple_expr(&mut self) -> ParseResult<'a> {

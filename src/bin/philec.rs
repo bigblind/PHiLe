@@ -199,10 +199,10 @@ fn format_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> String
     format!("Lexical error in '{}' near {}", file, location)
 }
 
-fn format_parse_error<P: AsRef<str>>(error: &ParseError, files: &[P]) -> String {
+fn format_syntax_error<P: AsRef<str>>(error: &SyntaxError, files: &[P]) -> String {
     let file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref());
     let range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r));
-    format!("Parse error in '{}' near {}: {}", file, range, error.message)
+    format!("Syntax error in '{}' near {}: {}", file, range, error.message)
 }
 
 fn format_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> String {
@@ -242,7 +242,7 @@ fn main() {
 
     let program = stopwatch!("Parsing", {
         parse(&tokens).unwrap_or_else(
-            |error| panic!(format_parse_error(&error, &args.sources))
+            |error| panic!(format_syntax_error(&error, &args.sources))
         )
     });
 
