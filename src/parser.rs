@@ -525,8 +525,19 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn parse_member_access_expr(&mut self, base: Node<'a>) -> ParseResult<'a> {
-        unimplemented!() // foo.bar
+    fn parse_member_access_expr(&mut self, node: Node<'a>) -> ParseResult<'a> {
+        let op = self.expect_one_of(&[".", "::"])?.value;
+        let member_tok = self.expect_identifier()?;
+        let base = Box::new(node);
+        let member = member_tok.value;
+        let range = base.range.map(|r| Range { end: member_tok.range.end, .. r });
+        let value = match op {
+            "."  => NodeValue::MemberAccess(MemberAccess { base, member }),
+            "::" => NodeValue::QualAccess(QualAccess { base, member }),
+            _    => unreachable!("forgot to handle '{}'", op),
+        };
+
+        Ok(Node { range, value })
     }
 
     fn parse_subscript_expr(&mut self, base: Node<'a>) -> ParseResult<'a> {
