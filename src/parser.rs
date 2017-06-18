@@ -25,21 +25,32 @@ pub fn parse<'a>(tokens: &'a [Token]) -> ParseResult<'a> {
     Parser::new(tokens).parse()
 }
 
-fn token_range(first: &Token, last: &Token) -> Option<Range> {
-    Some(
-        Range {
-            begin: first.range.begin,
-            end:   last.range.end,
-        }
-    )
+fn token_range(first: &Token, last: &Token) -> Range {
+    Range {
+        begin: first.range.begin,
+        end:   last.range.end,
+    }
 }
 
-fn node_range(first: &Node, last: &Node) -> Option<Range> {
-    first.range.and_then(
-        |b| last.range.map(
-            |e| Range { begin: b.begin, end: e.end }
-        )
-    )
+fn node_range(first: &Node, last: &Node) -> Range {
+    Range {
+        begin: first.range.begin,
+        end:   last.range.end,
+    }
+}
+
+fn token_node_range(first: &Token, last: &Node) -> Range {
+    Range {
+        begin: first.range.begin,
+        end:   last.range.end,
+    }
+}
+
+fn node_token_range(first: &Node, last: &Token) -> Range {
+    Range {
+        begin: first.range.begin,
+        end:   last.range.end,
+    }
 }
 
 fn is_keyword(lexeme: &str) -> bool {
@@ -158,7 +169,7 @@ impl<'a> Parser<'a> {
 
         let range = match (first_token, last_token) {
             (Some(first), Some(last)) => token_range(first, last),
-            (_, _)                    => None,
+            _ => Range::default(),
         };
         let value = NodeValue::Program(children);
 
@@ -309,9 +320,7 @@ impl<'a> Parser<'a> {
             None
         };
         let body = self.parse_block()?;
-        let range = body.range.map(
-            |r| Range { begin: fn_keyword.range.begin, .. r }
-        );
+        let range = token_node_range(fn_keyword, &body);
         let decl = Function { name, arguments, return_type, body };
         let value = NodeValue::Function(Box::new(decl));
 
@@ -326,11 +335,11 @@ impl<'a> Parser<'a> {
         };
         let name = name_tok.value;
         let begin = name_tok.range.begin;
-        let end = type_decl.as_ref().and_then(|d| d.range).map_or(
+        let end = type_decl.as_ref().map_or(
             name_tok.range.end,
-            |range| range.end
+            |decl| decl.range.end
         );
-        let range = Some(Range { begin, end });
+        let range = Range { begin, end };
         let value = NodeValue::FuncArg(FuncArg { name, type_decl });
 
         Ok(Node { range, value })
@@ -400,7 +409,7 @@ impl<'a> Parser<'a> {
 
     fn parse_empty_stmt(&mut self) -> ParseResult<'a> {
         self.expect(";").map(|semi| Node {
-            range: Some(semi.range),
+            range: semi.range,
             value: NodeValue::EmptyStmt,
         })
     }
@@ -528,7 +537,7 @@ impl<'a> Parser<'a> {
         let member_tok = self.expect_identifier()?;
         let base = Box::new(node);
         let member = member_tok.value;
-        let range = base.range.map(|r| Range { end: member_tok.range.end, .. r });
+        let range = node_token_range(&base, member_tok);
         let value = match op {
             "."  => NodeValue::MemberAccess(MemberAccess { base, member }),
             "::" => NodeValue::QualAccess(QualAccess { base, member }),
@@ -543,7 +552,7 @@ impl<'a> Parser<'a> {
 
         let index = self.parse_expr()?;
         let close_bracket = self.expect("]")?;
-        let range = base.range.map(|r| Range { end: close_bracket.range.end, .. r });
+        let range = node_token_range(&base, close_bracket);
         let expr = Subscript { base, index };
         let value = NodeValue::Subscript(Box::new(expr));
 
@@ -554,9 +563,9 @@ impl<'a> Parser<'a> {
         let (arguments, arg_range) = self.parse_paren_delim(
             "(", Self::parse_expr, ",", ")"
         )?;
-        let range = callee.range.and_then(
-            |cr| arg_range.map(|ar| Range { begin: cr.begin, end: ar.end })
-        );
+        let begin = callee.range.begin;
+        let end = arg_range.end;
+        let range = Range { begin, end };
         let function = Box::new(callee);
         let value = NodeValue::FuncCall(FuncCall { function, arguments });
 
@@ -582,7 +591,7 @@ impl<'a> Parser<'a> {
 
     fn parse_atomic_expr(&mut self) -> ParseResult<'a> {
         if let Some(token) = self.accept_one_of(&["nil", "true", "false"]) {
-            let range = Some(token.range);
+            let range = token.range;
             let value = match token.value {
                 "nil"   => NodeValue::NilLiteral,
                 "true"  => NodeValue::BoolLiteral(true),
@@ -595,7 +604,7 @@ impl<'a> Parser<'a> {
         // If the lexeme contains a decimal point or an exponent,
         // then it's floating-point, otherwise it's an integer.
         if let Some(token) = self.accept_of_kind(TokenKind::NumericLiteral) {
-            let range = Some(token.range);
+            let range = token.range;
             let value = if token.value.contains(|c| "eE.".contains(c)) {
                 NodeValue::FloatLiteral(token.value.parse()?)
             } else {
@@ -606,13 +615,13 @@ impl<'a> Parser<'a> {
 
         if let Some(token) = self.accept_of_kind(TokenKind::StringLiteral) {
             let s = unescape_string_literal(token.value)?;
-            let range = Some(token.range);
+            let range = token.range;
             let value = NodeValue::StringLiteral(s);
             return Ok(Node { range, value });
         }
 
         if let Some(token) = self.accept_identifier() {
-            let range = Some(token.range);
+            let range = token.range;
             let value = NodeValue::Identifier(token.value);
             return Ok(Node { range, value });
         }
@@ -651,12 +660,9 @@ impl<'a> Parser<'a> {
         } else {
             self.parse_expr()?
         };
-        let range = match (arg_range, body.range) {
-            (Some(ar), Some(br)) => Some(
-                Range { begin: ar.begin, end: br.end }
-            ),
-            (_, _)               => None,
-        };
+        let begin = arg_range.begin;
+        let end = body.range.end;
+        let range = Range { begin, end };
         let name = None;
         let decl = Function { name, arguments, return_type, body };
         let value = NodeValue::Function(Box::new(decl));
@@ -680,8 +686,9 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let range = else_arm.as_ref().unwrap_or(&then_arm).range.map(
-            |r| Range { begin: if_keyword.range.begin, .. r }
+        let range = token_node_range(
+            if_keyword,
+            else_arm.as_ref().unwrap_or(&then_arm)
         );
         let if_expr = If { condition, then_arm, else_arm };
         let value = NodeValue::If(Box::new(if_expr));
@@ -762,9 +769,7 @@ impl<'a> Parser<'a> {
         loop {
             match self.accept_one_of(&["?", "!"]) {
                 Some(token) => {
-                    let range = node.range.map(
-                        |r| Range { end: token.range.end, .. r }
-                    );
+                    let range = node_token_range(&node, token);
                     let value = match token.value {
                         "?" => NodeValue::OptionalType(Box::new(node)),
                         "!" => NodeValue::UniqueType(Box::new(node)),
@@ -815,7 +820,7 @@ impl<'a> Parser<'a> {
 
     fn parse_named_type(&mut self) -> ParseResult<'a> {
         let token = self.expect_identifier()?;
-        let range = Some(token.range);
+        let range = token.range;
         let value = NodeValue::NamedType(token.value);
 
         Ok(Node { range, value })
@@ -834,9 +839,7 @@ impl<'a> Parser<'a> {
         match self.accept_one_of(tokens) {
             Some(token) => {
                 let child = self.parse_prefix(tokens, nodes, subexpr)?;
-                let begin = token.range.begin;
-                let end = child.range.map_or(token.range.end, |r| r.end);
-                let range = Some(Range { begin, end });
+                let range = token_node_range(token, &child);
                 let index = tokens.iter().position(|v| *v == token.value).unwrap();
                 let value = nodes[index](Box::new(child));
 
@@ -852,7 +855,7 @@ impl<'a> Parser<'a> {
         subexpr: F,
         delim:   &str,
         close:   &str
-    ) -> SyntaxResult<(Vec<Node<'a>>, Option<Range>)>
+    ) -> SyntaxResult<(Vec<Node<'a>>, Range)>
         where F: Fn(&mut Self) -> ParseResult<'a> {
 
         let mut items = vec![];

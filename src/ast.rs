@@ -65,7 +65,7 @@ pub enum NodeValue<'a> {
 
 #[derive(Debug)]
 pub struct Node<'a> {
-    pub range: Option<Range>,
+    pub range: Range,
     pub value: NodeValue<'a>,
 }
 

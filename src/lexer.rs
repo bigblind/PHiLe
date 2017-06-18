@@ -18,7 +18,7 @@ pub struct Location {
     pub src_idx: usize, // index of the source `self` points into
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Range {
     pub begin: Location,
     pub end:   Location,

@@ -46,7 +46,7 @@ fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
     Err(
         SemaError {
             message: message,
-            range:   node.range,
+            range:   Some(node.range),
         }
     )
 }
