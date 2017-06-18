@@ -303,9 +303,10 @@ impl<'a> Parser<'a> {
         let (arguments, _) = self.parse_paren_delim(
             "(", Self::parse_decl_arg, ",", ")"
         )?;
-        let return_type = match self.accept("->") {
-            Some(_) => Some(self.parse_type()?),
-            None    => None,
+        let return_type = if self.accept("->").is_some() {
+            Some(self.parse_type()?)
+        } else {
+            None
         };
         let body = self.parse_block()?;
         let range = body.range.map(
@@ -574,6 +575,7 @@ impl<'a> Parser<'a> {
             "("     => self.parse_tuple_expr(),
             "["     => self.parse_array_expr(),
             "{"     => self.parse_block(),
+            "|"     => self.parse_func_expr(),
             _       => self.parse_atomic_expr(),
         }
     }
@@ -635,7 +637,31 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_func_expr(&mut self) -> ParseResult<'a> {
-        unimplemented!()
+        let (arguments, arg_range) = self.parse_paren_delim(
+            "|", Self::parse_decl_arg, ",", "|"
+        )?;
+        let has_return_type = self.accept("->").is_some();
+        let return_type = if has_return_type {
+            Some(self.parse_type()?)
+        } else {
+            None
+        };
+        let body = if has_return_type {
+            self.parse_block()?
+        } else {
+            self.parse_expr()?
+        };
+        let range = match (arg_range, body.range) {
+            (Some(ar), Some(br)) => Some(
+                Range { begin: ar.begin, end: br.end }
+            ),
+            (_, _)               => None,
+        };
+        let name = None;
+        let decl = Function { name, arguments, return_type, body };
+        let value = NodeValue::Function(Box::new(decl));
+
+        Ok(Node { range, value })
     }
 
     // TODO(H2CO3): this is ugly, refactor
