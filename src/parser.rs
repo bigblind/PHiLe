@@ -298,7 +298,8 @@ impl<'a> Parser<'a> {
 
     fn parse_function(&mut self) -> ParseResult<'a> {
         let fn_keyword = self.expect("fn")?;
-        let name = self.expect_identifier()?.value;
+        let name_tok = self.expect_identifier()?;
+        let name = Some(name_tok.value);
         let (arguments, _) = self.parse_paren_delim(
             "(", Self::parse_decl_arg, ",", ")"
         )?;
@@ -310,21 +311,25 @@ impl<'a> Parser<'a> {
         let range = body.range.map(
             |r| Range { begin: fn_keyword.range.begin, .. r }
         );
-        let decl = FuncDecl { name, arguments, return_type, body };
-        let value = NodeValue::FuncDecl(Box::new(decl));
+        let decl = Function { name, arguments, return_type, body };
+        let value = NodeValue::Function(Box::new(decl));
 
         Ok(Node { range, value })
     }
 
     fn parse_decl_arg(&mut self) -> ParseResult<'a> {
         let name_tok = self.expect_identifier()?;
-        self.expect(":")?;
-        let type_decl = Box::new(self.parse_type()?);
-
+        let type_decl = match self.accept(":") {
+            Some(_) => Some(Box::new(self.parse_type()?)),
+            None    => None,
+        };
         let name = name_tok.value;
-        let range = type_decl.range.map(
-            |r| Range { begin: name_tok.range.begin, .. r }
+        let begin = name_tok.range.begin;
+        let end = type_decl.as_ref().and_then(|d| d.range).map_or(
+            name_tok.range.end,
+            |range| range.end
         );
+        let range = Some(Range { begin, end });
         let value = NodeValue::FuncArg(FuncArg { name, type_decl });
 
         Ok(Node { range, value })

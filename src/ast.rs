@@ -18,7 +18,7 @@ pub enum NodeValue<'a> {
     ClassDecl(ClassDecl<'a>),
     Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
-    FuncDecl(Box<FuncDecl<'a>>),
+    Function(Box<Function<'a>>),
     FuncArg(FuncArg<'a>),
     Impl(Impl<'a>),
 
@@ -50,7 +50,6 @@ pub enum NodeValue<'a> {
     TupleLiteral(Vec<Node<'a>>),
     ArrayLiteral(Vec<Node<'a>>),
     StructLiteral(StructLiteral<'a>),
-    FuncLiteral(FuncLiteral<'a>),
     If(Box<If<'a>>),
     Match(Match<'a>),
     Block(Vec<Node<'a>>),
@@ -108,17 +107,17 @@ pub struct Variant<'a> {
 }
 
 #[derive(Debug)]
-pub struct FuncDecl<'a> {
-    pub name:        &'a str,
+pub struct Function<'a> {
+    pub name:        Option<&'a str>,  // None iff closure
     pub arguments:   Vec<Node<'a>>,    // FuncArg nodes
     pub return_type: Option<Node<'a>>, // type node
-    pub body:        Node<'a>,         // Block node
+    pub body:        Node<'a>,         // expression node
 }
 
 #[derive(Debug)]
 pub struct FuncArg<'a> {
     pub name:      &'a str,
-    pub type_decl: Box<Node<'a>>, // type node
+    pub type_decl: Option<Box<Node<'a>>>, // type node
 }
 
 #[derive(Debug)]
@@ -176,13 +175,6 @@ pub struct FuncCall<'a> {
 pub struct StructLiteral<'a> {
     pub name:   &'a str,
     pub fields: Vec<(&'a str, Node<'a>)>,
-}
-
-#[allow(missing_copy_implementations)]
-#[derive(Debug)]
-pub struct FuncLiteral<'a> {
-    // TODO(H2CO3): implement
-    dummy: &'a usize,
 }
 
 #[derive(Debug)]
