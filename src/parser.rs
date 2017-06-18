@@ -57,6 +57,8 @@ fn is_keyword(lexeme: &str) -> bool {
         "nil",
         "true",
         "false",
+        "and",
+        "or",
     ];
 
     keywords.contains(&lexeme)
@@ -454,14 +456,14 @@ impl<'a> Parser<'a> {
 
     fn parse_logic_or_expr(&mut self) -> ParseResult<'a> {
         self.parse_binop_leftassoc(
-            &["||"],
+            &["or"],
             Self::parse_logic_and_expr
         )
     }
 
     fn parse_logic_and_expr(&mut self) -> ParseResult<'a> {
         self.parse_binop_leftassoc(
-            &["&&"],
+            &["and"],
             Self::parse_comparison_expr
         )
     }
