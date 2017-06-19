@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 use util::*;
 use sqir::*;
-use ast::{ Node, NodeValue, EnumDecl, StructDecl, ClassDecl, Function, RelDecl };
+use ast::{ self, Node, NodeValue, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
@@ -233,7 +233,8 @@ impl SQIRGen {
     fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
             match child.value {
-                NodeValue::Function(ref f) => self.forward_declare_function(&f)?,
+                NodeValue::Function(ref f) => self.forward_declare_free_function(f)?,
+                NodeValue::Impl(ref i)     => self.forward_declare_impl(i)?,
                 _ => continue,
             }
         }
@@ -245,7 +246,8 @@ impl SQIRGen {
     fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
             match child.value {
-                NodeValue::Function(ref f) => self.generate_function(&f)?,
+                NodeValue::Function(ref f) => self.generate_free_function(f)?,
+                NodeValue::Impl(ref i)     => self.generate_impl(i)?,
                 _ => continue,
             }
         }
@@ -890,9 +892,10 @@ impl SQIRGen {
 
         let key = (lhs_type.clone(), lhs_field_name.to_owned());
 
-        match self.sqir.relations.insert(key, Relation { lhs, rhs }) {
-            None    => Ok(()),
-            Some(_) => unreachable!("Duplicate relation for field '{}'", lhs_field_name),
+        if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_none() {
+            Ok(())
+        } else {
+            unreachable!("Duplicate relation for field '{}'", lhs_field_name)
         }
     }
 
@@ -974,9 +977,10 @@ impl SQIRGen {
 
         let key = (class_type.clone(), field_name.to_owned());
 
-        match self.sqir.relations.insert(key, Relation { lhs, rhs }) {
-            None    => Ok(()),
-            Some(_) => unreachable!("Duplicate relation for field '{}'", field_name),
+        if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_none() {
+            Ok(())
+        } else {
+            unreachable!("Duplicate relation for field '{}'", field_name)
         }
     }
 
@@ -1031,11 +1035,28 @@ impl SQIRGen {
     // Function-level SQIR generation
     //
 
-    fn forward_declare_function(&mut self, _func: &Function) -> SemaResult<()> {
+    fn forward_declare_free_function(&mut self, func: &ast::Function) -> SemaResult<()> {
+        let _fns = self.sqir.functions.entry(None).or_insert_with(|| HashMap::new());
         unimplemented!()
     }
 
-    fn generate_function(&mut self, _func: &Function) -> SemaResult<()> {
+    fn generate_free_function(&mut self, _func: &ast::Function) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn forward_declare_impl(&mut self, _impl: &Impl) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn generate_impl(&mut self, _impl: &Impl) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn forward_declare_function(&mut self, _func: &ast::Function) -> SemaResult<Function> {
+        unimplemented!()
+    }
+
+    fn generate_function(&mut self, _func: &Function) -> SemaResult<Function> {
         unimplemented!()
     }
 }

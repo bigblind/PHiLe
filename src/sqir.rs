@@ -12,7 +12,9 @@ use std::cmp::*;
 use util::*;
 
 
+//
 // Types (part of the Schema)
+//
 
 #[derive(Debug)]
 pub enum Type {
@@ -96,7 +98,9 @@ pub struct FunctionType {
     pub ret_type:  WkCell<Type>,
 }
 
+//
 // Relations (also part of the Schema)
+//
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RelationSide {
@@ -119,21 +123,24 @@ pub struct Relation {
     pub rhs: RelationSide,
 }
 
+//
 // Functions (Queries)
+//
 
+// TODO(H2CO3): add body (instructions/basic blocks/etc.)
 #[derive(Debug)]
 pub struct Function {
-    pub name:    String,
+    pub name:    Option<String>,
     pub fn_type: WkCell<Type>, // wraps a FunctionType
     pub args:    Vec<String>,
-    // TODO(H2CO3): add body (instructions/basic blocks/etc.)
 }
 
+//
 // Top-level type for wrapping SQIR for a complete program
+//
 
 #[derive(Debug)]
 pub struct SQIR {
-    // builtins, structs, classes, enums, placeholders
     pub named_types:    HashMap<String, RcCell<Type>>,
     pub decimal_types:  HashMap<(usize, usize), RcCell<Type>>,
     pub optional_types: HashMap<RcCell<Type>, RcCell<Type>>,
@@ -143,7 +150,7 @@ pub struct SQIR {
     pub tuple_types:    HashMap<Vec<RcCell<Type>>, RcCell<Type>>,
     pub function_types: HashMap<(Vec<RcCell<Type>>, RcCell<Type>), RcCell<Type>>,
     pub relations:      HashMap<(RcCell<Type>, String), Relation>,
-    pub functions:      HashMap<String, Function>,
+    pub functions:      HashMap<Option<String>, HashMap<String, Function>>,
 }
 
 
