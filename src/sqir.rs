@@ -132,7 +132,7 @@ pub struct Relation {
 pub struct Function {
     pub name:      Option<String>,
     pub fn_type:   WkCell<Type>, // wraps a FunctionType
-    pub arguments: Vec<String>,
+    pub arg_names: Vec<String>,
 }
 
 //

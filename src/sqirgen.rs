@@ -1063,48 +1063,16 @@ impl SQIRGen {
     //
 
     fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
-        let decl = match node.value {
-            NodeValue::Function(ref f) => f,
-            _ => unreachable!("Non-function function node?!"),
-        };
-
-        let raw_name = match decl.name {
-            Some(s) => s.to_owned(),
-            None => return sema_error("Function has no name".to_owned(), node)
-        };
-        let name = Some(raw_name.clone());
-
-        let arguments = decl.arguments.iter().map(
-            |arg_node| match arg_node.value {
-                NodeValue::FuncArg(ref arg) => arg.name.to_owned(),
-                _ => unreachable!("Non-FuncArg argument?!"),
-            }
-        ).collect();
-
-        let arg_types = decl.arguments.iter().map(
-            |arg_node| match arg_node.value {
-                NodeValue::FuncArg(ref arg) => {
-                    let type_decl = match arg.type_decl {
-                        Some(ref typ) => Ok(typ),
-                        None => sema_error("Type required for argument".to_owned(), arg_node),
-                    };
-                    self.type_from_decl(type_decl?)
-                },
-                _ => unreachable!("Non-FuncArg argument?!"),
-            }
-        ).collect::<SemaResult<_>>()?;
-
-        let ret_type = decl.ret_type.as_ref().map_or(
-            self.get_tuple_type(&[]),
-            |rt| self.type_from_decl(rt),
-        )?;
-
-        let fn_type = self.get_function_type_from_types(arg_types, ret_type)?.as_weak();
-        let func = Function { name, fn_type, arguments };
+        let func = self.forward_declare_function(node)?;
         let entry = self.sqir.functions.entry(None);
-        let fns = entry.or_insert_with(|| HashMap::new());
+        let fns = entry.or_insert_with(HashMap::new);
 
-        if fns.insert(raw_name, func).is_none() {
+        let name = match func.name {
+            Some(ref s) => s.clone(),
+            None => return sema_error("Function has no name".to_owned(), node),
+        };
+
+        if fns.insert(name, func).is_none() {
             Ok(())
         } else {
             sema_error("Redefinition of function".to_owned(), node)
@@ -1123,8 +1091,47 @@ impl SQIRGen {
         unimplemented!()
     }
 
-    fn forward_declare_function(&mut self, _func: &ast::Function) -> SemaResult<Function> {
-        unimplemented!()
+    fn forward_declare_function(&mut self, func: &Node) -> SemaResult<Function> {
+        let decl = match func.value {
+            NodeValue::Function(ref f) => f,
+            _ => unreachable!("Non-function function node?!"),
+        };
+        let raw_name = match decl.name {
+            Some(s) => s.to_owned(),
+            None => return sema_error("Function has no name".to_owned(), func),
+        };
+        let ret_type = decl.ret_type.as_ref().map_or(
+            self.get_tuple_type(&[]),
+            |rt| self.type_from_decl(rt),
+        )?;
+
+        let (arg_names, arg_types) = self.unzip_arg_names_and_types(&decl.arguments)?;
+        let fn_type = self.get_function_type_from_types(arg_types, ret_type)?.as_weak();
+        let name = Some(raw_name);
+
+        Ok(Function { name, fn_type, arg_names })
+    }
+
+    fn unzip_arg_names_and_types(&mut self, args: &[Node])
+        -> SemaResult<(Vec<String>, Vec<RcCell<Type>>)> {
+
+        let names = args.iter().map(|node| match node.value {
+            NodeValue::FuncArg(ref arg) => arg.name.to_owned(),
+            _ => unreachable!("Non-FuncArg argument?!"),
+        }).collect();
+
+        let types = args.iter().map(|node| match node.value {
+            NodeValue::FuncArg(ref arg) => {
+                let type_decl = match arg.type_decl {
+                    Some(ref typ) => Ok(typ),
+                    None => sema_error("Type required for argument".to_owned(), node),
+                };
+                self.type_from_decl(type_decl?)
+            },
+            _ => unreachable!("Non-FuncArg argument?!"),
+        }).collect::<SemaResult<_>>()?;
+
+        Ok((names, types))
     }
 
     fn generate_function(&mut self, _func: &Function) -> SemaResult<Function> {
