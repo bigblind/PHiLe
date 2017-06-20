@@ -19,7 +19,7 @@ impl User {
         Self.find(|u| now - u.birth_date >= 18 * seconds_per_year)
     }
 
-    fn display_name(&self) -> String {
+    fn display_name(self: &Self) -> String {
         self.legal_name + "(" + self.handle + ")"
     }
 }

@@ -130,9 +130,9 @@ pub struct Relation {
 // TODO(H2CO3): add body (instructions/basic blocks/etc.)
 #[derive(Debug)]
 pub struct Function {
-    pub name:    Option<String>,
-    pub fn_type: WkCell<Type>, // wraps a FunctionType
-    pub args:    Vec<String>,
+    pub name:      Option<String>,
+    pub fn_type:   WkCell<Type>, // wraps a FunctionType
+    pub arguments: Vec<String>,
 }
 
 //

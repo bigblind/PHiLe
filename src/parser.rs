@@ -314,14 +314,14 @@ impl<'a> Parser<'a> {
         let (arguments, _) = self.parse_paren_delim(
             "(", Self::parse_decl_arg, ",", ")"
         )?;
-        let return_type = if self.accept("->").is_some() {
+        let ret_type = if self.accept("->").is_some() {
             Some(self.parse_type()?)
         } else {
             None
         };
         let body = self.parse_block()?;
         let range = token_node_range(fn_keyword, &body);
-        let decl = Function { name, arguments, return_type, body };
+        let decl = Function { name, arguments, ret_type, body };
         let value = NodeValue::Function(Box::new(decl));
 
         Ok(Node { range, value })
@@ -649,13 +649,13 @@ impl<'a> Parser<'a> {
         let (arguments, arg_range) = self.parse_paren_delim(
             "|", Self::parse_decl_arg, ",", "|"
         )?;
-        let has_return_type = self.accept("->").is_some();
-        let return_type = if has_return_type {
+        let has_ret_type = self.accept("->").is_some();
+        let ret_type = if has_ret_type {
             Some(self.parse_type()?)
         } else {
             None
         };
-        let body = if has_return_type {
+        let body = if has_ret_type {
             self.parse_block()?
         } else {
             self.parse_expr()?
@@ -664,7 +664,7 @@ impl<'a> Parser<'a> {
         let end = body.range.end;
         let range = Range { begin, end };
         let name = None;
-        let decl = Function { name, arguments, return_type, body };
+        let decl = Function { name, arguments, ret_type, body };
         let value = NodeValue::Function(Box::new(decl));
 
         Ok(Node { range, value })

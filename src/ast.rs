@@ -60,6 +60,7 @@ pub enum NodeValue<'a> {
     UniqueType(Box<Node<'a>>),
     TupleType(Vec<Node<'a>>),
     ArrayType(Box<Node<'a>>),
+    FunctionType(FunctionType<'a>),
     NamedType(&'a str),
 }
 
@@ -108,10 +109,10 @@ pub struct Variant<'a> {
 
 #[derive(Debug)]
 pub struct Function<'a> {
-    pub name:        Option<&'a str>,  // None iff closure
-    pub arguments:   Vec<Node<'a>>,    // FuncArg nodes
-    pub return_type: Option<Node<'a>>, // type node
-    pub body:        Node<'a>,         // expression node
+    pub name:      Option<&'a str>,  // None iff closure
+    pub arguments: Vec<Node<'a>>,    // FuncArg nodes
+    pub ret_type:  Option<Node<'a>>, // type node
+    pub body:      Node<'a>,         // expression node
 }
 
 #[derive(Debug)]
@@ -188,4 +189,10 @@ pub struct If<'a> {
 pub struct Match<'a> {
     pub discriminant: Box<Node<'a>>,
     pub arms:         Vec<Node<'a>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionType<'a> {
+    pub arg_types: Vec<Node<'a>>,
+    pub ret_type:  Box<Node<'a>>,
 }
