@@ -7,6 +7,7 @@
 //
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use util::*;
 use sqir::*;
 use ast::{ self, Node, NodeValue, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
@@ -1059,7 +1060,7 @@ impl SQIRGen {
     }
 
     //
-    // Function-level SQIR generation
+    // Forward declaring functions and impls
     //
 
     fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
@@ -1079,16 +1080,47 @@ impl SQIRGen {
         }
     }
 
-    fn generate_free_function(&mut self, _func: &ast::Function) -> SemaResult<()> {
-        unimplemented!()
-    }
+    // TODO(H2CO3): this is long, refactor
+    fn forward_declare_impl(&mut self, node: &Node) -> SemaResult<()> {
+        let decl = match node.value {
+            NodeValue::Impl(ref i) => i,
+            _ => unreachable!("Non-Impl implementation?!"),
+        };
+        let funcs: Vec<_> = decl.functions.iter().map(
+            |func_node| self.forward_declare_function(func_node)
+        ).collect::<SemaResult<_>>()?;
 
-    fn forward_declare_impl(&mut self, _node: &Node) -> SemaResult<()> {
-        unimplemented!()
-    }
+        let impl_name = Some(decl.name.to_owned());
 
-    fn generate_impl(&mut self, _impl: &Impl) -> SemaResult<()> {
-        unimplemented!()
+        match self.sqir.functions.entry(impl_name) {
+            Entry::Vacant(ve) => {
+                let fns = ve.insert(HashMap::new());
+                let it = funcs.into_iter().zip(decl.functions.iter());
+
+                for (func, func_node) in it {
+                    let func_name = match func.name {
+                        Some(ref s) => s.clone(),
+                        None => return sema_error(
+                            "Function has no name".to_owned(),
+                            func_node
+                        ),
+                    };
+
+                    if fns.insert(func_name, func).is_some() {
+                        return sema_error(
+                            "Redefinition of function".to_owned(),
+                            func_node
+                        )
+                    }
+                }
+            },
+            Entry::Occupied(_) => return sema_error(
+                format!("Redefinition of impl '{}'", decl.name),
+                node
+            ),
+        }
+
+        Ok(())
     }
 
     fn forward_declare_function(&mut self, func: &Node) -> SemaResult<Function> {
@@ -1132,6 +1164,18 @@ impl SQIRGen {
         }).collect::<SemaResult<_>>()?;
 
         Ok((names, types))
+    }
+
+    //
+    // Function-level SQIR generation
+    //
+
+    fn generate_free_function(&mut self, _func: &ast::Function) -> SemaResult<()> {
+        unimplemented!()
+    }
+
+    fn generate_impl(&mut self, _impl: &Impl) -> SemaResult<()> {
+        unimplemented!()
     }
 
     fn generate_function(&mut self, _func: &Function) -> SemaResult<Function> {

@@ -124,7 +124,7 @@ pub struct FuncArg<'a> {
 #[derive(Debug)]
 pub struct Impl<'a> {
     pub name:      &'a str,
-    pub functions: Vec<Node<'a>>, // FunctionDecl nodes
+    pub functions: Vec<Node<'a>>, // Function nodes
 }
 
 #[derive(Debug)]
