@@ -760,7 +760,31 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_type(&mut self) -> ParseResult<'a> {
-        self.parse_postfix_type()
+        self.parse_function_type()
+    }
+
+    // TODO(H2CO3): should this be non-associative instead of right-associative?
+    fn parse_function_type(&mut self) -> ParseResult<'a> {
+        let lhs = self.parse_postfix_type()?;
+
+        if self.accept("->").is_none() {
+            return Ok(lhs)
+        }
+
+        let rhs = self.parse_function_type()?;
+        let range = node_range(&lhs, &rhs);
+
+        // decompose tuple type if it appears in argument position
+        let arg_types = match lhs.value {
+            NodeValue::TupleType(items) => items,
+            _ => vec![lhs],
+        };
+
+        let ret_type = Box::new(rhs);
+        let fn_type = FunctionType { arg_types, ret_type };
+        let value = NodeValue::FunctionType(fn_type);
+
+        Ok(Node { range, value })
     }
 
     fn parse_postfix_type(&mut self) -> ParseResult<'a> {

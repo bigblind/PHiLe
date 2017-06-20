@@ -744,8 +744,8 @@ impl SQIRGen {
         let rc = self.sqir.function_types.entry(key).or_insert_with(|| {
             let arg_types = arg_types_rc.iter().map(RcCell::as_weak).collect();
             let ret_type = ret_type_rc.as_weak();
-            let func_type = FunctionType { arg_types, ret_type };
-            RcCell::new(Type::Function(func_type))
+            let fn_type = FunctionType { arg_types, ret_type };
+            RcCell::new(Type::Function(fn_type))
         });
 
         Ok(rc.clone())
