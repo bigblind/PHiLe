@@ -1080,7 +1080,6 @@ impl SQIRGen {
         }
     }
 
-    // TODO(H2CO3): this is long, refactor
     fn forward_declare_impl(&mut self, node: &Node) -> SemaResult<()> {
         let decl = match node.value {
             NodeValue::Impl(ref i) => i,
@@ -1093,31 +1092,34 @@ impl SQIRGen {
         let impl_name = Some(decl.name.to_owned());
 
         match self.sqir.functions.entry(impl_name) {
-            Entry::Vacant(ve) => {
-                let fns = ve.insert(HashMap::new());
-                let it = funcs.into_iter().zip(decl.functions.iter());
-
-                for (func, func_node) in it {
-                    let func_name = match func.name {
-                        Some(ref s) => s.clone(),
-                        None => return sema_error(
-                            "Function has no name".to_owned(),
-                            func_node
-                        ),
-                    };
-
-                    if fns.insert(func_name, func).is_some() {
-                        return sema_error(
-                            "Redefinition of function".to_owned(),
-                            func_node
-                        )
-                    }
-                }
-            },
-            Entry::Occupied(_) => return sema_error(
+            Entry::Vacant(ve) => Self::insert_functions_in_impl(
+                ve.insert(HashMap::new()),
+                funcs,
+                &decl.functions
+            ),
+            Entry::Occupied(_) => sema_error(
                 format!("Redefinition of impl '{}'", decl.name),
                 node
             ),
+        }
+    }
+
+    fn insert_functions_in_impl(
+        ns:    &mut HashMap<String, Function>,
+        funcs: Vec<Function>,
+        decls: &[Node]
+    ) -> SemaResult<()> {
+        assert!(funcs.len() == decls.len());
+
+        for (func, node) in funcs.into_iter().zip(decls.iter()) {
+            let name = match func.name {
+                Some(ref s) => s.clone(),
+                None => return sema_error("Function has no name".to_owned(), node),
+            };
+
+            if ns.insert(name, func).is_some() {
+                return sema_error("Redefinition of function".to_owned(), node)
+            }
         }
 
         Ok(())
