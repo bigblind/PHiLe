@@ -127,12 +127,125 @@ pub struct Relation {
 // Functions (Queries)
 //
 
-// TODO(H2CO3): add body (instructions/basic blocks/etc.)
+// Lambda calculus node
+#[derive(Debug)]
+pub struct Expr {
+    pub ty:    WkCell<Type>,
+    pub value: ExprValue,
+}
+
+#[derive(Debug)]
+pub enum ExprValue {
+    // Divergent/Uninhabited value
+    Void,
+
+    // Literals
+    NilLiteral,
+    BoolLiteral(bool),
+    IntLiteral(u64),
+    FloatLiteral(f64),
+    StringLiteral(String),
+
+    // Variable definition (binding) + reference (substitution);
+    // Function definition (lambda) + call
+    VarBind(VarBind),
+    VarSubst { name: String },
+    Function(Function),
+    Call(Call),
+
+    // Arithmetic, comparison, logical and set operations
+    Neg(Box<Expr>),
+    Add(Box<(Expr, Expr)>),
+    Sub(Box<(Expr, Expr)>),
+    Mul(Box<(Expr, Expr)>),
+    Div(Box<(Expr, Expr)>),
+    Mod(Box<(Expr, Expr)>),
+
+    Eq(Box<(Expr, Expr)>),
+    Lt(Box<(Expr, Expr)>),
+    LtEq(Box<(Expr, Expr)>), // TODO(H2CO3): need Neq, Gt, GtEq for symmetry?
+
+    And(Box<(Expr, Expr)>),
+    Or(Box<(Expr, Expr)>),
+    Not(Box<Expr>),
+
+    Union(Box<(Expr, Expr)>),
+    Intersect(Box<(Expr, Expr)>),
+    SetDiff(Box<(Expr, Expr)>),
+
+    // Branch
+    // TODO(H2CO3): generalize for arbitrary patterns
+    Branch(Branch),
+
+    // Block
+    Seq(Vec<Expr>),
+
+    // Built-in DB operations
+    Map(Map),       // projections etc.
+    Reduce(Reduce), // aggregations
+    Filter(Filter), // selection
+    Sort(Sort),
+    Group(Group),
+    Join,   // TODO(H2CO3): design + implement
+    Insert, // TODO(H2CO3): design + implement
+    Update, // TODO(H2CO3): design + implement
+}
+
+#[derive(Debug)]
+pub struct VarBind {
+    pub name:  String,
+    pub value: Box<Expr>,
+}
+
 #[derive(Debug)]
 pub struct Function {
     pub name:      Option<String>,
-    pub fn_type:   WkCell<Type>, // wraps a FunctionType
     pub arg_names: Vec<String>,
+    pub body:      Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Call {
+    pub callee: Box<Expr>,
+    pub args:   Vec<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Branch {
+    pub cond:      Box<Expr>,
+    pub true_val:  Box<Expr>,
+    pub false_val: Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Map {
+    pub range: Box<Expr>,
+    pub op:    Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Reduce {
+    pub range: Box<Expr>,
+    pub zero:  Box<Expr>,
+    pub op:    Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Filter {
+    pub range: Box<Expr>,
+    pub pred: Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Sort {
+    pub range: Box<Expr>,
+    pub cmp:   Box<Expr>,
+}
+
+#[derive(Debug)]
+pub struct Group {
+    pub range: Box<Expr>,
+    pub pred:  Box<Expr>,
 }
 
 //
@@ -150,7 +263,7 @@ pub struct SQIR {
     pub tuple_types:    HashMap<Vec<RcCell<Type>>, RcCell<Type>>,
     pub function_types: HashMap<(Vec<RcCell<Type>>, RcCell<Type>), RcCell<Type>>,
     pub relations:      HashMap<(RcCell<Type>, String), Relation>,
-    pub functions:      HashMap<Option<String>, HashMap<String, Function>>,
+    pub globals:        HashMap<Option<String>, HashMap<String, Expr>>,
 }
 
 
@@ -223,7 +336,7 @@ impl SQIR {
             tuple_types:    hash_map![],
             function_types: hash_map![],
             relations:      hash_map![],
-            functions:      hash_map![], // TODO(H2CO3): declare built-in functions
+            globals:        hash_map![], // TODO(H2CO3): declare built-in functions
         }
     }
 

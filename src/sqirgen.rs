@@ -1065,15 +1065,15 @@ impl SQIRGen {
 
     fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
         let func = self.forward_declare_function(node)?;
-        let entry = self.sqir.functions.entry(None);
-        let fns = entry.or_insert_with(HashMap::new);
+        let entry = self.sqir.globals.entry(None); // no namespace
+        let globals = entry.or_insert_with(HashMap::new);
 
-        let name = match func.name {
-            Some(ref s) => s.clone(),
-            None => return sema_error("Function has no name".to_owned(), node),
+        let name = match func.value {
+            ExprValue::Function(Function { name: Some(ref s), .. }) => s.clone(),
+            _ => return sema_error("Function has no name".to_owned(), node),
         };
 
-        if fns.insert(name, func).is_none() {
+        if globals.insert(name, func).is_none() {
             Ok(())
         } else {
             sema_error("Redefinition of function".to_owned(), node)
@@ -1091,12 +1091,12 @@ impl SQIRGen {
 
         let impl_name = Some(decl.name.to_owned());
 
-        match self.sqir.functions.entry(impl_name) {
-            Entry::Vacant(ve) => Self::insert_functions_in_impl(
-                ve.insert(HashMap::new()),
-                funcs,
-                &decl.functions
-            ),
+        match self.sqir.globals.entry(impl_name) {
+            Entry::Vacant(ve) => {
+                let ns = Self::impl_from_functions(funcs, &decl.functions)?;
+                ve.insert(ns);
+                Ok(())
+            },
             Entry::Occupied(_) => sema_error(
                 format!("Redefinition of impl '{}'", decl.name),
                 node
@@ -1104,17 +1104,14 @@ impl SQIRGen {
         }
     }
 
-    fn insert_functions_in_impl(
-        ns:    &mut HashMap<String, Function>,
-        funcs: Vec<Function>,
-        decls: &[Node]
-    ) -> SemaResult<()> {
+    fn impl_from_functions(funcs: Vec<Expr>, decls: &[Node]) -> SemaResult<HashMap<String, Expr>> {
         assert!(funcs.len() == decls.len());
+        let mut ns = HashMap::with_capacity(funcs.len());
 
         for (func, node) in funcs.into_iter().zip(decls.iter()) {
-            let name = match func.name {
-                Some(ref s) => s.clone(),
-                None => return sema_error("Function has no name".to_owned(), node),
+            let name = match func.value {
+                ExprValue::Function(Function { name: Some(ref s), .. }) => s.clone(),
+                _ => return sema_error("Function has no name".to_owned(), node),
             };
 
             if ns.insert(name, func).is_some() {
@@ -1122,10 +1119,10 @@ impl SQIRGen {
             }
         }
 
-        Ok(())
+        Ok(ns)
     }
 
-    fn forward_declare_function(&mut self, func: &Node) -> SemaResult<Function> {
+    fn forward_declare_function(&mut self, func: &Node) -> SemaResult<Expr> {
         let decl = match func.value {
             NodeValue::Function(ref f) => f,
             _ => unreachable!("Non-function function node?!"),
@@ -1139,11 +1136,18 @@ impl SQIRGen {
             |rt| self.type_from_decl(rt),
         )?;
 
+        // placeholder expression in body
+        let body = Box::new(
+            Expr {
+                ty:    ret_type.as_weak(),
+                value: ExprValue::Void,
+            }
+        );
         let (arg_names, arg_types) = self.unzip_arg_names_and_types(&decl.arguments)?;
-        let fn_type = self.get_function_type_from_types(arg_types, ret_type)?.as_weak();
+        let ty = self.get_function_type_from_types(arg_types, ret_type)?.as_weak();
         let name = Some(raw_name);
-
-        Ok(Function { name, fn_type, arg_names })
+        let value = ExprValue::Function(Function { name, arg_names, body });
+        Ok(Expr { ty, value })
     }
 
     fn unzip_arg_names_and_types(&mut self, args: &[Node])
