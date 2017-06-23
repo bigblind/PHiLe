@@ -174,11 +174,14 @@ pub enum ExprValue {
     SetDiff(Box<(Expr, Expr)>),
 
     // Branch
-    // TODO(H2CO3): generalize for arbitrary patterns
+    // TODO(H2CO3): generalize for match & arbitrary patterns
     Branch(Box<Branch>),
 
-    // Block
+    // Blocks and aggreate literals
     Seq(Vec<Expr>),
+    ArrayLiteral(Vec<Expr>),
+    TupleLiteral(Vec<Expr>),
+    StructLiteral(HashMap<String, Expr>),
 
     // Built-in DB operations
     Map(Box<Map>),       // projections etc.
@@ -189,6 +192,9 @@ pub enum ExprValue {
     Join,   // TODO(H2CO3): design + implement
     Insert, // TODO(H2CO3): design + implement
     Update, // TODO(H2CO3): design + implement
+
+    // TODO(H2CO3): add common aggregations for optimization?
+    // e.g. Sum, Avg, Min, Max?
 }
 
 #[derive(Debug)]

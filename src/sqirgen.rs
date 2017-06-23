@@ -1177,15 +1177,23 @@ impl SQIRGen {
     // Function-level SQIR generation
     //
 
-    fn generate_free_function(&mut self, _func: &ast::Function) -> SemaResult<()> {
-        unimplemented!()
+    fn generate_free_function(&mut self, func: &ast::Function) -> SemaResult<()> {
+        self.generate_function(func, None)
     }
 
-    fn generate_impl(&mut self, _impl: &Impl) -> SemaResult<()> {
-        unimplemented!()
+    fn generate_impl(&mut self, ns: &Impl) -> SemaResult<()> {
+        for node in &ns.functions {
+            let func = match node.value {
+                NodeValue::Function(ref f) => f,
+                _ => unreachable!("Non-function function node?!"),
+            };
+            self.generate_function(func, Some(ns.name))?
+        }
+
+        Ok(())
     }
 
-    fn generate_function(&mut self, _func: &Function) -> SemaResult<Function> {
+    fn generate_function(&mut self, func: &ast::Function, ns: Option<&str>) -> SemaResult<()> {
         unimplemented!()
     }
 }
