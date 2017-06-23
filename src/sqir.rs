@@ -175,17 +175,17 @@ pub enum ExprValue {
 
     // Branch
     // TODO(H2CO3): generalize for arbitrary patterns
-    Branch(Branch),
+    Branch(Box<Branch>),
 
     // Block
     Seq(Vec<Expr>),
 
     // Built-in DB operations
-    Map(Map),       // projections etc.
-    Reduce(Reduce), // aggregations
-    Filter(Filter), // selection
-    Sort(Sort),
-    Group(Group),
+    Map(Box<Map>),       // projections etc.
+    Reduce(Box<Reduce>), // aggregations
+    Filter(Box<Filter>), // selection
+    Sort(Box<Sort>),
+    Group(Box<Group>),
     Join,   // TODO(H2CO3): design + implement
     Insert, // TODO(H2CO3): design + implement
     Update, // TODO(H2CO3): design + implement
@@ -212,40 +212,40 @@ pub struct Call {
 
 #[derive(Debug)]
 pub struct Branch {
-    pub cond:      Box<Expr>,
-    pub true_val:  Box<Expr>,
-    pub false_val: Box<Expr>,
+    pub cond:      Expr,
+    pub true_val:  Expr,
+    pub false_val: Expr,
 }
 
 #[derive(Debug)]
 pub struct Map {
-    pub range: Box<Expr>,
-    pub op:    Box<Expr>,
+    pub range: Expr,
+    pub op:    Expr,
 }
 
 #[derive(Debug)]
 pub struct Reduce {
-    pub range: Box<Expr>,
-    pub zero:  Box<Expr>,
-    pub op:    Box<Expr>,
+    pub range: Expr,
+    pub zero:  Expr,
+    pub op:    Expr,
 }
 
 #[derive(Debug)]
 pub struct Filter {
-    pub range: Box<Expr>,
-    pub pred: Box<Expr>,
+    pub range: Expr,
+    pub pred:  Expr,
 }
 
 #[derive(Debug)]
 pub struct Sort {
-    pub range: Box<Expr>,
-    pub cmp:   Box<Expr>,
+    pub range: Expr,
+    pub cmp:   Expr,
 }
 
 #[derive(Debug)]
 pub struct Group {
-    pub range: Box<Expr>,
-    pub pred:  Box<Expr>,
+    pub range: Expr,
+    pub pred:  Expr,
 }
 
 //
