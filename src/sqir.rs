@@ -169,8 +169,8 @@ pub enum ExprValue {
     Or(Box<(Expr, Expr)>),
     Not(Box<Expr>),
 
-    Union(Box<(Expr, Expr)>),
     Intersect(Box<(Expr, Expr)>),
+    Union(Box<(Expr, Expr)>),
     SetDiff(Box<(Expr, Expr)>),
 
     // Branch

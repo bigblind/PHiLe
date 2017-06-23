@@ -1187,13 +1187,32 @@ impl SQIRGen {
                 NodeValue::Function(ref f) => f,
                 _ => unreachable!("Non-function function node?!"),
             };
-            self.generate_function(func, Some(ns.name))?
+
+            self.generate_function(func, Some(ns.name))?;
         }
 
         Ok(())
     }
 
     fn generate_function(&mut self, func: &ast::Function, ns: Option<&str>) -> SemaResult<()> {
+        // TODO(H2CO3): declare function arguments
+        let body = self.generate_expr(&func.body)?;
+        let name = func.name.expect("Forward-decl should've caught this");
+
+        let ns = self.sqir.globals.get_mut(&ns.map(str::to_owned)).expect("namespace");
+        let expr = ns.get_mut(name).expect("forward-declared function");
+
+        match expr.value {
+            ExprValue::Function(ref mut f) => {
+                f.body = Box::new(body);
+            },
+            _ => unreachable!("Non-function global?!"),
+        }
+
+        Ok(())
+    }
+
+    fn generate_expr(&mut self, node: &Node) -> SemaResult<Expr> {
         unimplemented!()
     }
 }
