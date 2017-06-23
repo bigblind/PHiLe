@@ -1127,8 +1127,8 @@ impl SQIRGen {
             NodeValue::Function(ref f) => f,
             _ => unreachable!("Non-function function node?!"),
         };
-        let raw_name = match decl.name {
-            Some(s) => s.to_owned(),
+        let name = match decl.name {
+            Some(s) => Some(s.to_owned()),
             None => return sema_error("Function has no name".to_owned(), func),
         };
         let ret_type = decl.ret_type.as_ref().map_or(
@@ -1143,10 +1143,11 @@ impl SQIRGen {
                 value: ExprValue::Void,
             }
         );
+
         let (arg_names, arg_types) = self.unzip_arg_names_and_types(&decl.arguments)?;
         let ty = self.get_function_type_from_types(arg_types, ret_type)?.as_weak();
-        let name = Some(raw_name);
         let value = ExprValue::Function(Function { name, arg_names, body });
+
         Ok(Expr { ty, value })
     }
 
