@@ -130,7 +130,7 @@ pub struct Relation {
 // Lambda calculus node
 #[derive(Debug)]
 pub struct Expr {
-    pub ty:    WkCell<Type>,
+    pub ty:    RcCell<Type>, // can be Rc: no cycles are possible
     pub value: ExprValue,
 }
 

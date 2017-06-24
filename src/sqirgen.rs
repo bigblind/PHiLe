@@ -1139,13 +1139,13 @@ impl SQIRGen {
         // placeholder expression in body
         let body = Box::new(
             Expr {
-                ty:    ret_type.as_weak(),
+                ty:    ret_type.clone(),
                 value: ExprValue::Void,
             }
         );
 
         let (arg_names, arg_types) = self.unzip_arg_names_and_types(&decl.arguments)?;
-        let ty = self.get_function_type_from_types(arg_types, ret_type)?.as_weak();
+        let ty = self.get_function_type_from_types(arg_types, ret_type)?;
         let value = ExprValue::Function(Function { name, arg_names, body });
 
         Ok(Expr { ty, value })
@@ -1194,22 +1194,41 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn generate_function(&mut self, func: &ast::Function, ns: Option<&str>) -> SemaResult<()> {
+    fn generate_function(&mut self, decl: &ast::Function, ns: Option<&str>) -> SemaResult<()> {
         // TODO(H2CO3): declare function arguments
-        let body = self.generate_expr(&func.body)?;
-        let name = func.name.expect("Forward-decl should've caught this");
+        let body = self.generate_expr(&decl.body)?;
+        let name = decl.name.expect("Forward-decl should've caught this");
 
         let ns = self.sqir.globals.get_mut(&ns.map(str::to_owned)).expect("namespace");
-        let expr = ns.get_mut(name).expect("forward-declared function");
+        let func = ns.get_mut(name).expect("forward-declared function");
 
-        match expr.value {
+        match func.value {
             ExprValue::Function(ref mut f) => {
+                Self::check_return_type(&func.ty, &body, &decl.body)?;
                 f.body = Box::new(body);
             },
             _ => unreachable!("Non-function global?!"),
         }
 
         Ok(())
+    }
+
+    fn check_return_type(ty: &RcCell<Type>, body: &Expr, node: &Node) -> SemaResult<()> {
+        match *ty.borrow()? {
+            Type::Function(FunctionType { ref ret_type, .. }) => {
+                if ret_type.as_rc()? != body.ty {
+                    let err_msg = format!(
+                        "Return type mismatch: declared {} but body has type {}",
+                        format_type(&ret_type),
+                        format_type(&body.ty.as_weak())
+                    );
+                    sema_error(err_msg, node)
+                } else {
+                    Ok(())
+                }
+            },
+            _ => unreachable!("Non-function type for function?!"),
+        }
     }
 
     fn generate_expr(&mut self, node: &Node) -> SemaResult<Expr> {
