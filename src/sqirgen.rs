@@ -1285,9 +1285,22 @@ impl SQIRGen {
     }
 
     fn generate_function(&mut self, func: &ast::Function) -> SemaResult<Expr> {
-        // TODO(H2CO3): implement
-        // TODO(H2CO3): declare function arguments
-        unimplemented!()
+        // TODO(H2CO3): declare function arguments before generating body
+        let name = func.name.map(str::to_owned);
+        let (arg_names, arg_types) = self.unzip_arg_names_and_types(&func.arguments)?;
+        let ret_type = func.ret_type.as_ref().map_or(
+            Ok(self.get_unit_type()),
+            |rt| self.type_from_decl(rt),
+        )?;
+
+        let ty = self.get_function_type_from_types(arg_types, ret_type)?;
+        let body = Box::new(self.generate_expr(&func.body)?);
+
+        Self::check_return_type(&ty, &body, &func.body)?;
+
+        let value = ExprValue::Function(Function { name, arg_names, body });
+
+        Ok(Expr { ty, value })
     }
 
     // helper for generate_function()
