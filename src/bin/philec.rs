@@ -24,6 +24,7 @@ use std::io::prelude::*;
 use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
+use phile::sqiropt::*;
 use phile::codegen::*;
 use phile::error::*;
 
@@ -246,11 +247,13 @@ fn main() {
         )
     });
 
-    let sqir = stopwatch!("Typechecking and generating SQIR", {
+    let mut sqir = stopwatch!("Typechecking and generating SQIR", {
         generate_sqir(&program).unwrap_or_else(
             |error| panic!(format_sema_error(&error, &args.sources))
         )
     });
+
+    stopwatch!("Optimizing SQIR", optimize_sqir(&mut sqir));
 
     let mut wp = writer_provider_with_args(&args);
 

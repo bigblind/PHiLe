@@ -136,8 +136,8 @@ pub struct Expr {
 
 #[derive(Debug)]
 pub enum ExprValue {
-    // Divergent/Uninhabited value
-    Void,
+    // Value of forward declared function
+    Placeholder,
 
     // Literals
     NilLiteral,
@@ -323,6 +323,7 @@ impl Hash for Relation {
 
 impl SQIR {
     pub fn new() -> SQIR {
+        // TODO(H2CO3): match these with get_bool_type(), etc. in sqirgen.rs
         let named_types = hash_map![
             "bool"   => RcCell::new(Type::Bool),
             "int"    => RcCell::new(Type::Int),
