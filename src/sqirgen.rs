@@ -1230,46 +1230,54 @@ impl SQIRGen {
     }
 
     fn generate_expr(&mut self, node: &Node) -> SemaResult<Expr> {
-        let expr = match node.value {
+        match node.value {
             NodeValue::NilLiteral           => self.generate_nil_literal(),
             NodeValue::BoolLiteral(b)       => self.generate_bool_literal(b),
             NodeValue::IntLiteral(n)        => self.generate_int_literal(n),
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
-            NodeValue::Block(ref items)     => self.generate_block(items)?,
-            NodeValue::Function(ref func)   => self.generate_function(func)?,
+            NodeValue::Identifier(name)     => self.generate_ident_ref(name),
+            NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(binop),
+            NodeValue::Block(ref items)     => self.generate_block(items),
+            NodeValue::Function(ref func)   => self.generate_function(func),
             _ => unimplemented!(),
-        };
-
-        Ok(expr)
+        }
     }
 
-    fn generate_nil_literal(&self) -> Expr {
+    fn generate_nil_literal(&self) -> SemaResult<Expr> {
         unimplemented!()
     }
 
-    fn generate_bool_literal(&self, b: bool) -> Expr {
+    fn generate_bool_literal(&self, b: bool) -> SemaResult<Expr> {
         let ty = self.get_bool_type();
         let value = ExprValue::BoolLiteral(b);
-        Expr { ty, value }
+        Ok(Expr { ty, value })
     }
 
-    fn generate_int_literal(&self, n: u64) -> Expr {
+    fn generate_int_literal(&self, n: u64) -> SemaResult<Expr> {
         let ty = self.get_int_type();
         let value = ExprValue::IntLiteral(n);
-        Expr { ty, value }
+        Ok(Expr { ty, value })
     }
 
-    fn generate_float_literal(&self, x: f64) -> Expr {
+    fn generate_float_literal(&self, x: f64) -> SemaResult<Expr> {
         let ty = self.get_float_type();
         let value = ExprValue::FloatLiteral(x);
-        Expr { ty, value }
+        Ok(Expr { ty, value })
     }
 
-    fn generate_string_literal(&self, s: &str) -> Expr {
+    fn generate_string_literal(&self, s: &str) -> SemaResult<Expr> {
         let ty = self.get_string_type();
         let value = ExprValue::StringLiteral(s.to_owned());
-        Expr { ty, value }
+        Ok(Expr { ty, value })
+    }
+
+    fn generate_ident_ref(&self, name: &str) -> SemaResult<Expr> {
+        unimplemented!()
+    }
+
+    fn generate_binary_op(&mut self, op: &ast::BinaryOp) -> SemaResult<Expr> {
+        unimplemented!()
     }
 
     fn generate_block(&mut self, nodes: &[Node]) -> SemaResult<Expr> {
