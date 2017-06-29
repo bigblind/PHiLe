@@ -57,7 +57,6 @@ pub enum NodeValue<'a> {
     // Types
     PointerType(Box<Node<'a>>),
     OptionalType(Box<Node<'a>>),
-    UniqueType(Box<Node<'a>>),
     TupleType(Vec<Node<'a>>),
     ArrayType(Box<Node<'a>>),
     FunctionType(FunctionType<'a>),

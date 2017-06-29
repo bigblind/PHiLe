@@ -31,7 +31,6 @@ pub enum Type {
     Date,
 
     Optional(WkCell<Type>),
-    Unique(WkCell<Type>),
     Pointer(WkCell<Type>),
     Array(WkCell<Type>),
     Tuple(Vec<WkCell<Type>>),
@@ -58,7 +57,7 @@ pub enum PlaceholderKind {
 // A bit of terminology:
 // * Complex types include enum, struct, class and tuple types.
 // * Recursive but not complex types are pointers, optionals,
-//   uniques and arrays.
+//   and arrays.
 // * Placeholders are temporaries that stand in for named types.
 // * The rest of the types are called atomic or simple.
 //   They include numeric types (bool, integral, floating-point),
@@ -263,7 +262,6 @@ pub struct SQIR {
     pub named_types:    HashMap<String, RcCell<Type>>,
     pub decimal_types:  HashMap<(usize, usize), RcCell<Type>>,
     pub optional_types: HashMap<RcCell<Type>, RcCell<Type>>,
-    pub unique_types:   HashMap<RcCell<Type>, RcCell<Type>>,
     pub pointer_types:  HashMap<RcCell<Type>, RcCell<Type>>,
     pub array_types:    HashMap<RcCell<Type>, RcCell<Type>>,
     pub tuple_types:    HashMap<Vec<RcCell<Type>>, RcCell<Type>>,
@@ -337,7 +335,6 @@ impl SQIR {
             named_types:    named_types,
             decimal_types:  hash_map![],
             optional_types: hash_map![],
-            unique_types:   hash_map![],
             pointer_types:  hash_map![],
             array_types:    hash_map![],
             tuple_types:    hash_map![],

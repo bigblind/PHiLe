@@ -790,20 +790,11 @@ impl<'a> Parser<'a> {
     fn parse_postfix_type(&mut self) -> ParseResult<'a> {
         let mut node = self.parse_prefix_type()?;
 
-        loop {
-            match self.accept_one_of(&["?", "!"]) {
-                Some(token) => {
-                    let range = node_token_range(&node, token);
-                    let value = match token.value {
-                        "?" => NodeValue::OptionalType(Box::new(node)),
-                        "!" => NodeValue::UniqueType(Box::new(node)),
-                        op  => unreachable!("forgot to handle '{}'", op),
-                    };
-
-                    node = Node { range, value };
-                },
-                None => break,
-            }
+        // currently, optional is the only postfix type
+        while let Some(token) = self.accept("?") {
+            let range = node_token_range(&node, token);
+            let value = NodeValue::OptionalType(Box::new(node));
+            node = Node { range, value };
         }
 
         Ok(node)

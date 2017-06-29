@@ -204,7 +204,6 @@ impl<'a> Generator<'a> {
             Type::Date   => write!(wr, "time.Time"),
 
             Type::Optional(ref wrapped) => self.write_optional_type(wr, wrapped),
-            Type::Unique(ref wrapped)   => self.write_type(wr, wrapped), // don't care
             Type::Pointer(ref pointed)  => self.write_pointer_type(wr, pointed),
             Type::Array(ref element)    => self.write_array_type(wr, element),
             Type::Tuple(ref types)      => self.write_tuple_type(wr, types),

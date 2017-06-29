@@ -456,13 +456,12 @@ impl SQIRGen {
             // Function types are not allowed within user-defined types.
             Type::Function(_) => sema_error("Function type not allowed in user-defined type".to_owned(), node),
 
-            // Optionals, uniques, and arrays are checked for
+            // Optionals and arrays are checked for
             // explicitly and recursively, because they are
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
             Type::Optional(ref t) => self.validate_optional(t, node, parent_kind),
-            Type::Unique(ref t)   => self.validate_unique(t, node, parent_kind),
             Type::Array(ref t)    => self.validate_array(t, node, parent_kind),
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
@@ -483,22 +482,6 @@ impl SQIRGen {
                 node,
                 "optional"
             ),
-        }
-    }
-
-    fn validate_unique(&self, wrapped_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
-        match parent_kind {
-            ComplexTypeKind::Value => sema_error("Unique not allowed in value type".to_owned(), node),
-            ComplexTypeKind::Entity => {
-                let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
-
-                self.validate_wrapper_in_entity(
-                    wrapped_type,
-                    res,
-                    node,
-                    "unique"
-                )
-            },
         }
     }
 
@@ -529,7 +512,7 @@ impl SQIRGen {
 
             // As an immediate member of a class type, in addition
             // to everything that is permitted in value types,
-            // an optional/unique/array of pointers is also allowed.
+            // an optional or array of pointers is also allowed.
             match *ptr {
                 Type::Pointer(_) => Ok(()),
                 _ => sema_error(
@@ -571,7 +554,6 @@ impl SQIRGen {
 
             // Non-indirect, potentially recursive types
             Type::Optional(ref t) => self.ensure_transitive_noncontainment(root, t),
-            Type::Unique(ref t)   => self.ensure_transitive_noncontainment(root, t),
             Type::Tuple(ref ts)   => self.ensure_transitive_noncontainment_multi(root, ts),
             Type::Enum(ref et)    => self.ensure_transitive_noncontainment_multi(root, et.variants.values()),
             Type::Struct(ref st)  => self.ensure_transitive_noncontainment_multi(root, st.fields.values()),
@@ -616,7 +598,6 @@ impl SQIRGen {
         match decl.value {
             NodeValue::PointerType(ref pointed)  => self.get_pointer_type(pointed),
             NodeValue::OptionalType(ref wrapped) => self.get_optional_type(wrapped),
-            NodeValue::UniqueType(ref wrapped)   => self.get_unique_type(wrapped),
             NodeValue::ArrayType(ref element)    => self.get_array_type(element),
             NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
             NodeValue::FunctionType(ref func)    => self.get_function_type(func),
@@ -654,26 +635,6 @@ impl SQIRGen {
         self.get_optional_type_raw(decl)
     }
 
-    fn get_unique_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
-        let unique_type = self.get_unique_type_raw(decl)?;
-
-        match *unique_type.borrow()? {
-            Type::Unique(ref wrapped_type) => {
-                let rc = wrapped_type.as_rc()?;
-                let ptr = rc.borrow()?;
-
-                // Unique-of-unique does not make sense
-                match *ptr {
-                    Type::Unique(_) => return sema_error("Unique of unique type disallowed".to_owned(), decl),
-                    _ => (),
-                }
-            },
-            _ => unreachable!("Non-unique unique type?!"),
-        }
-
-        Ok(unique_type)
-    }
-
     fn get_array_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
         self.get_array_type_raw(decl)
     }
@@ -688,12 +649,6 @@ impl SQIRGen {
         get_optional_type_raw,
         Optional,
         optional_types
-    }
-
-    implement_wrapping_type_getter! {
-        get_unique_type_raw,
-        Unique,
-        unique_types
     }
 
     implement_wrapping_type_getter! {
@@ -991,9 +946,6 @@ impl SQIRGen {
         }
 
         match *t {
-            Type::Unique(ref wrapped) => validate_and_unwrap_pointer_type!(
-                wrapped, "Unique pointer",   One
-            ),
             Type::Optional(ref wrapped) => validate_and_unwrap_pointer_type!(
                 wrapped, "Optional pointer", ZeroOrOne
             ),
@@ -1061,7 +1013,6 @@ impl SQIRGen {
         }
 
         let type_and_cardinality = match *t {
-            Type::Unique(ref wrapped)   => try_unwrap_pointer_type!(wrapped, One),
             Type::Optional(ref wrapped) => try_unwrap_pointer_type!(wrapped, ZeroOrOne),
             Type::Array(ref element)    => try_unwrap_pointer_type!(element, ZeroOrMore),
             Type::Pointer(ref pointed)  => (pointed.as_rc()?, Cardinality::One),
@@ -1229,6 +1180,7 @@ impl SQIRGen {
         Ok(())
     }
 
+    // Main, centralized expression emitter
     fn generate_expr(&mut self, node: &Node) -> SemaResult<Expr> {
         match node.value {
             NodeValue::NilLiteral           => self.generate_nil_literal(),
