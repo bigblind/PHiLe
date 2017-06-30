@@ -39,17 +39,21 @@ macro_rules! implement_wrapping_type_getter {
     }
 }
 
-pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
-    SQIRGen::new().generate_sqir(program)
+macro_rules! sema_error {
+    ($cause: expr, $msg: expr) => ({
+        let message = $msg.to_owned();
+        let range = Some($cause.range);
+        Err(SemaError { message, range })
+    });
+    ($cause: expr, $fmt: expr, $($arg: tt)+) => ({
+        let message = format!($fmt, $($arg)+);
+        let range = Some($cause.range);
+        Err(SemaError { message, range })
+    });
 }
 
-fn sema_error<T>(message: String, node: &Node) -> SemaResult<T> {
-    Err(
-        SemaError {
-            message: message,
-            range:   Some(node.range),
-        }
-    )
+pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
+    SQIRGen::new().generate_sqir(program)
 }
 
 // TODO(H2CO3): make occurs check know about Nodes and Ranges
@@ -126,7 +130,7 @@ impl SQIRGen {
             };
 
             if self.sqir.named_types.contains_key(name) {
-                return sema_error(format!("Redefinition of '{}'", name), child);
+                return sema_error!(child, "Redefinition of '{}'", name);
             }
 
             self.sqir.named_types.insert(
@@ -335,7 +339,7 @@ impl SQIRGen {
 
             // No relations are allowed in a struct.
             if field.relation.is_some() {
-                return sema_error(format!("Field '{}' must not be part of a relation", field.name), node);
+                return sema_error!(node, "Field '{}' must not be part of a relation", field.name);
             }
 
             let field_type_rc = self.type_from_decl(&field.type_decl)?;
@@ -344,7 +348,7 @@ impl SQIRGen {
             self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Value)?;
 
             if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
-                return sema_error(format!("Duplicate field '{}'", field.name), node);
+                return sema_error!(node, "Duplicate field '{}'", field.name);
             }
         }
 
@@ -370,7 +374,7 @@ impl SQIRGen {
             self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Entity)?;
 
             if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
-                return sema_error(format!("Duplicate field '{}'", field.name), node);
+                return sema_error!(node, "Duplicate field '{}'", field.name);
             }
         }
 
@@ -400,7 +404,7 @@ impl SQIRGen {
             self.validate_complex_type_item(&type_wk, node, ComplexTypeKind::Value)?;
 
             if variants.insert(variant.name.to_owned(), type_wk).is_some() {
-                return sema_error(format!("Duplicate variant '{}'", variant.name), node);
+                return sema_error!(node, "Duplicate variant '{}'", variant.name);
             }
         }
 
@@ -425,17 +429,19 @@ impl SQIRGen {
             // pointed type will be caught later in the worst case.
             Type::Pointer(_) => match parent_kind {
                 ComplexTypeKind::Entity => Ok(()),
-                ComplexTypeKind::Value  => sema_error("Pointer not allowed in value type".to_owned(), node),
+                ComplexTypeKind::Value  => sema_error!(node, "Pointer not allowed in value type"),
             },
 
             // Class types without indirection are never allowed.
-            Type::Class(ref t) => sema_error(
-                format!("Class type '{}' not allowed without indirection", t.name),
-                node
+            Type::Class(ref t) => sema_error!(
+                node,
+                "Class type '{}' not allowed without indirection",
+                t.name,
             ),
-            Type::Placeholder { ref name, kind: PlaceholderKind::Class } => sema_error(
-                format!("Class type '{}' not allowed without indirection", name),
-                node
+            Type::Placeholder { ref name, kind: PlaceholderKind::Class } => sema_error!(
+                node,
+                "Class type '{}' not allowed without indirection",
+                name,
             ),
 
             // Every type of a contained tuple, every member of
@@ -454,7 +460,7 @@ impl SQIRGen {
             Type::Placeholder { kind: PlaceholderKind::Enum, .. }   => Ok(()),
 
             // Function types are not allowed within user-defined types.
-            Type::Function(_) => sema_error("Function type not allowed in user-defined type".to_owned(), node),
+            Type::Function(_) => sema_error!(node, "Function type not allowed in user-defined type"),
 
             // Optionals and arrays are checked for
             // explicitly and recursively, because they are
@@ -515,13 +521,11 @@ impl SQIRGen {
             // an optional or array of pointers is also allowed.
             match *ptr {
                 Type::Pointer(_) => Ok(()),
-                _ => sema_error(
-                    format!(
-                        "Expected {} of pointer/value type ({})",
-                        wrapper_type_name,
-                        err.message
-                    ),
-                    node
+                _ => sema_error!(
+                    node,
+                    "Expected {} of pointer/value type ({})",
+                    wrapper_type_name,
+                    err.message,
                 ),
             }
         })
@@ -619,9 +623,10 @@ impl SQIRGen {
                 match *ptr {
                     Type::Class(_) => (),
                     Type::Placeholder { kind: PlaceholderKind::Class, .. } => (),
-                    _ => return sema_error(
-                        format!("Pointer to non-class type '{}'", format_type(pointed_type)),
-                        decl
+                    _ => return sema_error!(
+                        decl,
+                        "Pointer to non-class type '{}'",
+                        format_type(pointed_type),
                     ),
                 }
             },
@@ -709,7 +714,7 @@ impl SQIRGen {
     fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<RcCell<Type>> {
         match self.sqir.named_types.get(name) {
             Some(rc) => Ok(rc.clone()),
-            None => sema_error(format!("Unknown type: '{}'", name), node),
+            None => sema_error!(node, "Unknown type: '{}'", name),
         }
     }
 
@@ -836,18 +841,17 @@ impl SQIRGen {
 
         // Check that the referring field doesn't refer back to itself
         if *lhs_class_type == rhs_class_type && lhs_field_name == rhs_field_name {
-            return sema_error(
-                format!("Field '{}' refers to itself", lhs_field_name),
-                node
-            )
+            return sema_error!(node, "Field '{}' refers to itself", lhs_field_name)
         }
 
         // Check that the RHS type contains a field with the specified name
         match *rhs_class_type.borrow()? {
             Type::Class(ref rhs_class) => if !rhs_class.fields.contains_key(rhs_field_name) {
-                return sema_error(
-                    format!("Class '{}' doesn't contain field '{}'", rhs_class.name, rhs_field_name),
-                    node
+                return sema_error!(
+                    node,
+                    "Class '{}' doesn't contain field '{}'",
+                    rhs_class.name,
+                    rhs_field_name,
                 )
             },
             _ => unreachable!("Non-class class type?!"),
@@ -921,13 +925,16 @@ impl SQIRGen {
     // or it doesn't correspond to the specified cardinality,
     // then return an error.
     fn validate_type_cardinality(&self, t: &Type, cardinality: Cardinality, node: &Node) -> SemaResult<RcCell<Type>> {
-        let not_relational_error = || sema_error(
-            format!("Field type is not relational: '{:#?}'", t),
-            node
+        let not_relational_error = || sema_error!(
+            node,
+            "Field type is not relational: '{:#?}'",
+            t,
         );
-        let cardinality_mismatch_error = |name| sema_error(
-            format!("{} type can't have a cardinality of {:#?}", name, cardinality),
-            node
+        let cardinality_mismatch_error = |name| sema_error!(
+            node,
+            "{} type can't have a cardinality of {:#?}",
+            name,
+            cardinality,
         );
 
         macro_rules! validate_and_unwrap_pointer_type {
@@ -1056,7 +1063,7 @@ impl SQIRGen {
         if globals.insert(name, expr).is_none() {
             Ok(())
         } else {
-            sema_error("Redefinition of function".to_owned(), node)
+            sema_error!(node, "Redefinition of function")
         }
     }
 
@@ -1077,10 +1084,7 @@ impl SQIRGen {
                 ve.insert(ns);
                 Ok(())
             },
-            Entry::Occupied(_) => sema_error(
-                format!("Redefinition of impl '{}'", decl.name),
-                node
-            ),
+            Entry::Occupied(_) => sema_error!(node, "Redefinition of impl '{}'", decl.name),
         }
     }
 
@@ -1096,7 +1100,7 @@ impl SQIRGen {
             let expr = Expr { ty, value };
 
             if ns.insert(name, expr).is_some() {
-                return sema_error("Redefinition of function".to_owned(), node)
+                return sema_error!(node, "Redefinition of function")
             }
         }
 
@@ -1110,7 +1114,7 @@ impl SQIRGen {
         };
         let name = match decl.name {
             Some(s) => s.to_owned(),
-            None => return sema_error("Function has no name".to_owned(), func),
+            None => return sema_error!(func, "Function has no name"),
         };
         let ret_type = decl.ret_type.as_ref().map_or(
             Ok(self.get_unit_type()),
@@ -1135,7 +1139,7 @@ impl SQIRGen {
             NodeValue::FuncArg(ref arg) => {
                 let type_decl = match arg.type_decl {
                     Some(ref typ) => Ok(typ),
-                    None => sema_error("Type required for argument".to_owned(), node),
+                    None => sema_error!(node, "Type required for argument"),
                 };
                 self.type_from_decl(type_decl?)
             },
@@ -1163,16 +1167,14 @@ impl SQIRGen {
             Some(rc) => {
                 match *rc.borrow()? {
                     Type::Enum(_) | Type::Struct(_) | Type::Class(_) => (),
-                    _ => return sema_error(
-                        format!("Cannot impl built-in type '{}'", ns.name),
-                        node
+                    _ => return sema_error!(
+                        node,
+                        "Cannot impl built-in type '{}'",
+                        ns.name,
                     ),
                 }
             },
-            None => return sema_error(
-                format!("Unknown type: '{}'", ns.name),
-                node
-            ),
+            None => return sema_error!(node, "Unknown type: '{}'", ns.name),
         }
 
         let namespace = Some(ns.name.to_owned());
@@ -1289,12 +1291,12 @@ impl SQIRGen {
         match *ty.borrow()? {
             Type::Function(FunctionType { ref ret_type, .. }) => {
                 if ret_type.as_rc()? != body.ty {
-                    let err_msg = format!(
+                    sema_error!(
+                        node,
                         "Return type mismatch: declared {} but body has type {}",
                         format_type(&ret_type),
-                        format_type(&body.ty.as_weak())
-                    );
-                    sema_error(err_msg, node)
+                        format_type(&body.ty.as_weak()),
+                    )
                 } else {
                     Ok(())
                 }
