@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use util::*;
 use sqir::*;
-use ast::{ self, Node, NodeValue, EnumDecl, StructDecl, ClassDecl, RelDecl };
+use ast::{ self, Ranged, Node, NodeValue };
+use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
@@ -244,9 +245,15 @@ impl SQIRGen {
     // no instructions/basic blocks, only a type and argument names
     fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
+            let range = child.range;
+
             match child.value {
-                NodeValue::Function(_) => self.forward_declare_free_function(child)?,
-                NodeValue::Impl(_)     => self.forward_declare_impl(child)?,
+                NodeValue::Function(_) => {
+                    self.forward_declare_free_function(child)?
+                },
+                NodeValue::Impl(ref value) => {
+                    self.forward_declare_impl(Ranged { range, value })?
+                },
                 _ => continue,
             }
         }
@@ -257,9 +264,15 @@ impl SQIRGen {
     // Generate SQIR for each function
     fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
+            let range = child.range;
+
             match child.value {
-                NodeValue::Function(_) => self.generate_free_function(child)?,
-                NodeValue::Impl(_)     => self.generate_impl(child)?,
+                NodeValue::Function(_) => {
+                    self.generate_free_function(child)?
+                },
+                NodeValue::Impl(ref value) => {
+                    self.generate_impl(Ranged { range, value })?
+                },
                 _ => continue,
             }
         }
@@ -1072,11 +1085,8 @@ impl SQIRGen {
         }
     }
 
-    fn forward_declare_impl(&mut self, node: &Node) -> SemaResult<()> {
-        let decl = match node.value {
-            NodeValue::Impl(ref i) => i,
-            _ => unreachable!("Non-Impl implementation?!"),
-        };
+    fn forward_declare_impl(&mut self, node: Ranged<&Impl>) -> SemaResult<()> {
+        let decl = node.value;
         let names_types: Vec<_> = decl.functions.iter().map(
             |func_node| self.forward_declare_function(func_node)
         ).collect::<SemaResult<_>>()?;
@@ -1115,7 +1125,7 @@ impl SQIRGen {
     fn forward_declare_function(&mut self, func: &Node) -> SemaResult<(String, RcCell<Type>)> {
         let decl = match func.value {
             NodeValue::Function(ref f) => f,
-            _ => unreachable!("Non-function function node?!"),
+            _ => return sema_error!(func, "Non-function function node?!"),
         };
         let name = match decl.name {
             Some(s) => s.to_owned(),
@@ -1162,11 +1172,8 @@ impl SQIRGen {
         self.generate_global_function(func, &None)
     }
 
-    fn generate_impl(&mut self, node: &Node) -> SemaResult<()> {
-        let ns = match node.value {
-            NodeValue::Impl(ref imp) => imp,
-            _ => unreachable!("Non-Impl impl node?!"),
-        };
+    fn generate_impl(&mut self, node: Ranged<&Impl>) -> SemaResult<()> {
+        let ns = node.value;
 
         match self.sqir.named_types.get(ns.name) {
             Some(rc) => {
