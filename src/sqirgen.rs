@@ -39,6 +39,10 @@ macro_rules! implement_wrapping_type_getter {
     }
 }
 
+// These macros generate errors with nicely-formatted
+// error messages and source location info (if applicable).
+// TODO(H2CO3): make occurs check know about Nodes and Ranges
+// TODO(H2CO3): make reciprocity check know about Nodes and Ranges
 macro_rules! sema_error {
     ($cause: expr, $msg: expr) => ({
         let message = $msg.to_owned();
@@ -52,28 +56,35 @@ macro_rules! sema_error {
     });
 }
 
+macro_rules! occurs_check_error {
+    ($msg: expr) => ({
+        let message = $msg.to_owned();
+        let range = None;
+        Err(SemaError { message, range })
+    });
+    ($fmt: expr, $($arg: tt)+) => ({
+        let message = format!($fmt, $($arg)+);
+        let range = None;
+        Err(SemaError { message, range })
+    });
+}
+
+macro_rules! reciprocity_error {
+    ($msg: expr) => ({
+        let message = $msg.to_owned();
+        let range = None;
+        Err(SemaError { message, range })
+    });
+    ($fmt: expr, $($arg: tt)+) => ({
+        let message = format!($fmt, $($arg)+);
+        let range = None;
+        Err(SemaError { message, range })
+    });
+}
+
+
 pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
-}
-
-// TODO(H2CO3): make occurs check know about Nodes and Ranges
-fn occurs_check_error<T>(message: String) -> SemaResult<T> {
-    Err(
-        SemaError {
-            message: message,
-            range:   None,
-        }
-    )
-}
-
-// TODO(H2CO3): make reciprocity check know about Nodes and Ranges
-fn reciprocity_error<T>(message: String) -> SemaResult<T> {
-    Err(
-        SemaError {
-            message: message,
-            range:   None,
-        }
-    )
 }
 
 fn format_type(t: &WkCell<Type>) -> String {
@@ -206,24 +217,20 @@ impl SQIRGen {
         // LHS refers to a field in the RHS that doesn't correspond to a relation.
         let rhs_key = (rhs_type.clone(), rhs_field.clone());
         match self.sqir.relations.get(&rhs_key) {
-            None => return reciprocity_error(
-                format!(
-                    "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
+            None => return reciprocity_error!(
+                "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
+                unwrap_class_name(&lhs_type),
+                lhs_field,
+                unwrap_class_name(&rhs_type),
+                rhs_field,
+            ),
+            Some(ref inverse_relation) => if relation != *inverse_relation {
+                return reciprocity_error!(
+                    "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
                     unwrap_class_name(&lhs_type),
                     lhs_field,
                     unwrap_class_name(&rhs_type),
-                    rhs_field
-                )
-            ),
-            Some(ref inverse_relation) => if relation != *inverse_relation {
-                return reciprocity_error(
-                    format!(
-                        "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
-                        unwrap_class_name(&lhs_type),
-                        lhs_field,
-                        unwrap_class_name(&rhs_type),
-                        rhs_field
-                    )
+                    rhs_field,
                 )
             },
         }
@@ -558,8 +565,9 @@ impl SQIRGen {
             Type::Class(ref ct)   => self.ensure_transitive_noncontainment_multi(root, ct.fields.values()),
 
             // Function types are not allowed within user-defined types
-            Type::Function(_) => occurs_check_error(
-                format!("Function type should not occur within user-defined type '{}'", format_type(root))
+            Type::Function(_) => occurs_check_error!(
+                "Function type should not occur within user-defined type '{}'",
+                format_type(root),
             ),
 
             // Occurs check is supposed to happen after type resolution
@@ -572,8 +580,9 @@ impl SQIRGen {
 
     fn ensure_transitive_noncontainment(&self, root: &WkCell<Type>, child: &WkCell<Type>) -> SemaResult<()> {
         if root.as_rc()? == child.as_rc()? {
-            occurs_check_error(
-                format!("Recursive type '{}' contains itself without indirection", format_type(root))
+            occurs_check_error!(
+                "Recursive type '{}' contains itself without indirection",
+                format_type(root),
             )
         } else {
             self.occurs_check_type(root, child)
