@@ -138,7 +138,11 @@ pub struct Expr {
 
 #[derive(Debug)]
 pub enum ExprValue {
-    // Value of forward declared function
+    ////////////////////////////////////////////////////////////
+    // Core -- only the variants below are emitted by SQIRGen //
+    ////////////////////////////////////////////////////////////
+
+    // Value of a forward-declared function
     Placeholder,
 
     // Literals
@@ -155,6 +159,10 @@ pub enum ExprValue {
     Function(Function),
     Call(Call),
 
+    // Implicit type conversions
+    OptionalConv(Box<Expr>),
+    IntToFloatConv(Box<Expr>),
+
     // Arithmetic, comparison, logical and set operations
     Neg(Box<Expr>),
     Add(Box<(Expr, Expr)>),
@@ -164,8 +172,11 @@ pub enum ExprValue {
     Mod(Box<(Expr, Expr)>),
 
     Eq(Box<(Expr, Expr)>),
+    Neq(Box<(Expr, Expr)>),
     Lt(Box<(Expr, Expr)>),
-    LtEq(Box<(Expr, Expr)>), // TODO(H2CO3): need Neq, Gt, GtEq for symmetry?
+    LtEq(Box<(Expr, Expr)>),
+    Gt(Box<(Expr, Expr)>),
+    GtEq(Box<(Expr, Expr)>),
 
     And(Box<(Expr, Expr)>),
     Or(Box<(Expr, Expr)>),
@@ -185,7 +196,7 @@ pub enum ExprValue {
     TupleLiteral(Vec<Expr>),
     StructLiteral(HashMap<String, Expr>),
 
-    // Built-in DB operations
+    // Generalized Built-in DB operations
     Map(Box<Map>),       // projections etc.
     Reduce(Box<Reduce>), // aggregations
     Filter(Box<Filter>), // selection
@@ -195,8 +206,22 @@ pub enum ExprValue {
     Insert, // TODO(H2CO3): design + implement
     Update, // TODO(H2CO3): design + implement
 
-    // TODO(H2CO3): add common aggregations for optimization?
-    // e.g. Sum, Avg, Min, Max?
+    ///////////////////////////////////////////////////
+    // Common DB operations, only emitted by SQIROpt //
+    ///////////////////////////////////////////////////
+
+    // TODO(H2CO3): _actually_ design these
+
+    // Simple projection, sorting and grouping based on columns
+    Project(RcType, Vec<String>),
+    GroupBy(RcType, Vec<String>),
+    SortBy(RcType, Vec<String>),
+
+    // Common aggregations on a single column / independent columns
+    Sum(RcType, String),
+    Avg(RcType, String),
+    Min(RcType, String),
+    Max(RcType, String),
 }
 
 #[derive(Debug)]
