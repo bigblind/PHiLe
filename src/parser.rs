@@ -7,7 +7,7 @@
 //
 
 use std::slice;
-use lexer::{ Token, TokenKind, Range };
+use lexer::{ Token, TokenKind, Range, Ranged };
 use ast::*;
 use error::{ SyntaxError, SyntaxResult };
 use util::unescape_string_literal;
@@ -25,31 +25,10 @@ pub fn parse<'a>(tokens: &'a [Token]) -> ParseResult<'a> {
     Parser::new(tokens).parse()
 }
 
-fn token_range(first: &Token, last: &Token) -> Range {
+fn make_range<F: Ranged, L: Ranged>(first: &F, last: &L) -> Range {
     Range {
-        begin: first.range.begin,
-        end:   last.range.end,
-    }
-}
-
-fn node_range(first: &Node, last: &Node) -> Range {
-    Range {
-        begin: first.range.begin,
-        end:   last.range.end,
-    }
-}
-
-fn token_node_range(first: &Token, last: &Node) -> Range {
-    Range {
-        begin: first.range.begin,
-        end:   last.range.end,
-    }
-}
-
-fn node_token_range(first: &Node, last: &Token) -> Range {
-    Range {
-        begin: first.range.begin,
-        end:   last.range.end,
+        begin: first.range().begin,
+        end:   last.range().end,
     }
 }
 
@@ -168,7 +147,7 @@ impl<'a> Parser<'a> {
         }
 
         let range = match (first_token, last_token) {
-            (Some(first), Some(last)) => token_range(first, last),
+            (Some(first), Some(last)) => make_range(first, last),
             _ => Range::default(),
         };
         let value = NodeValue::Program(children);
@@ -207,7 +186,7 @@ impl<'a> Parser<'a> {
 
         let close_brace = self.expect("}")?;
 
-        let range = token_range(keyword, close_brace);
+        let range = make_range(keyword, close_brace);
         let value = match keyword.value {
             "struct" => NodeValue::StructDecl(
                 StructDecl { name, fields }
@@ -229,7 +208,7 @@ impl<'a> Parser<'a> {
         let comma = self.expect(",")?;
 
         let field = Field { name, type_decl, relation };
-        let range = token_range(name_tok, comma);
+        let range = make_range(name_tok, comma);
         let value = NodeValue::Field(Box::new(field));
 
         Ok(Node { range, value })
@@ -275,7 +254,7 @@ impl<'a> Parser<'a> {
         let close_brace = self.expect("}")?;
 
         let decl = EnumDecl { name, variants };
-        let range = token_range(enum_keyword, close_brace);
+        let range = make_range(enum_keyword, close_brace);
         let value = NodeValue::EnumDecl(decl);
 
         Ok(Node { range, value })
@@ -297,7 +276,7 @@ impl<'a> Parser<'a> {
         let comma = self.expect(",")?;
 
         let variant = Variant { name, type_decl };
-        let range = token_range(name_tok, comma);
+        let range = make_range(name_tok, comma);
         let value = NodeValue::Variant(Box::new(variant));
 
         Ok(Node { range, value })
@@ -320,7 +299,7 @@ impl<'a> Parser<'a> {
             None
         };
         let body = self.parse_block()?;
-        let range = token_node_range(fn_keyword, &body);
+        let range = make_range(fn_keyword, &body);
         let decl = Function { name, arguments, ret_type, body };
         let value = NodeValue::Function(Box::new(decl));
 
@@ -357,7 +336,7 @@ impl<'a> Parser<'a> {
         }
 
         let close_brace = self.expect("}")?;
-        let range = token_range(impl_keyword, close_brace);
+        let range = make_range(impl_keyword, close_brace);
         let value = NodeValue::Impl(Impl { name, functions });
 
         Ok(Node { range, value })
@@ -400,7 +379,7 @@ impl<'a> Parser<'a> {
 
         let semicolon = self.expect(";")?;
         let name = name_tok.value;
-        let range = token_range(let_keyword, semicolon);
+        let range = make_range(let_keyword, semicolon);
         let decl = VarDecl { name, type_decl, init_expr };
         let value = NodeValue::VarDecl(Box::new(decl));
 
@@ -462,7 +441,7 @@ impl<'a> Parser<'a> {
         self.expect(":")?;
         let false_val = self.parse_cond_expr()?;
 
-        let range = node_range(&condition, &false_val);
+        let range = make_range(&condition, &false_val);
         let expr = CondExpr { condition, true_val, false_val };
         let value = NodeValue::CondExpr(Box::new(expr));
 
@@ -537,7 +516,7 @@ impl<'a> Parser<'a> {
         let member_tok = self.expect_identifier()?;
         let base = Box::new(node);
         let member = member_tok.value;
-        let range = node_token_range(&base, member_tok);
+        let range = make_range(&*base, member_tok);
         let value = match op {
             "."  => NodeValue::MemberAccess(MemberAccess { base, member }),
             "::" => NodeValue::QualAccess(QualAccess { base, member }),
@@ -552,7 +531,7 @@ impl<'a> Parser<'a> {
 
         let index = self.parse_expr()?;
         let close_bracket = self.expect("]")?;
-        let range = node_token_range(&base, close_bracket);
+        let range = make_range(&base, close_bracket);
         let expr = Subscript { base, index };
         let value = NodeValue::Subscript(Box::new(expr));
 
@@ -686,7 +665,7 @@ impl<'a> Parser<'a> {
             None
         };
 
-        let range = token_node_range(
+        let range = make_range(
             if_keyword,
             else_arm.as_ref().unwrap_or(&then_arm)
         );
@@ -709,7 +688,7 @@ impl<'a> Parser<'a> {
         }
 
         let close_brace = self.expect("}")?;
-        let range = token_range(open_brace, close_brace);
+        let range = make_range(open_brace, close_brace);
         let value = NodeValue::Block(items);
 
         Ok(Node { range, value })
@@ -726,7 +705,7 @@ impl<'a> Parser<'a> {
 
         while let Some(tok) = self.accept_one_of(tokens) {
             let rhs = subexpr(self)?;
-            let range = node_range(&lhs, &rhs);
+            let range = make_range(&lhs, &rhs);
             let op = tok.value;
             let expr = BinaryOp { op, lhs, rhs };
             let value = NodeValue::BinaryOp(Box::new(expr));
@@ -744,7 +723,7 @@ impl<'a> Parser<'a> {
 
         if let Some(tok) = self.accept_one_of(tokens) {
             let rhs = self.parse_binop_rightassoc(tokens, subexpr)?;
-            let range = node_range(&lhs, &rhs);
+            let range = make_range(&lhs, &rhs);
             let op = tok.value;
             let expr = BinaryOp { op, lhs, rhs };
             let value = NodeValue::BinaryOp(Box::new(expr));
@@ -772,7 +751,7 @@ impl<'a> Parser<'a> {
         }
 
         let rhs = self.parse_function_type()?;
-        let range = node_range(&lhs, &rhs);
+        let range = make_range(&lhs, &rhs);
 
         // decompose tuple type if it appears in argument position
         let arg_types = match lhs.value {
@@ -792,7 +771,7 @@ impl<'a> Parser<'a> {
 
         // currently, optional is the only postfix type
         while let Some(token) = self.accept("?") {
-            let range = node_token_range(&node, token);
+            let range = make_range(&node, token);
             let value = NodeValue::OptionalType(Box::new(node));
             node = Node { range, value };
         }
@@ -830,7 +809,7 @@ impl<'a> Parser<'a> {
         let open_bracket = self.expect("[")?;
         let element_type = self.parse_type()?;
         let close_bracket = self.expect("]")?;
-        let range = token_range(open_bracket, close_bracket);
+        let range = make_range(open_bracket, close_bracket);
         let value = NodeValue::ArrayType(Box::new(element_type));
 
         Ok(Node { range, value })
@@ -857,7 +836,7 @@ impl<'a> Parser<'a> {
         match self.accept_one_of(tokens) {
             Some(token) => {
                 let child = self.parse_prefix(tokens, nodes, subexpr)?;
-                let range = token_node_range(token, &child);
+                let range = make_range(token, &child);
                 let index = tokens.iter().position(|v| *v == token.value).unwrap();
                 let value = nodes[index](Box::new(child));
 
@@ -889,7 +868,7 @@ impl<'a> Parser<'a> {
         }
 
         let close_tok = self.expect(close)?;
-        let range = token_range(open_tok, close_tok);
+        let range = make_range(open_tok, close_tok);
 
         Ok((items, range))
     }

@@ -95,7 +95,7 @@ impl<'a> Generator<'a> {
         &self,
         wr: &mut io::Write,
         raw_struct_name: &str,
-        fields: &HashMap<String, WkType>
+        fields: &HashMap<String, WkType>,
     ) -> io::Result<()> {
         // Respect the type name transform
         let struct_name = transform_type_name(raw_struct_name, &self.params);
@@ -137,7 +137,7 @@ impl<'a> Generator<'a> {
         &self,
         wr: &mut io::Write,
         raw_enum_name: &str,
-        variants: &HashMap<String, WkType>
+        variants: &HashMap<String, WkType>,
     ) -> io::Result<()> {
         // Respect the type name transform
         let enum_name = transform_type_name(raw_enum_name, &self.params);

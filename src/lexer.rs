@@ -24,6 +24,10 @@ pub struct Range {
     pub end:   Location,
 }
 
+pub trait Ranged {
+    fn range(&self) -> Range;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     Whitespace,
@@ -83,6 +87,18 @@ impl Display for Location {
 impl Display for Range {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}...{}", self.begin, self.end)
+    }
+}
+
+impl Ranged for Range {
+    fn range(&self) -> Range {
+        *self
+    }
+}
+
+impl<'a> Ranged for Token<'a> {
+    fn range(&self) -> Range {
+        self.range
     }
 }
 

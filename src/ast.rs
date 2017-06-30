@@ -6,14 +6,8 @@
 // on 07/04/2017
 //
 
-use lexer::Range;
+use lexer::{ Range, Ranged };
 
-
-#[derive(Debug)]
-pub struct Ranged<T> {
-    pub range: Range,
-    pub value: T,
-}
 
 #[derive(Debug)]
 pub enum NodeValue<'a> {
@@ -69,7 +63,11 @@ pub enum NodeValue<'a> {
     NamedType(&'a str),
 }
 
-pub type Node<'a> = Ranged<NodeValue<'a>>;
+#[derive(Debug)]
+pub struct Node<'a> {
+    pub range: Range,
+    pub value: NodeValue<'a>,
+}
 
 #[derive(Debug)]
 pub struct StructDecl<'a> {
@@ -196,4 +194,11 @@ pub struct Match<'a> {
 pub struct FunctionType<'a> {
     pub arg_types: Vec<Node<'a>>,
     pub ret_type:  Box<Node<'a>>,
+}
+
+
+impl<'a> Ranged for Node<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
 }

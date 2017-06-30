@@ -10,7 +10,8 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use util::*;
 use sqir::*;
-use ast::{ self, Ranged, Node, NodeValue };
+use lexer::{ Range, Ranged };
+use ast::{ self, Node, NodeValue };
 use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
@@ -47,12 +48,12 @@ macro_rules! implement_wrapping_type_getter {
 macro_rules! sema_error {
     ($cause: expr, $msg: expr) => ({
         let message = $msg.to_owned();
-        let range = Some($cause.range);
+        let range = Some($cause.range());
         Err(SemaError { message, range })
     });
     ($cause: expr, $fmt: expr, $($arg: tt)+) => ({
         let message = format!($fmt, $($arg)+);
-        let range = Some($cause.range);
+        let range = Some($cause.range());
         Err(SemaError { message, range })
     });
 }
@@ -249,9 +250,8 @@ impl SQIRGen {
                 NodeValue::Function(_) => {
                     self.forward_declare_free_function(child)?
                 },
-                NodeValue::Impl(ref value) => {
-                    let range = child.range;
-                    self.forward_declare_impl(Ranged { range, value })?
+                NodeValue::Impl(ref imp) => {
+                    self.forward_declare_impl(imp, child.range)?
                 },
                 _ => continue,
             }
@@ -267,9 +267,8 @@ impl SQIRGen {
                 NodeValue::Function(_) => {
                     self.generate_free_function(child)?
                 },
-                NodeValue::Impl(ref value) => {
-                    let range = child.range;
-                    self.generate_impl(Ranged { range, value })?
+                NodeValue::Impl(ref imp) => {
+                    self.generate_impl(imp, child.range)?
                 },
                 _ => continue,
             }
@@ -522,7 +521,7 @@ impl SQIRGen {
         wrapped_type: &WkType,
         validation_result: SemaResult<()>,
         node: &Node,
-        wrapper_type_name: &str
+        wrapper_type_name: &str,
     ) -> SemaResult<()> {
         validation_result.or_else(|err| {
             let rc = wrapped_type.as_rc()?;
@@ -838,7 +837,7 @@ impl SQIRGen {
         lhs_field_type: &Type,
         lhs_field_name: &str,
         relation: &RelDecl,
-        node: &Node
+        node: &Node,
     ) -> SemaResult<()> {
         // Ensure that declared RHS cardinality matches with the field type
         let (lhs_card, rhs_card) = self.cardinalities_from_operator(relation.cardinality);
@@ -912,7 +911,7 @@ impl SQIRGen {
         rhs_type: &RcType,
         lhs_field_name: &str,
         lhs_cardinality: Cardinality,
-        rhs_cardinality: Cardinality
+        rhs_cardinality: Cardinality,
     ) -> SemaResult<()> {
         let lhs = RelationSide {
             class:       lhs_type.clone(),
@@ -1083,8 +1082,7 @@ impl SQIRGen {
         }
     }
 
-    fn forward_declare_impl(&mut self, node: Ranged<&Impl>) -> SemaResult<()> {
-        let decl = node.value;
+    fn forward_declare_impl(&mut self, decl: &Impl, range: Range) -> SemaResult<()> {
         let names_types: Vec<_> = decl.functions.iter().map(
             |func_node| self.forward_declare_function(func_node)
         ).collect::<SemaResult<_>>()?;
@@ -1097,7 +1095,7 @@ impl SQIRGen {
                 ve.insert(ns);
                 Ok(())
             },
-            Entry::Occupied(_) => sema_error!(node, "Redefinition of impl '{}'", decl.name),
+            Entry::Occupied(_) => sema_error!(range, "Redefinition of impl '{}'", decl.name),
         }
     }
 
@@ -1170,21 +1168,19 @@ impl SQIRGen {
         self.generate_global_function(func, &None)
     }
 
-    fn generate_impl(&mut self, node: Ranged<&Impl>) -> SemaResult<()> {
-        let ns = node.value;
-
+    fn generate_impl(&mut self, ns: &Impl, range: Range) -> SemaResult<()> {
         match self.sqir.named_types.get(ns.name) {
             Some(rc) => {
                 match *rc.borrow()? {
                     Type::Enum(_) | Type::Struct(_) | Type::Class(_) => (),
                     _ => return sema_error!(
-                        node,
+                        range,
                         "Cannot impl built-in type '{}'",
                         ns.name,
                     ),
                 }
             },
-            None => return sema_error!(node, "Unknown type: '{}'", ns.name),
+            None => return sema_error!(range, "Unknown type: '{}'", ns.name),
         }
 
         let namespace = Some(ns.name.to_owned());
@@ -1213,8 +1209,10 @@ impl SQIRGen {
         Ok(())
     }
 
-    // Main, centralized expression emitter
-    fn generate_expr(&mut self, node: &Node) -> SemaResult<Expr> {
+    // Main, centralized expression emitter.
+    // 'ty' is a type hint from the caller, used
+    // for the top-down part of type inference.
+    fn generate_expr(&mut self, node: &Node, /* ty: Option<RcType> */) -> SemaResult<Expr> {
         match node.value {
             NodeValue::NilLiteral           => self.generate_nil_literal(),
             NodeValue::BoolLiteral(b)       => self.generate_bool_literal(b),
