@@ -25,7 +25,7 @@ struct SQIRGen {
 // that simply wrap other types, e.g. &T, [T], T?, etc.
 macro_rules! implement_wrapping_type_getter {
     ($fn_name: ident, $variant: ident, $cache: ident) => {
-        fn $fn_name(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+        fn $fn_name(&mut self, decl: &Node) -> SemaResult<RcType> {
             // get the current wrapped type
             let wrapped = self.type_from_decl(decl)?;
 
@@ -88,14 +88,14 @@ pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
-fn format_type(t: &WkCell<Type>) -> String {
+fn format_type(t: &WkType) -> String {
     let rc = match t.as_rc() {
         Ok(rc) => rc,
-        Err(_) => return "[WkCell<Type>; no backing RcCell]".to_owned(),
+        Err(_) => return "[WkType; no backing RcCell]".to_owned(),
     };
     let ptr = match rc.borrow() {
         Ok(ptr) => ptr,
-        Err(_)  => return "[WkCell<Type>; not borrowable]".to_owned(),
+        Err(_)  => return "[WkType; not borrowable]".to_owned(),
     };
 
     format!("{:#?}", *ptr)
@@ -207,7 +207,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn check_relation_reciprocity(&self, lhs_type: &RcCell<Type>, lhs_field: &str, relation: &Relation) -> SemaResult<()> {
+    fn check_relation_reciprocity(&self, lhs_type: &RcType, lhs_field: &str, relation: &Relation) -> SemaResult<()> {
         let rhs_type = relation.rhs.class.clone();
         let rhs_field = match relation.rhs.field {
             Some(ref name) => name.clone(),
@@ -282,7 +282,7 @@ impl SQIRGen {
     // Type-wise semantic analysis methods
     //
 
-    fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcCell<Type>> {
+    fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcType> {
         let name = decl.name.to_owned();
 
         let struct_type = Type::Struct(
@@ -300,7 +300,7 @@ impl SQIRGen {
         Ok(struct_type_rc.clone())
     }
 
-    fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcCell<Type>> {
+    fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcType> {
         let name = decl.name.to_owned();
 
         let class_type = Type::Class(
@@ -318,7 +318,7 @@ impl SQIRGen {
         Ok(class_type_rc.clone())
     }
 
-    fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcCell<Type>> {
+    fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcType> {
         let name = decl.name.to_owned();
 
         let enum_type = Type::Enum(
@@ -340,7 +340,7 @@ impl SQIRGen {
     // Helpers for struct types
     //
 
-    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
+    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<HashMap<String, WkType>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
         for node in &decl.fields {
@@ -371,7 +371,7 @@ impl SQIRGen {
     // Helpers for class types
     //
 
-    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
+    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<HashMap<String, WkType>> {
         let mut fields = HashMap::with_capacity(decl.fields.len());
 
         for node in &decl.fields {
@@ -397,7 +397,7 @@ impl SQIRGen {
     // Helpers for enum types
     //
 
-    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<HashMap<String, WkCell<Type>>> {
+    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<HashMap<String, WkType>> {
         let mut variants = HashMap::with_capacity(decl.variants.len());
 
         for node in &decl.variants {
@@ -428,7 +428,7 @@ impl SQIRGen {
     // value and entity types (struct, class, enum, tuple)
     //
 
-    fn validate_complex_type_item(&self, item_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+    fn validate_complex_type_item(&self, item_type: &WkType, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
         let rc = item_type.as_rc()?;
         let ptr = rc.borrow()?;
 
@@ -489,7 +489,7 @@ impl SQIRGen {
         }
     }
 
-    fn validate_optional(&self, wrapped_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+    fn validate_optional(&self, wrapped_type: &WkType, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
         let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
 
         match parent_kind {
@@ -503,7 +503,7 @@ impl SQIRGen {
         }
     }
 
-    fn validate_array(&self, element_type: &WkCell<Type>, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+    fn validate_array(&self, element_type: &WkType, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
         let res = self.validate_complex_type_item(element_type, node, ComplexTypeKind::Value);
 
         match parent_kind {
@@ -519,7 +519,7 @@ impl SQIRGen {
 
     fn validate_wrapper_in_entity(
         &self,
-        wrapped_type: &WkCell<Type>,
+        wrapped_type: &WkType,
         validation_result: SemaResult<()>,
         node: &Node,
         wrapper_type_name: &str
@@ -547,14 +547,14 @@ impl SQIRGen {
     // Occurs Check
     //
 
-    fn occurs_check(&self, ud_type: &WkCell<Type>) -> SemaResult<()> {
+    fn occurs_check(&self, ud_type: &WkType) -> SemaResult<()> {
         self.occurs_check_type(ud_type, ud_type)
     }
 
     // Try to find the root_type in the transitive closure of its
     // contained/wrapped types that occur without indirection,
     // i.e. those that are _not_ behind a pointer or in an array.
-    fn occurs_check_type(&self, root: &WkCell<Type>, child: &WkCell<Type>) -> SemaResult<()> {
+    fn occurs_check_type(&self, root: &WkType, child: &WkType) -> SemaResult<()> {
         let rc = child.as_rc()?;
         let ptr = rc.borrow()?;
 
@@ -589,7 +589,7 @@ impl SQIRGen {
         }
     }
 
-    fn ensure_transitive_noncontainment(&self, root: &WkCell<Type>, child: &WkCell<Type>) -> SemaResult<()> {
+    fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> SemaResult<()> {
         if root.as_rc()? == child.as_rc()? {
             occurs_check_error!(
                 "Recursive type '{}' contains itself without indirection",
@@ -600,8 +600,8 @@ impl SQIRGen {
         }
     }
 
-    fn ensure_transitive_noncontainment_multi<'a, I>(&self, root: &WkCell<Type>, types: I) -> SemaResult<()>
-        where I: IntoIterator<Item = &'a WkCell<Type>> {
+    fn ensure_transitive_noncontainment_multi<'a, I>(&self, root: &WkType, types: I) -> SemaResult<()>
+        where I: IntoIterator<Item = &'a WkType> {
 
         for ty in types {
             self.ensure_transitive_noncontainment(root, ty)?
@@ -614,7 +614,7 @@ impl SQIRGen {
     // Caching getters for types
     //
 
-    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<RcType> {
         match decl.value {
             NodeValue::PointerType(ref pointed)  => self.get_pointer_type(pointed),
             NodeValue::OptionalType(ref wrapped) => self.get_optional_type(wrapped),
@@ -626,7 +626,7 @@ impl SQIRGen {
         }
     }
 
-    fn get_pointer_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+    fn get_pointer_type(&mut self, decl: &Node) -> SemaResult<RcType> {
         let pointer_type = self.get_pointer_type_raw(decl)?;
 
         match *pointer_type.borrow()? {
@@ -652,11 +652,11 @@ impl SQIRGen {
         Ok(pointer_type)
     }
 
-    fn get_optional_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+    fn get_optional_type(&mut self, decl: &Node) -> SemaResult<RcType> {
         self.get_optional_type_raw(decl)
     }
 
-    fn get_array_type(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
+    fn get_array_type(&mut self, decl: &Node) -> SemaResult<RcType> {
         self.get_array_type_raw(decl)
     }
 
@@ -678,7 +678,7 @@ impl SQIRGen {
         array_types
     }
 
-    fn get_tuple_type(&mut self, decls: &[Node]) -> SemaResult<RcCell<Type>> {
+    fn get_tuple_type(&mut self, decls: &[Node]) -> SemaResult<RcType> {
         // A one-element tuple is converted to its element type,
         // _without_ validation of containment in a value type.
         if decls.len() == 1 {
@@ -701,7 +701,7 @@ impl SQIRGen {
         Ok(tuple.clone())
     }
 
-    fn get_function_type(&mut self, fn_type: &ast::FunctionType) -> SemaResult<RcCell<Type>> {
+    fn get_function_type(&mut self, fn_type: &ast::FunctionType) -> SemaResult<RcType> {
         let arg_types = fn_type.arg_types.iter().map(
             |decl| self.type_from_decl(decl)
         ).collect::<SemaResult<_>>()?;
@@ -713,9 +713,9 @@ impl SQIRGen {
 
     fn get_function_type_from_types(
         &mut self,
-        arg_types_rc: Vec<RcCell<Type>>,
-        ret_type_rc:  RcCell<Type>,
-    ) -> SemaResult<RcCell<Type>> {
+        arg_types_rc: Vec<RcType>,
+        ret_type_rc:  RcType,
+    ) -> SemaResult<RcType> {
         let key = (arg_types_rc.clone(), ret_type_rc.clone());
         let rc = self.sqir.function_types.entry(key).or_insert_with(|| {
             let arg_types = arg_types_rc.iter().map(RcCell::as_weak).collect();
@@ -727,42 +727,42 @@ impl SQIRGen {
         Ok(rc.clone())
     }
 
-    fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<RcCell<Type>> {
+    fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<RcType> {
         match self.sqir.named_types.get(name) {
             Some(rc) => Ok(rc.clone()),
             None => sema_error!(node, "Unknown type: '{}'", name),
         }
     }
 
-    fn get_unit_type(&mut self) -> RcCell<Type> {
+    fn get_unit_type(&mut self) -> RcType {
         self.get_tuple_type(&[]).expect("can't create unit type?!")
     }
 
-    fn get_builtin_type(&self, name: &str) -> RcCell<Type> {
+    fn get_builtin_type(&self, name: &str) -> RcType {
         self.sqir.named_types[name].clone()
     }
 
-    fn get_bool_type(&self) -> RcCell<Type> {
+    fn get_bool_type(&self) -> RcType {
         self.get_builtin_type("bool")
     }
 
-    fn get_int_type(&self) -> RcCell<Type> {
+    fn get_int_type(&self) -> RcType {
         self.get_builtin_type("int")
     }
 
-    fn get_float_type(&self) -> RcCell<Type> {
+    fn get_float_type(&self) -> RcType {
         self.get_builtin_type("float")
     }
 
-    fn get_string_type(&self) -> RcCell<Type> {
+    fn get_string_type(&self) -> RcType {
         self.get_builtin_type("String")
     }
 
-    fn get_blob_type(&self) -> RcCell<Type> {
+    fn get_blob_type(&self) -> RcType {
         self.get_builtin_type("Blob")
     }
 
-    fn get_date_type(&self) -> RcCell<Type> {
+    fn get_date_type(&self) -> RcType {
         self.get_builtin_type("Date")
     }
 
@@ -780,7 +780,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn define_relation_for_field(&mut self, class_type: WkCell<Type>, node: &Node) -> SemaResult<()> {
+    fn define_relation_for_field(&mut self, class_type: WkType, node: &Node) -> SemaResult<()> {
         let field = match node.value {
             NodeValue::Field(ref field) => field,
             _ => unreachable!("Class fields must be Field values"),
@@ -834,7 +834,7 @@ impl SQIRGen {
     // TODO(H2CO3): this is too long; refactor
     fn define_explicit_relation(
         &mut self,
-        lhs_class_type: &RcCell<Type>,
+        lhs_class_type: &RcType,
         lhs_field_type: &Type,
         lhs_field_name: &str,
         relation: &RelDecl,
@@ -908,8 +908,8 @@ impl SQIRGen {
     // impossible (one field can only declare one relation).
     fn define_unilateral_relation(
         &mut self,
-        lhs_type: &RcCell<Type>,
-        rhs_type: &RcCell<Type>,
+        lhs_type: &RcType,
+        rhs_type: &RcType,
         lhs_field_name: &str,
         lhs_cardinality: Cardinality,
         rhs_cardinality: Cardinality
@@ -940,7 +940,7 @@ impl SQIRGen {
     // Otherwise, if the type is either not a relational type,
     // or it doesn't correspond to the specified cardinality,
     // then return an error.
-    fn validate_type_cardinality(&self, t: &Type, cardinality: Cardinality, node: &Node) -> SemaResult<RcCell<Type>> {
+    fn validate_type_cardinality(&self, t: &Type, cardinality: Cardinality, node: &Node) -> SemaResult<RcType> {
         let not_relational_error = || sema_error!(
             node,
             "Field type is not relational: '{:#?}'",
@@ -992,7 +992,7 @@ impl SQIRGen {
     //   * One        for &T
     //   * ZeroOrOne  for &T?
     //   * ZeroOrMore for [&T]
-    fn define_implicit_relation(&mut self, class_type: &RcCell<Type>, field_type: &Type, field_name: &str) -> SemaResult<()> {
+    fn define_implicit_relation(&mut self, class_type: &RcType, field_type: &Type, field_name: &str) -> SemaResult<()> {
         let (pointed_type, rhs_card) = match self.try_infer_type_cardinality(field_type)? {
             Some(type_and_cardinality) => type_and_cardinality,
             None => return Ok(()), // not a relational type
@@ -1022,7 +1022,7 @@ impl SQIRGen {
     // If 't' represents a relational type (&T, &T?, or [&T]),
     // return the corresponding cardinality and the pointed type T.
     // Otherwise, return None.
-    fn try_infer_type_cardinality(&self, t: &Type) -> SemaResult<Option<(RcCell<Type>, Cardinality)>> {
+    fn try_infer_type_cardinality(&self, t: &Type) -> SemaResult<Option<(RcType, Cardinality)>> {
         macro_rules! try_unwrap_pointer_type {
             ($ty: expr, $card: ident) => ({
                 let rc = $ty.as_rc()?;
@@ -1101,7 +1101,7 @@ impl SQIRGen {
         }
     }
 
-    fn impl_from_functions(names_types: Vec<(String, RcCell<Type>)>, decls: &[Node])
+    fn impl_from_functions(names_types: Vec<(String, RcType)>, decls: &[Node])
         -> SemaResult<HashMap<String, Expr>> {
 
         assert!(names_types.len() == decls.len());
@@ -1120,7 +1120,7 @@ impl SQIRGen {
         Ok(ns)
     }
 
-    fn forward_declare_function(&mut self, func: &Node) -> SemaResult<(String, RcCell<Type>)> {
+    fn forward_declare_function(&mut self, func: &Node) -> SemaResult<(String, RcType)> {
         let decl = match func.value {
             NodeValue::Function(ref f) => f,
             _ => return sema_error!(func, "Non-function function node?!"),
@@ -1141,7 +1141,7 @@ impl SQIRGen {
     }
 
     fn unzip_arg_names_and_types(&mut self, args: &[Node])
-        -> SemaResult<(Vec<String>, Vec<RcCell<Type>>)> {
+        -> SemaResult<(Vec<String>, Vec<RcType>)> {
 
         let names = args.iter().map(|node| match node.value {
             NodeValue::FuncArg(ref arg) => arg.name.to_owned(),
@@ -1297,7 +1297,7 @@ impl SQIRGen {
     }
 
     // helper for generate_function()
-    fn check_return_type(ty: &RcCell<Type>, body: &Expr, node: &Node) -> SemaResult<()> {
+    fn check_return_type(ty: &RcType, body: &Expr, node: &Node) -> SemaResult<()> {
         match *ty.borrow()? {
             Type::Function(FunctionType { ref ret_type, .. }) => {
                 if ret_type.as_rc()? != body.ty {

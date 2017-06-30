@@ -65,7 +65,7 @@ impl<'a> Generator<'a> {
         Ok(())
     }
 
-    fn writers_for_types(&mut self, types: &[RcCell<Type>]) -> io::Result<HashMap<String, Rc<RefCell<io::Write>>>> {
+    fn writers_for_types(&mut self, types: &[RcType]) -> io::Result<HashMap<String, Rc<RefCell<io::Write>>>> {
         let mut writers = HashMap::with_capacity(types.len());
 
         for typ in types {
@@ -95,7 +95,7 @@ impl<'a> Generator<'a> {
         &self,
         wr: &mut io::Write,
         raw_struct_name: &str,
-        fields: &HashMap<String, WkCell<Type>>
+        fields: &HashMap<String, WkType>
     ) -> io::Result<()> {
         // Respect the type name transform
         let struct_name = transform_type_name(raw_struct_name, &self.params);
@@ -137,7 +137,7 @@ impl<'a> Generator<'a> {
         &self,
         wr: &mut io::Write,
         raw_enum_name: &str,
-        variants: &HashMap<String, WkCell<Type>>
+        variants: &HashMap<String, WkType>
     ) -> io::Result<()> {
         // Respect the type name transform
         let enum_name = transform_type_name(raw_enum_name, &self.params);
@@ -189,7 +189,7 @@ impl<'a> Generator<'a> {
     //
     // Generic Type Writers
     //
-    fn write_type(&self, wr: &mut io::Write, typ: &WkCell<Type>) -> io::Result<()> {
+    fn write_type(&self, wr: &mut io::Write, typ: &WkType) -> io::Result<()> {
         let rc = typ.as_rc()?;
         let ptr = rc.borrow()?;
 
@@ -218,19 +218,19 @@ impl<'a> Generator<'a> {
         }
     }
 
-    fn write_optional_type(&self, wr: &mut io::Write, wrapped: &WkCell<Type>) -> io::Result<()> {
+    fn write_optional_type(&self, wr: &mut io::Write, wrapped: &WkType) -> io::Result<()> {
         self.write_pointer_type(wr, wrapped)
     }
 
-    fn write_pointer_type(&self, wr: &mut io::Write, pointed: &WkCell<Type>) -> io::Result<()> {
+    fn write_pointer_type(&self, wr: &mut io::Write, pointed: &WkType) -> io::Result<()> {
         write!(wr, "*").and_then(|_| self.write_type(wr, pointed))
     }
 
-    fn write_array_type(&self, wr: &mut io::Write, element: &WkCell<Type>) -> io::Result<()> {
+    fn write_array_type(&self, wr: &mut io::Write, element: &WkType) -> io::Result<()> {
         write!(wr, "[]").and_then(|_| self.write_type(wr, element))
     }
 
-    fn write_tuple_type(&self, wr: &mut io::Write, types: &[WkCell<Type>]) -> io::Result<()> {
+    fn write_tuple_type(&self, wr: &mut io::Write, types: &[WkType]) -> io::Result<()> {
         write!(wr, "struct {{ ")?;
 
         for (idx, typ) in types.iter().enumerate() {
@@ -248,7 +248,7 @@ impl<'a> Generator<'a> {
     // Common Helpers
     //
 
-    fn types_sorted_by_name(&self) -> Vec<RcCell<Type>> {
+    fn types_sorted_by_name(&self) -> Vec<RcType> {
         let mut types: Vec<_> = self.sqir.named_types.iter().collect();
         types.sort_by_key(|&(name, _)| name);
         types.iter().map(|&(_, typ)| typ.clone()).collect()

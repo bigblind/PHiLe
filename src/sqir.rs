@@ -12,6 +12,9 @@ use std::cmp::*;
 use util::*;
 
 
+pub type RcType = RcCell<Type>;
+pub type WkType = WkCell<Type>;
+
 //
 // Types (part of the Schema)
 //
@@ -30,10 +33,10 @@ pub enum Type {
     Blob,
     Date,
 
-    Optional(WkCell<Type>),
-    Pointer(WkCell<Type>),
-    Array(WkCell<Type>),
-    Tuple(Vec<WkCell<Type>>),
+    Optional(WkType),
+    Pointer(WkType),
+    Array(WkType),
+    Tuple(Vec<WkType>),
 
     Enum(EnumType),
     Struct(StructType),
@@ -76,25 +79,25 @@ pub enum ComplexTypeKind {
 #[derive(Debug)]
 pub struct EnumType {
     pub name:     String,
-    pub variants: HashMap<String, WkCell<Type>>,
+    pub variants: HashMap<String, WkType>,
 }
 
 #[derive(Debug)]
 pub struct StructType {
     pub name:   String,
-    pub fields: HashMap<String, WkCell<Type>>,
+    pub fields: HashMap<String, WkType>,
 }
 
 #[derive(Debug)]
 pub struct ClassType {
     pub name:   String,
-    pub fields: HashMap<String, WkCell<Type>>,
+    pub fields: HashMap<String, WkType>,
 }
 
 #[derive(Debug)]
 pub struct FunctionType {
-    pub arg_types: Vec<WkCell<Type>>,
-    pub ret_type:  WkCell<Type>,
+    pub arg_types: Vec<WkType>,
+    pub ret_type:  WkType,
 }
 
 //
@@ -103,7 +106,7 @@ pub struct FunctionType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RelationSide {
-    pub class:       RcCell<Type>,
+    pub class:       RcType,
     pub field:       Option<String>,
     pub cardinality: Cardinality,
 }
@@ -129,7 +132,7 @@ pub struct Relation {
 // Lambda calculus node
 #[derive(Debug)]
 pub struct Expr {
-    pub ty:    RcCell<Type>, // can be Rc: no cycles are possible
+    pub ty:    RcType, // can be Rc: no cycles are possible
     pub value: ExprValue,
 }
 
@@ -259,20 +262,20 @@ pub struct Group {
 
 #[derive(Debug)]
 pub struct SQIR {
-    pub named_types:    HashMap<String, RcCell<Type>>,
-    pub decimal_types:  HashMap<(usize, usize), RcCell<Type>>,
-    pub optional_types: HashMap<RcCell<Type>, RcCell<Type>>,
-    pub pointer_types:  HashMap<RcCell<Type>, RcCell<Type>>,
-    pub array_types:    HashMap<RcCell<Type>, RcCell<Type>>,
-    pub tuple_types:    HashMap<Vec<RcCell<Type>>, RcCell<Type>>,
-    pub function_types: HashMap<(Vec<RcCell<Type>>, RcCell<Type>), RcCell<Type>>,
-    pub relations:      HashMap<(RcCell<Type>, String), Relation>,
+    pub named_types:    HashMap<String, RcType>,
+    pub decimal_types:  HashMap<(usize, usize), RcType>,
+    pub optional_types: HashMap<RcType, RcType>,
+    pub pointer_types:  HashMap<RcType, RcType>,
+    pub array_types:    HashMap<RcType, RcType>,
+    pub tuple_types:    HashMap<Vec<RcType>, RcType>,
+    pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
+    pub relations:      HashMap<(RcType, String), Relation>,
     pub globals:        HashMap<Option<String>, HashMap<String, Expr>>,
 }
 
 
 // This is to be used ONLY when you know you have a Class type
-pub fn unwrap_class_name(class: &RcCell<Type>) -> String {
+pub fn unwrap_class_name(class: &RcType) -> String {
     match *class.borrow().expect("Cannot borrow Type::Class?!") {
         Type::Class(ref c) => c.name.clone(),
         _ => unreachable!("Non-class class type?!"),
