@@ -245,13 +245,12 @@ impl SQIRGen {
     // no instructions/basic blocks, only a type and argument names
     fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
-            let range = child.range;
-
             match child.value {
                 NodeValue::Function(_) => {
                     self.forward_declare_free_function(child)?
                 },
                 NodeValue::Impl(ref value) => {
+                    let range = child.range;
                     self.forward_declare_impl(Ranged { range, value })?
                 },
                 _ => continue,
@@ -264,13 +263,12 @@ impl SQIRGen {
     // Generate SQIR for each function
     fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
         for child in children {
-            let range = child.range;
-
             match child.value {
                 NodeValue::Function(_) => {
                     self.generate_free_function(child)?
                 },
                 NodeValue::Impl(ref value) => {
+                    let range = child.range;
                     self.generate_impl(Ranged { range, value })?
                 },
                 _ => continue,
