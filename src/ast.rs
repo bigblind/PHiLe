@@ -10,6 +10,12 @@ use lexer::Range;
 
 
 #[derive(Debug)]
+pub struct Ranged<T> {
+    pub range: Range,
+    pub value: T,
+}
+
+#[derive(Debug)]
 pub enum NodeValue<'a> {
     // Declarations / Definitions
     Program(Vec<Node<'a>>),
@@ -63,11 +69,7 @@ pub enum NodeValue<'a> {
     NamedType(&'a str),
 }
 
-#[derive(Debug)]
-pub struct Node<'a> {
-    pub range: Range,
-    pub value: NodeValue<'a>,
-}
+pub type Node<'a> = Ranged<NodeValue<'a>>;
 
 #[derive(Debug)]
 pub struct StructDecl<'a> {

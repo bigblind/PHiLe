@@ -104,7 +104,7 @@ impl SQIRGen {
     fn generate_sqir(mut self, node: &Node) -> SemaResult<SQIR> {
         let children = match node.value {
             NodeValue::Program(ref children) => children,
-            _ => unreachable!("Top-level node must be a Program"),
+            _ => return sema_error!(node, "Top-level node must be a Program"),
         };
 
         self.forward_declare_user_defined_types(children)?;
@@ -275,9 +275,7 @@ impl SQIRGen {
         );
 
         // Replace the placeholder type with the now-created actual type
-        let struct_type_rc = self.sqir.named_types.get(&name).unwrap_or_else(
-            || unreachable!("No placeholder type for struct '{}'", name)
-        );
+        let struct_type_rc = &self.sqir.named_types[&name];
 
         *struct_type_rc.borrow_mut()? = struct_type;
 
@@ -295,9 +293,7 @@ impl SQIRGen {
         );
 
         // Replace the placeholder type with the now-created actual type
-        let class_type_rc = self.sqir.named_types.get(&name).unwrap_or_else(
-            || unreachable!("No placeholder type for class '{}'", name)
-        );
+        let class_type_rc = &self.sqir.named_types[&name];
 
         *class_type_rc.borrow_mut()? = class_type;
 
@@ -315,9 +311,7 @@ impl SQIRGen {
         );
 
         // Replace the placeholder type with the now-created actual type
-        let enum_type_rc = self.sqir.named_types.get(&name).unwrap_or_else(
-            || unreachable!("No placeholder type for enum '{}'", name)
-        );
+        let enum_type_rc = &self.sqir.named_types[&name];
 
         *enum_type_rc.borrow_mut()? = enum_type;
 
