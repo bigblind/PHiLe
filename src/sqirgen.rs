@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use util::*;
 use sqir::*;
-use ast::{ self, Node, NodeValue, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
+use ast::{ self, Node, NodeValue, EnumDecl, StructDecl, ClassDecl, RelDecl };
 use error::{ SemaError, SemaResult };
 
 
@@ -248,7 +248,7 @@ impl SQIRGen {
         for child in children {
             match child.value {
                 NodeValue::Function(_) => self.generate_free_function(child)?,
-                NodeValue::Impl(ref i) => self.generate_impl(i)?,
+                NodeValue::Impl(_)     => self.generate_impl(child)?,
                 _ => continue,
             }
         }
@@ -1153,7 +1153,28 @@ impl SQIRGen {
         self.generate_global_function(func, &None)
     }
 
-    fn generate_impl(&mut self, ns: &Impl) -> SemaResult<()> {
+    fn generate_impl(&mut self, node: &Node) -> SemaResult<()> {
+        let ns = match node.value {
+            NodeValue::Impl(ref imp) => imp,
+            _ => unreachable!("Non-Impl impl node?!"),
+        };
+
+        match self.sqir.named_types.get(ns.name) {
+            Some(rc) => {
+                match *rc.borrow()? {
+                    Type::Enum(_) | Type::Struct(_) | Type::Class(_) => (),
+                    _ => return sema_error(
+                        format!("Cannot impl built-in type '{}'", ns.name),
+                        node
+                    ),
+                }
+            },
+            None => return sema_error(
+                format!("Unknown type: '{}'", ns.name),
+                node
+            ),
+        }
+
         let namespace = Some(ns.name.to_owned());
 
         for func in &ns.functions {
