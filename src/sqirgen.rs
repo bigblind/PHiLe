@@ -21,7 +21,7 @@ struct SQIRGen {
 
 
 // This macro generates caching getter functions for types
-// that simply wrap other types, e.g. &T, [T], T?, T!, etc.
+// that simply wrap other types, e.g. &T, [T], T?, etc.
 macro_rules! implement_wrapping_type_getter {
     ($fn_name: ident, $variant: ident, $cache: ident) => {
         fn $fn_name(&mut self, decl: &Node) -> SemaResult<RcCell<Type>> {
@@ -778,7 +778,7 @@ impl SQIRGen {
         let field_type = field_type_rc.borrow()?;
 
         // If the field has an explicit relation, typecheck it.
-        // Otherwise, if it has a relational type (&T, &T!, &T?,
+        // Otherwise, if it has a relational type (&T, &T?,
         // or [&T]), then implicitly form a relation.
         match field.relation {
             Some(ref rel) => self.define_explicit_relation(
@@ -914,7 +914,7 @@ impl SQIRGen {
         }
     }
 
-    // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
+    // If 't' represents a relational type (&T, &T?, or [&T]),
     // ensure that the specified cardinality can be used with it,
     // then unwrap and return the referred pointed type T.
     // Otherwise, if the type is either not a relational type,
@@ -969,7 +969,7 @@ impl SQIRGen {
     //   we have no information about how many instances of the
     //   LHS may point to one particular instance of the RHS.
     // * The cardinality of the RHS is:
-    //   * One        for &T and &T!
+    //   * One        for &T
     //   * ZeroOrOne  for &T?
     //   * ZeroOrMore for [&T]
     fn define_implicit_relation(&mut self, class_type: &RcCell<Type>, field_type: &Type, field_name: &str) -> SemaResult<()> {
@@ -999,7 +999,7 @@ impl SQIRGen {
         }
     }
 
-    // If 't' represents a relational type (&T, &T!, &T?, or [&T]),
+    // If 't' represents a relational type (&T, &T?, or [&T]),
     // return the corresponding cardinality and the pointed type T.
     // Otherwise, return None.
     fn try_infer_type_cardinality(&self, t: &Type) -> SemaResult<Option<(RcCell<Type>, Cardinality)>> {
