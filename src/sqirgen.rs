@@ -1235,6 +1235,7 @@ impl SQIRGen {
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(ctx, x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(ctx, s),
             NodeValue::Identifier(name)     => self.generate_ident_ref(ctx, name),
+            NodeValue::Semi(ref expr)       => self.generate_semi(ctx, expr),
             NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx, binop),
             NodeValue::Block(ref items)     => self.generate_block(ctx, items),
             NodeValue::Function(ref func)   => self.generate_function(ctx, func),
@@ -1329,12 +1330,19 @@ impl SQIRGen {
         unimplemented!()
     }
 
+    fn generate_semi(&mut self, ctx: TyCtx, node: &Node) -> SemaResult<Expr> {
+        let subexpr = self.generate_expr(node, None)?;
+        let ty = self.get_unit_type();
+        let value = ExprValue::IgnoreValue(Box::new(subexpr));
+        let expr = Expr { ty, value };
+        self.unify(expr, ctx)
+    }
+
     fn generate_binary_op(&mut self, ctx: TyCtx, op: &ast::BinaryOp) -> SemaResult<Expr> {
         unimplemented!()
     }
 
     fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<Expr> {
-        // TODO(H2CO3): handle case where last expression is a Semi so ty = Unit
         let (items, ty) = match nodes.split_last() {
             Some((last, firsts)) => {
                 let mut items: Vec<_> = firsts.iter().map(
