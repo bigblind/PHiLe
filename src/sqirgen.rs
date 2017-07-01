@@ -16,6 +16,12 @@ use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
+#[derive(Debug)]
+struct TyCtx {
+    ty:    Option<RcType>, // type hint
+    range: Range,
+}
+
 #[allow(missing_debug_implementations)]
 struct SQIRGen {
     sqir: SQIR,
@@ -100,6 +106,12 @@ fn format_type(t: &WkType) -> String {
     };
 
     format!("{:#?}", *ptr)
+}
+
+impl Ranged for TyCtx {
+    fn range(&self) -> Range {
+        self.range
+    }
 }
 
 impl SQIRGen {
@@ -1198,7 +1210,7 @@ impl SQIRGen {
             _ => unreachable!("Non-Function function node?!"),
         };
 
-        let expr = self.generate_expr(node)?;
+        let expr = self.generate_expr(node, None)?;
         let name = decl.name.expect("function name");
         let ns = self.sqir.globals.get_mut(ns).expect("namespace");
         let slot = ns.get_mut(name).expect("forward-declared function");
@@ -1209,73 +1221,146 @@ impl SQIRGen {
         Ok(())
     }
 
-    // Main, centralized expression emitter.
+    // Top-level expression emitter.
     // 'ty' is a type hint from the caller, used
     // for the top-down part of type inference.
-    fn generate_expr(&mut self, node: &Node, /* ty: Option<RcType> */) -> SemaResult<Expr> {
+    fn generate_expr(&mut self, node: &Node, ty: Option<RcType>) -> SemaResult<Expr> {
+        let range = node.range;
+        let ctx = TyCtx { ty, range };
+
         match node.value {
-            NodeValue::NilLiteral           => self.generate_nil_literal(),
-            NodeValue::BoolLiteral(b)       => self.generate_bool_literal(b),
-            NodeValue::IntLiteral(n)        => self.generate_int_literal(n),
-            NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
-            NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
-            NodeValue::Identifier(name)     => self.generate_ident_ref(name),
-            NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(binop),
-            NodeValue::Block(ref items)     => self.generate_block(items),
-            NodeValue::Function(ref func)   => self.generate_function(func),
+            NodeValue::NilLiteral           => self.generate_nil_literal(ctx),
+            NodeValue::BoolLiteral(b)       => self.generate_bool_literal(ctx, b),
+            NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx, n),
+            NodeValue::FloatLiteral(x)      => self.generate_float_literal(ctx, x),
+            NodeValue::StringLiteral(ref s) => self.generate_string_literal(ctx, s),
+            NodeValue::Identifier(name)     => self.generate_ident_ref(ctx, name),
+            NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx, binop),
+            NodeValue::Block(ref items)     => self.generate_block(ctx, items),
+            NodeValue::Function(ref func)   => self.generate_function(ctx, func),
             _ => unimplemented!(),
         }
     }
 
-    fn generate_nil_literal(&self) -> SemaResult<Expr> {
-        unimplemented!()
+    // Try to unify the type of 'expr' with the type hint
+    // specified in 'ctx'. This may be either an identity
+    // transform or an implicit conversion (e.g. T -> T?).
+    // If no hint is provided, propagate the inferred one.
+    // Unification rules (with subtyping notation) follow:
+    // * T <= T
+    // * T <= T?          (results in an OptionalWrap)
+    // * Int <= Float     (results in an IntToFloat conversion)
+    fn unify(&self, expr: Expr, ctx: TyCtx) -> SemaResult<Expr> {
+        match ctx.ty {
+            Some(ty_hint) => if ty_hint == expr.ty {
+                Ok(expr)
+            } else if ty_hint == self.get_float_type() && expr.ty == self.get_int_type() {
+                let ty = ty_hint.clone();
+                let value = ExprValue::IntToFloat(Box::new(expr));
+                Ok(Expr { ty, value })
+            } else {
+                match *ty_hint.borrow()? {
+                    Type::Optional(ref wr) => if expr.ty == wr.as_rc()? {
+                        let ty = ty_hint.clone();
+                        let value = ExprValue::OptionalWrap(Box::new(expr));
+                        Ok(Expr { ty, value })
+                    } else {
+                        sema_error!(
+                            ctx.range,
+                            "Cannot match type '{}' with wrapped type of optional '{}'",
+                            format_type(&expr.ty.as_weak()),
+                            format_type(wr),
+                        )
+                    },
+                    _ => sema_error!(
+                        ctx.range,
+                        "Cannot match types: expected {}; found {}",
+                        format_type(&ty_hint.as_weak()),
+                        format_type(&expr.ty.as_weak()),
+                    ),
+                }
+            },
+            None => Ok(expr),
+        }
     }
 
-    fn generate_bool_literal(&self, b: bool) -> SemaResult<Expr> {
+    fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<Expr> {
+        let value = ExprValue::Nil;
+        let range = ctx.range;
+        let ty = match ctx.ty {
+            Some(ty) => ty,
+            None => return sema_error!(ctx, "Cannot infer optional type"),
+        };
+
+        match *ty.borrow()? {
+            Type::Optional(_) => (),
+            _ => return sema_error!(range, "Nil must have optional type"),
+        }
+
+        Ok(Expr { ty, value })
+    }
+
+    fn generate_bool_literal(&self, ctx: TyCtx, b: bool) -> SemaResult<Expr> {
         let ty = self.get_bool_type();
-        let value = ExprValue::BoolLiteral(b);
-        Ok(Expr { ty, value })
+        let value = ExprValue::BoolConst(b);
+        let expr = Expr { ty, value };
+        self.unify(expr, ctx)
     }
 
-    fn generate_int_literal(&self, n: u64) -> SemaResult<Expr> {
+    fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<Expr> {
         let ty = self.get_int_type();
-        let value = ExprValue::IntLiteral(n);
-        Ok(Expr { ty, value })
+        let value = ExprValue::IntConst(n);
+        let expr = Expr { ty, value };
+        self.unify(expr, ctx)
     }
 
-    fn generate_float_literal(&self, x: f64) -> SemaResult<Expr> {
+    fn generate_float_literal(&self, ctx: TyCtx, x: f64) -> SemaResult<Expr> {
         let ty = self.get_float_type();
-        let value = ExprValue::FloatLiteral(x);
-        Ok(Expr { ty, value })
+        let value = ExprValue::FloatConst(x);
+        let expr = Expr { ty, value };
+        self.unify(expr, ctx)
     }
 
-    fn generate_string_literal(&self, s: &str) -> SemaResult<Expr> {
+    fn generate_string_literal(&self, ctx: TyCtx, s: &str) -> SemaResult<Expr> {
         let ty = self.get_string_type();
-        let value = ExprValue::StringLiteral(s.to_owned());
-        Ok(Expr { ty, value })
+        let value = ExprValue::StringConst(s.to_owned());
+        let expr = Expr { ty, value };
+        self.unify(expr, ctx)
     }
 
-    fn generate_ident_ref(&self, name: &str) -> SemaResult<Expr> {
+    fn generate_ident_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<Expr> {
         unimplemented!()
     }
 
-    fn generate_binary_op(&mut self, op: &ast::BinaryOp) -> SemaResult<Expr> {
+    fn generate_binary_op(&mut self, ctx: TyCtx, op: &ast::BinaryOp) -> SemaResult<Expr> {
         unimplemented!()
     }
 
-    fn generate_block(&mut self, nodes: &[Node]) -> SemaResult<Expr> {
+    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<Expr> {
         // TODO(H2CO3): handle case where last expression is a Semi so ty = Unit
-        let items: Vec<_> = nodes.iter().map(
-            |node| self.generate_expr(node)
-        ).collect::<SemaResult<_>>()?;
+        let (items, ty) = match nodes.split_last() {
+            Some((last, firsts)) => {
+                let mut items: Vec<_> = firsts.iter().map(
+                    |node| self.generate_expr(node, None)
+                ).collect::<SemaResult<_>>()?;
 
-        let ty = items.last().map_or(self.get_unit_type(), |it| it.ty.clone());
+                let last_expr = self.generate_expr(last, ctx.ty)?;
+                let last_ty = last_expr.ty.clone();
+
+                items.push(last_expr);
+
+                (items, last_ty)
+            },
+            None => (vec![], self.get_unit_type()),
+        };
+
         let value = ExprValue::Seq(items);
 
         Ok(Expr { ty, value })
     }
 
-    fn generate_function(&mut self, func: &ast::Function) -> SemaResult<Expr> {
+    fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<Expr> {
+        // TODO(H2CO3): use ctx.ty for type checking/inference
         // TODO(H2CO3): declare function arguments before generating body
         let name = func.name.map(str::to_owned);
         let (arg_names, arg_types) = self.unzip_arg_names_and_types(&func.arguments)?;
@@ -1285,7 +1370,8 @@ impl SQIRGen {
         )?;
 
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
-        let body = Box::new(self.generate_expr(&func.body)?);
+        // TODO(H2CO3): instead of None, use the type inferred from the function type
+        let body = Box::new(self.generate_expr(&func.body, None)?);
 
         Self::check_return_type(&ty, &body, &func.body)?;
 

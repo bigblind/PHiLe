@@ -145,13 +145,14 @@ pub enum ExprValue {
     // Value of a forward-declared function
     Placeholder,
 
-    // Literals
-    NilLiteral,
-    BoolLiteral(bool),
-    IntLiteral(u64),
-    FloatLiteral(f64),
-    StringLiteral(String),
+    // Constants (mostly generated from literals)
+    Nil,
+    BoolConst(bool),
+    IntConst(u64),
+    FloatConst(f64),
+    StringConst(String),
 
+    // Lambda calculus backbone:
     // Variable definition (binding) + reference (substitution);
     // Function definition (lambda) + call
     VarBind(VarBind),
@@ -159,9 +160,11 @@ pub enum ExprValue {
     Function(Function),
     Call(Call),
 
-    // Implicit type conversions
-    OptionalConv(Box<Expr>),
-    IntToFloatConv(Box<Expr>),
+    // Type conversions: impicit T -> T?, Int -> Float,
+    // and explicit T -> unit (Semi)
+    OptionalWrap(Box<Expr>),
+    IntToFloat(Box<Expr>),
+    IgnoreValue(Box<Expr>),
 
     // Arithmetic, comparison, logical and set operations
     Neg(Box<Expr>),
