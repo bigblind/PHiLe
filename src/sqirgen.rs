@@ -1251,36 +1251,35 @@ impl SQIRGen {
     // * T <= T?          (results in an OptionalWrap)
     // * Int <= Float     (results in an IntToFloat conversion)
     fn unify(&self, expr: Expr, ctx: TyCtx) -> SemaResult<Expr> {
-        match ctx.ty {
-            Some(ty_hint) => if ty_hint == expr.ty {
+        if let Some(ty) = ctx.ty {
+            if ty == expr.ty {
                 Ok(expr)
-            } else if ty_hint == self.get_float_type() && expr.ty == self.get_int_type() {
-                let ty = ty_hint.clone();
+            } else if ty == self.get_float_type() && expr.ty == self.get_int_type() {
                 let value = ExprValue::IntToFloat(Box::new(expr));
                 Ok(Expr { ty, value })
-            } else {
-                match *ty_hint.borrow()? {
-                    Type::Optional(ref wr) => if expr.ty == wr.as_rc()? {
-                        let ty = ty_hint.clone();
-                        let value = ExprValue::OptionalWrap(Box::new(expr));
-                        Ok(Expr { ty, value })
-                    } else {
-                        sema_error!(
-                            ctx.range,
-                            "Cannot match type '{}' with wrapped type of optional '{}'",
-                            format_type(&expr.ty.as_weak()),
-                            format_type(wr),
-                        )
-                    },
-                    _ => sema_error!(
+            } else if let Type::Optional(ref inner) = *ty.borrow()? {
+                if expr.ty == inner.as_rc()? {
+                    let ty = ty.clone();
+                    let value = ExprValue::OptionalWrap(Box::new(expr));
+                    Ok(Expr { ty, value })
+                } else {
+                    sema_error!(
                         ctx.range,
-                        "Cannot match types: expected {}; found {}",
-                        format_type(&ty_hint.as_weak()),
+                        "Cannot match type '{}' with wrapped type of optional '{}'",
                         format_type(&expr.ty.as_weak()),
-                    ),
+                        format_type(inner),
+                    )
                 }
-            },
-            None => Ok(expr),
+            } else {
+                sema_error!(
+                    ctx.range,
+                    "Cannot match types: expected {}; found {}",
+                    format_type(&ty.as_weak()),
+                    format_type(&expr.ty.as_weak()),
+                )
+            }
+        } else {
+            Ok(expr)
         }
     }
 
