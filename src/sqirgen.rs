@@ -1251,36 +1251,34 @@ impl SQIRGen {
     // * T <= T?          (results in an OptionalWrap)
     // * Int <= Float     (results in an IntToFloat conversion)
     fn unify(&self, expr: Expr, ctx: TyCtx) -> SemaResult<Expr> {
-        if let Some(ty) = ctx.ty {
-            if ty == expr.ty {
-                Ok(expr)
-            } else if ty == self.get_float_type() && expr.ty == self.get_int_type() {
-                let value = ExprValue::IntToFloat(Box::new(expr));
-                Ok(Expr { ty, value })
-            } else if let Type::Optional(ref inner) = *ty.borrow()? {
-                if expr.ty == inner.as_rc()? {
-                    let ty = ty.clone();
-                    let value = ExprValue::OptionalWrap(Box::new(expr));
-                    Ok(Expr { ty, value })
-                } else {
-                    sema_error!(
-                        ctx.range,
-                        "Cannot match type '{}' with wrapped type of optional '{}'",
-                        format_type(&expr.ty.as_weak()),
-                        format_type(inner),
-                    )
-                }
+        let ty = match ctx.ty {
+            None => return Ok(expr),
+            Some(ty) => if ty == expr.ty {
+                return Ok(expr)
             } else {
-                sema_error!(
-                    ctx.range,
-                    "Cannot match types: expected {}; found {}",
-                    format_type(&ty.as_weak()),
-                    format_type(&expr.ty.as_weak()),
-                )
-            }
-        } else {
-            Ok(expr)
+                ty
+            },
+        };
+
+        if ty == self.get_float_type() && expr.ty == self.get_int_type() {
+            let value = ExprValue::IntToFloat(Box::new(expr));
+            return Ok(Expr { ty, value });
         }
+
+        if let Type::Optional(ref inner) = *ty.borrow()? {
+            if expr.ty == inner.as_rc()? {
+                let ty = ty.clone();
+                let value = ExprValue::OptionalWrap(Box::new(expr));
+                return Ok(Expr { ty, value });
+            }
+        }
+
+        sema_error!(
+            ctx.range,
+            "Cannot match types: expected {}; found {}",
+            format_type(&ty.as_weak()),
+            format_type(&expr.ty.as_weak()),
+        )
     }
 
     fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<Expr> {
