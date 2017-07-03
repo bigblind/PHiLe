@@ -1367,12 +1367,7 @@ impl SQIRGen {
         let ret_type_hint = if is_lambda {
             self.lambda_return_type_hint(&type_hint, func)?
         } else {
-            assert!(type_hint.is_none());
-            let ret_type = match func.ret_type {
-                Some(ref rt_decl) => self.type_from_decl(rt_decl)?,
-                None              => self.get_unit_type(),
-            };
-            Some(ret_type)
+            self.global_fn_return_type_hint(&type_hint, func)?
         };
 
         // TODO(H2CO3): declare function arguments before generating body
@@ -1513,5 +1508,20 @@ impl SQIRGen {
         };
 
         Ok(ret_type_hint)
+    }
+
+    fn global_fn_return_type_hint(
+        &mut self,
+        type_hint: &Option<FunctionType>,
+        func:      &ast::Function,
+    ) -> SemaResult<Option<RcType>> {
+        assert!(type_hint.is_none());
+
+        let ret_type = match func.ret_type {
+            Some(ref rt_decl) => self.type_from_decl(rt_decl)?,
+            None              => self.get_unit_type(),
+        };
+
+        Ok(Some(ret_type))
     }
 }
