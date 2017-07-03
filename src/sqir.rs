@@ -94,7 +94,7 @@ pub struct ClassType {
     pub fields: HashMap<String, WkType>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FunctionType {
     pub arg_types: Vec<WkType>,
     pub ret_type:  WkType,
@@ -160,7 +160,7 @@ pub enum ExprValue {
     Function(Function),
     Call(Call),
 
-    // Type conversions: impicit T -> T?, Int -> Float,
+    // Type conversions: implicit T -> T?, Int -> Float,
     // and explicit T -> unit (Semi)
     OptionalWrap(Box<Expr>),
     IntToFloat(Box<Expr>),
@@ -235,7 +235,6 @@ pub struct VarBind {
 
 #[derive(Debug)]
 pub struct Function {
-    pub name:      Option<String>,
     pub arg_names: Vec<String>,
     pub body:      Box<Expr>,
 }

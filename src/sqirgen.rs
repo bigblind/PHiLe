@@ -1144,21 +1144,14 @@ impl SQIRGen {
             |rt| self.type_from_decl(rt),
         )?;
 
-        let (_, arg_types) = self.unzip_arg_names_and_types(&decl.arguments)?;
+        let arg_types = self.arg_types_for_toplevel_func(&decl.arguments)?;
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
 
         Ok((name, ty))
     }
 
-    fn unzip_arg_names_and_types(&mut self, args: &[Node])
-        -> SemaResult<(Vec<String>, Vec<RcType>)> {
-
-        let names = args.iter().map(|node| match node.value {
-            NodeValue::FuncArg(ref arg) => arg.name.to_owned(),
-            _ => unreachable!("Non-FuncArg argument?!"),
-        }).collect();
-
-        let types = args.iter().map(|node| match node.value {
+    fn arg_types_for_toplevel_func(&mut self, args: &[Node]) -> SemaResult<Vec<RcType>> {
+        args.iter().map(|node| match node.value {
             NodeValue::FuncArg(ref arg) => {
                 let type_decl = match arg.type_decl {
                     Some(ref typ) => Ok(typ),
@@ -1167,9 +1160,7 @@ impl SQIRGen {
                 self.type_from_decl(type_decl?)
             },
             _ => unreachable!("Non-FuncArg argument?!"),
-        }).collect::<SemaResult<_>>()?;
-
-        Ok((names, types))
+        }).collect()
     }
 
     //
@@ -1246,7 +1237,7 @@ impl SQIRGen {
     // Try to unify the type of 'expr' with the type hint
     // specified in 'ctx'. This may be either an identity
     // transform or an implicit conversion (e.g. T -> T?).
-    // If no hint is provided, propagate the inferred one.
+    // If no type is provided, propagate the inferred one.
     // Unification rules (with subtyping notation) follow:
     // * T <= T
     // * T <= T?          (results in an OptionalWrap)
@@ -1284,7 +1275,7 @@ impl SQIRGen {
 
     fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<Expr> {
         let value = ExprValue::Nil;
-        let range = ctx.range;
+
         let ty = match ctx.ty {
             Some(ty) => ty,
             None => return sema_error!(ctx, "Cannot infer optional type"),
@@ -1292,7 +1283,7 @@ impl SQIRGen {
 
         match *ty.borrow()? {
             Type::Optional(_) => (),
-            _ => return sema_error!(range, "Nil must have optional type"),
+            _ => return sema_error!(ctx.range, "Nil must have optional type"),
         }
 
         Ok(Expr { ty, value })
@@ -1349,7 +1340,7 @@ impl SQIRGen {
                     |node| self.generate_expr(node, None)
                 ).collect::<SemaResult<_>>()?;
 
-                let last_expr = self.generate_expr(last, ctx.ty)?;
+                let last_expr = self.generate_expr(last, ctx.ty.clone())?;
                 let last_ty = last_expr.ty.clone();
 
                 items.push(last_expr);
@@ -1360,47 +1351,167 @@ impl SQIRGen {
         };
 
         let value = ExprValue::Seq(items);
+        let expr = Expr { ty, value };
 
-        Ok(Expr { ty, value })
+        self.unify(expr, ctx)
     }
 
     fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<Expr> {
-        // TODO(H2CO3): use ctx.ty for type checking/inference
+        let is_lambda = func.name.is_none();
+        let range = ctx.range;
+        let arg_names = Self::arg_names_for_function(func);
+        let type_hint = Self::type_hint_for_function(ctx)?;
+
+        Self::check_function_arity(func, &type_hint, range)?;
+
+        let ret_type_hint = if is_lambda {
+            self.lambda_return_type_hint(&type_hint, func)?
+        } else {
+            assert!(type_hint.is_none());
+            let ret_type = match func.ret_type {
+                Some(ref rt_decl) => self.type_from_decl(rt_decl)?,
+                None              => self.get_unit_type(),
+            };
+            Some(ret_type)
+        };
+
         // TODO(H2CO3): declare function arguments before generating body
-        let name = func.name.map(str::to_owned);
-        let (arg_names, arg_types) = self.unzip_arg_names_and_types(&func.arguments)?;
-        let ret_type = func.ret_type.as_ref().map_or(
-            Ok(self.get_unit_type()),
-            |rt| self.type_from_decl(rt),
-        )?;
+        let arg_types = self.arg_types_for_function(func, &type_hint)?;
+        let body = Box::new(self.generate_expr(&func.body, ret_type_hint)?);
+        let ret_type = body.ty.clone();
 
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
-        // TODO(H2CO3): instead of None, use the type inferred from the function type
-        let body = Box::new(self.generate_expr(&func.body, None)?);
-
-        Self::check_return_type(&ty, &body, &func.body)?;
-
-        let value = ExprValue::Function(Function { name, arg_names, body });
+        let value = ExprValue::Function(Function { arg_names, body });
 
         Ok(Expr { ty, value })
     }
 
-    // helper for generate_function()
-    fn check_return_type(ty: &RcType, body: &Expr, node: &Node) -> SemaResult<()> {
-        match *ty.borrow()? {
-            Type::Function(FunctionType { ref ret_type, .. }) => {
-                if ret_type.as_rc()? != body.ty {
-                    sema_error!(
-                        node,
-                        "Return type mismatch: declared {} but body has type {}",
-                        format_type(&ret_type),
-                        format_type(&body.ty.as_weak()),
-                    )
+    fn arg_names_for_function(func: &ast::Function) -> Vec<String> {
+        func.arguments.iter().map(|node| match node.value {
+            NodeValue::FuncArg(ref arg) => arg.name.to_owned(),
+            _ => unreachable!("Non-FuncArg argument?!"),
+        }).collect()
+    }
+
+    fn arg_types_for_function(
+        &mut self,
+        func:    &ast::Function,
+        fn_type: &Option<FunctionType>,
+    ) -> SemaResult<Vec<RcType>> {
+        match *fn_type {
+            Some(ref t) => {
+                func.arguments.iter()
+                    .zip(t.arg_types.iter())
+                    .map(|(node, ty)| self.arg_type_with_hint(node, ty))
+                    .collect()
+            },
+            None => {
+                func.arguments.iter()
+                    .map(|node| self.arg_type_no_hint(node))
+                    .collect()
+            },
+        }
+    }
+
+    fn arg_type_with_hint(&mut self, node: &Node, ty: &WkType) -> SemaResult<RcType> {
+        match node.value {
+            NodeValue::FuncArg(ref arg) => match arg.type_decl {
+                None => Ok(ty.as_rc()?),
+                Some(ref type_decl) => {
+                    let expected_type = ty.as_rc()?;
+                    let actual_type = self.type_from_decl(type_decl)?;
+
+                    if expected_type == actual_type {
+                        Ok(actual_type)
+                    } else {
+                        sema_error!(
+                            node,
+                            "Expected argument of type {}, found {}",
+                            format_type(&ty),
+                            format_type(&actual_type.as_weak()),
+                        )
+                    }
+                },
+            },
+            _ => unreachable!("Non-FuncArg argument?!"),
+        }
+    }
+
+    fn arg_type_no_hint(&mut self, node: &Node) -> SemaResult<RcType> {
+        match node.value {
+            NodeValue::FuncArg(ref arg) => {
+                let type_decl = match arg.type_decl {
+                    Some(ref ty) => Ok(ty),
+                    None => sema_error!(node, "Cannot infer argument type"),
+                };
+                self.type_from_decl(type_decl?)
+            },
+            _ => unreachable!("Non-FuncArg argument?!"),
+        }
+    }
+
+    fn type_hint_for_function(ctx: TyCtx) -> SemaResult<Option<FunctionType>> {
+        match ctx.ty {
+            Some(ty) => match *ty.borrow()? {
+                Type::Function(ref f) => Ok(Some(f.clone())),
+                _ => sema_error!(
+                    ctx.range,
+                    "Non-function type {} prescribed for function",
+                    format_type(&ty.as_weak()),
+                ),
+            },
+            None => Ok(None),
+        }
+    }
+
+    fn check_function_arity(func: &ast::Function, type_hint: &Option<FunctionType>, range: Range) -> SemaResult<()> {
+        let fn_type = if let Some(ref ty) = *type_hint {
+            ty
+        } else {
+            return Ok(())
+        };
+
+        let expected_num_args = fn_type.arg_types.len();
+        let actual_num_args = func.arguments.len();
+
+        if expected_num_args == actual_num_args {
+            Ok(())
+        } else {
+            sema_error!(
+                range,
+                "Expected {} arguments, found {}",
+                expected_num_args,
+                actual_num_args,
+            )
+        }
+    }
+
+    fn lambda_return_type_hint(
+        &mut self,
+        type_hint: &Option<FunctionType>,
+        func:      &ast::Function,
+    ) -> SemaResult<Option<RcType>> {
+        let ret_type_hint = match (type_hint, &func.ret_type) {
+            (&Some(ref t), &None) => Some(t.ret_type.as_rc()?),
+            (&None, &Some(ref rt_decl)) => Some(self.type_from_decl(rt_decl)?),
+            (&Some(ref t), &Some(ref rt_decl)) => {
+                let expected_ret_type = t.ret_type.as_rc()?;
+                let actual_ret_type = self.type_from_decl(rt_decl)?;
+
+                if actual_ret_type == expected_ret_type {
+                    Some(actual_ret_type)
                 } else {
-                    Ok(())
+                    return sema_error!(
+                        rt_decl,
+                        "Expected return type {}, found {}",
+                        format_type(&t.ret_type),
+                        format_type(&self.type_from_decl(rt_decl)?.as_weak()),
+                    )
                 }
             },
-            _ => unreachable!("Non-function type for function?!"),
-        }
+            (&None, &None) => None,
+        };
+
+        Ok(ret_type_hint)
     }
 }
