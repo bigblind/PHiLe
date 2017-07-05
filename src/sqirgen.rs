@@ -24,7 +24,8 @@ struct TyCtx {
 
 #[allow(missing_debug_implementations)]
 struct SQIRGen {
-    sqir: SQIR,
+    sqir:   SQIR,
+    locals: HashMap<String, Expr>,
 }
 
 
@@ -118,7 +119,8 @@ impl SQIRGen {
     // Constructor
     fn new() -> SQIRGen {
         SQIRGen {
-            sqir: SQIR::new(),
+            sqir:   SQIR::new(),
+            locals: hash_map![],
         }
     }
 
@@ -290,7 +292,7 @@ impl SQIRGen {
     }
 
     //
-    // Type-wise semantic analysis methods
+    // Type-wise semantic analysis methods (DDL)
     //
 
     fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcType> {
@@ -1164,7 +1166,7 @@ impl SQIRGen {
     }
 
     //
-    // Function-level SQIR generation
+    // Value-level SQIR generation (DML)
     //
 
     fn generate_free_function(&mut self, func: &Node) -> SemaResult<()> {
@@ -1225,7 +1227,7 @@ impl SQIRGen {
             NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx, n),
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(ctx, x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(ctx, s),
-            NodeValue::Identifier(name)     => self.generate_ident_ref(ctx, name),
+            NodeValue::Identifier(name)     => self.generate_name_ref(ctx, name),
             NodeValue::Semi(ref expr)       => self.generate_semi(ctx, expr),
             NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx, binop),
             NodeValue::Block(ref items)     => self.generate_block(ctx, items),
@@ -1317,8 +1319,25 @@ impl SQIRGen {
         self.unify(expr, ctx)
     }
 
-    fn generate_ident_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<Expr> {
-        unimplemented!()
+    fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<Expr> {
+        if let Some(local) = self.locals.get(name) {
+            let ty = local.ty.clone();
+            let value = ExprValue::LocalNameRef(name.to_owned());
+            let expr = Expr { ty, value };
+            return self.unify(expr, ctx);
+        }
+
+        // TODO(H2CO3): handle impl namespaces too
+        if let Some(top_ns) = self.sqir.globals.get(&None) {
+            if let Some(global) = top_ns.get(name) {
+                let ty = global.ty.clone();
+                let value = ExprValue::GlobalNameRef(name.to_owned());
+                let expr = Expr { ty, value };
+                return self.unify(expr, ctx);
+            }
+        }
+
+        sema_error!(ctx, "Undeclared identifier: '{}'", name)
     }
 
     fn generate_semi(&mut self, ctx: TyCtx, node: &Node) -> SemaResult<Expr> {

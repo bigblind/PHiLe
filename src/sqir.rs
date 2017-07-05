@@ -156,7 +156,8 @@ pub enum ExprValue {
     // Variable definition (binding) + reference (substitution);
     // Function definition (lambda) + call
     VarBind(VarBind),
-    VarSubst { name: String },
+    LocalNameRef(String),
+    GlobalNameRef(String),
     Function(Function),
     Call(Call),
 
