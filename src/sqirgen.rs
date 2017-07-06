@@ -25,7 +25,7 @@ struct TyCtx {
 #[allow(missing_debug_implementations)]
 struct SQIRGen {
     sqir:   SQIR,
-    locals: HashMap<String, Expr>,
+    locals: HashMap<String, RcExpr>,
 }
 
 
@@ -1087,7 +1087,7 @@ impl SQIRGen {
         let value = Value::Placeholder;
         let entry = self.sqir.globals.entry(None); // no namespace
         let globals = entry.or_insert_with(BTreeMap::new);
-        let expr = Expr { ty, value };
+        let expr = RcCell::new(Expr { ty, value });
 
         if globals.insert(name, expr).is_none() {
             Ok(())
@@ -1114,7 +1114,7 @@ impl SQIRGen {
     }
 
     fn impl_from_functions(names_types: Vec<(String, RcType)>, decls: &[Node])
-        -> SemaResult<BTreeMap<String, Expr>> {
+        -> SemaResult<BTreeMap<String, RcExpr>> {
 
         assert!(names_types.len() == decls.len());
 
@@ -1122,7 +1122,7 @@ impl SQIRGen {
 
         for ((name, ty), node) in names_types.into_iter().zip(decls.iter()) {
             let value = Value::Placeholder;
-            let expr = Expr { ty, value };
+            let expr = RcCell::new(Expr { ty, value });
 
             if ns.insert(name, expr).is_some() {
                 return sema_error!(node, "Redefinition of function")
@@ -1203,13 +1203,19 @@ impl SQIRGen {
             _ => unreachable!("Non-Function function node?!"),
         };
 
-        let expr = self.generate_expr(node, None)?;
+        let expr_rc = self.generate_expr(node, None)?;
+        let expr = expr_rc.borrow()?;
         let name = decl.name.expect("function name");
         let ns = self.sqir.globals.get_mut(ns).expect("namespace");
-        let slot = ns.get_mut(name).expect("forward-declared function");
+        let mut slot = ns.get(name).expect("forward-declared function").borrow_mut()?;
 
         // Replace placeholder expr with actual, generated function
-        *slot = expr;
+        assert!(slot.ty == expr.ty);
+
+        slot.value = match expr.value {
+            Value::Function(ref func) => Value::Function(func.clone()),
+            _ => unreachable!("Global function compiled to non-Function value?!"),
+        };
 
         Ok(())
     }
@@ -1217,7 +1223,7 @@ impl SQIRGen {
     // Top-level expression emitter.
     // 'ty' is a type hint from the caller, used
     // for the top-down part of type inference.
-    fn generate_expr(&mut self, node: &Node, ty: Option<RcType>) -> SemaResult<Expr> {
+    fn generate_expr(&mut self, node: &Node, ty: Option<RcType>) -> SemaResult<RcExpr> {
         let range = node.range;
         let ctx = TyCtx { ty, range };
 
@@ -1244,26 +1250,28 @@ impl SQIRGen {
     // * T <= T
     // * T <= T?          (results in an OptionalWrap)
     // * Int <= Float     (results in an IntToFloat conversion)
-    fn unify(&self, expr: Expr, ctx: TyCtx) -> SemaResult<Expr> {
+    fn unify(&self, expr: RcExpr, ctx: TyCtx) -> SemaResult<RcExpr> {
         let ty = match ctx.ty {
             None => return Ok(expr),
-            Some(ty) => if ty == expr.ty {
+            Some(ty) => if ty == expr.borrow()?.ty {
                 return Ok(expr)
             } else {
                 ty
             },
         };
 
-        if ty == self.get_float_type() && expr.ty == self.get_int_type() {
-            let value = Value::IntToFloat(Box::new(expr));
-            return Ok(Expr { ty, value });
+        let expr_ref = expr.borrow()?;
+
+        if ty == self.get_float_type() && expr_ref.ty == self.get_int_type() {
+            let value = Value::IntToFloat(expr.as_weak());
+            return Ok(RcCell::new(Expr { ty, value }));
         }
 
         if let Type::Optional(ref inner) = *ty.borrow()? {
-            if expr.ty == inner.as_rc()? {
+            if expr_ref.ty == inner.as_rc()? {
                 let ty = ty.clone();
-                let value = Value::OptionalWrap(Box::new(expr));
-                return Ok(Expr { ty, value });
+                let value = Value::OptionalWrap(expr.as_weak());
+                return Ok(RcCell::new(Expr { ty, value }));
             }
         }
 
@@ -1271,11 +1279,11 @@ impl SQIRGen {
             ctx.range,
             "Cannot match types: expected {}; found {}",
             format_type(&ty.as_weak()),
-            format_type(&expr.ty.as_weak()),
+            format_type(&expr_ref.ty.as_weak()),
         )
     }
 
-    fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<Expr> {
+    fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<RcExpr> {
         let value = Value::Nil;
 
         let ty = match ctx.ty {
@@ -1288,81 +1296,75 @@ impl SQIRGen {
             _ => return sema_error!(ctx.range, "Nil must have optional type"),
         }
 
-        Ok(Expr { ty, value })
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_bool_literal(&self, ctx: TyCtx, b: bool) -> SemaResult<Expr> {
+    fn generate_bool_literal(&self, ctx: TyCtx, b: bool) -> SemaResult<RcExpr> {
         let ty = self.get_bool_type();
         let value = Value::BoolConst(b);
-        let expr = Expr { ty, value };
+        let expr = RcCell::new(Expr { ty, value });
         self.unify(expr, ctx)
     }
 
-    fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<Expr> {
+    fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<RcExpr> {
         let ty = self.get_int_type();
         let value = Value::IntConst(n);
-        let expr = Expr { ty, value };
+        let expr = RcCell::new(Expr { ty, value });
         self.unify(expr, ctx)
     }
 
-    fn generate_float_literal(&self, ctx: TyCtx, x: f64) -> SemaResult<Expr> {
+    fn generate_float_literal(&self, ctx: TyCtx, x: f64) -> SemaResult<RcExpr> {
         let ty = self.get_float_type();
         let value = Value::FloatConst(x);
-        let expr = Expr { ty, value };
+        let expr = RcCell::new(Expr { ty, value });
         self.unify(expr, ctx)
     }
 
-    fn generate_string_literal(&self, ctx: TyCtx, s: &str) -> SemaResult<Expr> {
+    fn generate_string_literal(&self, ctx: TyCtx, s: &str) -> SemaResult<RcExpr> {
         let ty = self.get_string_type();
         let value = Value::StringConst(s.to_owned());
-        let expr = Expr { ty, value };
+        let expr = RcCell::new(Expr { ty, value });
         self.unify(expr, ctx)
     }
 
-    fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<Expr> {
-        if let Some(local) = self.locals.get(name) {
-            let ty = local.ty.clone();
-            let value = Value::LocalNameRef(name.to_owned());
-            let expr = Expr { ty, value };
-            return self.unify(expr, ctx);
+    fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<RcExpr> {
+        if let Some(expr) = self.locals.get(name) {
+            return self.unify(expr.clone(), ctx);
         }
 
         // TODO(H2CO3): handle impl namespaces too
         if let Some(top_ns) = self.sqir.globals.get(&None) {
-            if let Some(global) = top_ns.get(name) {
-                let ty = global.ty.clone();
-                let value = Value::GlobalNameRef(name.to_owned());
-                let expr = Expr { ty, value };
-                return self.unify(expr, ctx);
+            if let Some(expr) = top_ns.get(name) {
+                return self.unify(expr.clone(), ctx);
             }
         }
 
         sema_error!(ctx, "Undeclared identifier: '{}'", name)
     }
 
-    fn generate_semi(&mut self, ctx: TyCtx, node: &Node) -> SemaResult<Expr> {
+    fn generate_semi(&mut self, ctx: TyCtx, node: &Node) -> SemaResult<RcExpr> {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
-        let value = Value::Ignore(Box::new(subexpr));
-        let expr = Expr { ty, value };
+        let value = Value::Ignore(subexpr.as_weak());
+        let expr = RcCell::new(Expr { ty, value });
         self.unify(expr, ctx)
     }
 
-    fn generate_binary_op(&mut self, ctx: TyCtx, op: &ast::BinaryOp) -> SemaResult<Expr> {
+    fn generate_binary_op(&mut self, ctx: TyCtx, op: &ast::BinaryOp) -> SemaResult<RcExpr> {
         unimplemented!()
     }
 
-    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<Expr> {
+    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
         let (items, ty) = match nodes.split_last() {
             Some((last, firsts)) => {
                 let mut items: Vec<_> = firsts.iter().map(
-                    |node| self.generate_expr(node, None)
+                    |node| self.generate_expr(node, None).map(|rc| rc.as_weak())
                 ).collect::<SemaResult<_>>()?;
 
                 let last_expr = self.generate_expr(last, ctx.ty.clone())?;
-                let last_ty = last_expr.ty.clone();
+                let last_ty = last_expr.borrow()?.ty.clone();
 
-                items.push(last_expr);
+                items.push(last_expr.as_weak());
 
                 (items, last_ty)
             },
@@ -1370,12 +1372,12 @@ impl SQIRGen {
         };
 
         let value = Value::Seq(items);
-        let expr = Expr { ty, value };
+        let expr = RcCell::new(Expr { ty, value });
 
         self.unify(expr, ctx)
     }
 
-    fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<Expr> {
+    fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<RcExpr> {
         let is_lambda = func.name.is_none();
         let range = ctx.range;
         let arg_names = Self::arg_names_for_function(func);
@@ -1391,13 +1393,14 @@ impl SQIRGen {
 
         // TODO(H2CO3): declare function arguments before generating body
         let arg_types = self.arg_types_for_function(func, &type_hint)?;
-        let body = Box::new(self.generate_expr(&func.body, ret_type_hint)?);
-        let ret_type = body.ty.clone();
+        let body_rc = self.generate_expr(&func.body, ret_type_hint)?;
+        let ret_type = body_rc.borrow()?.ty.clone();
+        let body = body_rc.as_weak();
 
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
         let value = Value::Function(Function { arg_names, body });
 
-        Ok(Expr { ty, value })
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
     fn arg_names_for_function(func: &ast::Function) -> Vec<String> {

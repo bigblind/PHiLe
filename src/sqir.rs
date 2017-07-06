@@ -13,6 +13,8 @@ use util::*;
 
 pub type RcType = RcCell<Type>;
 pub type WkType = WkCell<Type>;
+pub type RcExpr = RcCell<Expr>;
+pub type WkExpr = WkCell<Expr>;
 
 //
 // Types (part of the Schema)
@@ -152,59 +154,57 @@ pub enum Value {
     StringConst(String),
 
     // Lambda calculus backbone:
-    // Variable definition (binding) + reference (substitution);
-    // Function definition (lambda) + call
-    VarBind(VarBind),
-    LocalNameRef(String),
-    GlobalNameRef(String),
+    // Function definition (lambda) + call.
+    // Variable definitions (bindings) + references (substitutions)
+    // are handled without explicit Expr nodes.
     Function(Function),
     Call(Call),
 
     // Type conversions: implicit T -> T?, Int -> Float,
     // and explicit T -> unit (Semi)
-    OptionalWrap(Box<Expr>),
-    IntToFloat(Box<Expr>),
-    Ignore(Box<Expr>),
+    OptionalWrap(WkExpr),
+    IntToFloat(WkExpr),
+    Ignore(WkExpr),
 
     // Arithmetic, comparison, logical and set operations
-    Neg(Box<Expr>),
-    Add(Box<(Expr, Expr)>),
-    Sub(Box<(Expr, Expr)>),
-    Mul(Box<(Expr, Expr)>),
-    Div(Box<(Expr, Expr)>),
-    Mod(Box<(Expr, Expr)>),
+    Neg(WkExpr),
+    Add(WkExpr, WkExpr),
+    Sub(WkExpr, WkExpr),
+    Mul(WkExpr, WkExpr),
+    Div(WkExpr, WkExpr),
+    Mod(WkExpr, WkExpr),
 
-    Eq(Box<(Expr, Expr)>),
-    Neq(Box<(Expr, Expr)>),
-    Lt(Box<(Expr, Expr)>),
-    LtEq(Box<(Expr, Expr)>),
-    Gt(Box<(Expr, Expr)>),
-    GtEq(Box<(Expr, Expr)>),
+    Eq(WkExpr, WkExpr),
+    Neq(WkExpr, WkExpr),
+    Lt(WkExpr, WkExpr),
+    LtEq(WkExpr, WkExpr),
+    Gt(WkExpr, WkExpr),
+    GtEq(WkExpr, WkExpr),
 
-    And(Box<(Expr, Expr)>),
-    Or(Box<(Expr, Expr)>),
-    Not(Box<Expr>),
+    And(WkExpr, WkExpr),
+    Or(WkExpr, WkExpr),
+    Not(WkExpr),
 
-    Intersect(Box<(Expr, Expr)>),
-    Union(Box<(Expr, Expr)>),
-    SetDiff(Box<(Expr, Expr)>),
+    Intersect(WkExpr, WkExpr),
+    Union(WkExpr, WkExpr),
+    SetDiff(WkExpr, WkExpr),
 
     // Branch
     // TODO(H2CO3): generalize for match & arbitrary patterns
-    Branch(Box<Branch>),
+    Branch(Branch),
 
     // Blocks and aggreate literals
-    Seq(Vec<Expr>),
-    ArrayLiteral(Vec<Expr>),
-    TupleLiteral(Vec<Expr>),
-    StructLiteral(BTreeMap<String, Expr>),
+    Seq(Vec<WkExpr>),
+    ArrayLiteral(Vec<WkExpr>),
+    TupleLiteral(Vec<WkExpr>),
+    StructLiteral(BTreeMap<String, WkExpr>),
 
     // Generalized Built-in DB operations
-    Map(Box<Map>),       // projections etc.
-    Reduce(Box<Reduce>), // aggregations
-    Filter(Box<Filter>), // selection
-    Sort(Box<Sort>),
-    Group(Box<Group>),
+    Map(Map),       // projections etc.
+    Reduce(Reduce), // aggregations
+    Filter(Filter), // selection
+    Sort(Sort),
+    Group(Group),
     Join,   // TODO(H2CO3): design + implement
     Insert, // TODO(H2CO3): design + implement
     Update, // TODO(H2CO3): design + implement
@@ -227,60 +227,53 @@ pub enum Value {
     Max(RcType, String),
 }
 
-#[derive(Debug)]
-pub struct VarBind {
-    pub name:  String,
-    pub value: Box<Expr>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Function {
-    pub arg_names: Vec<String>,
-    pub body:      Box<Expr>,
+    pub arg_names: Vec<String>, // TODO(H2CO3): maybe this should be a Vec<RcExpr> holding arguments?
+    pub body:      WkExpr,
 }
 
 #[derive(Debug)]
 pub struct Call {
-    pub callee: Box<Expr>,
-    pub args:   Vec<Expr>,
+    pub callee: WkExpr,
+    pub args:   Vec<WkExpr>,
 }
 
 #[derive(Debug)]
 pub struct Branch {
-    pub cond:      Expr,
-    pub true_val:  Expr,
-    pub false_val: Expr,
+    pub discriminant: WkExpr,
+    pub arms:         Vec<(WkExpr, WkExpr)>,
 }
 
 #[derive(Debug)]
 pub struct Map {
-    pub range: Expr,
-    pub op:    Expr,
+    pub range: WkExpr,
+    pub op:    WkExpr,
 }
 
 #[derive(Debug)]
 pub struct Reduce {
-    pub range: Expr,
-    pub zero:  Expr,
-    pub op:    Expr,
+    pub range: WkExpr,
+    pub zero:  WkExpr,
+    pub op:    WkExpr,
 }
 
 #[derive(Debug)]
 pub struct Filter {
-    pub range: Expr,
-    pub pred:  Expr,
+    pub range: WkExpr,
+    pub pred:  WkExpr,
 }
 
 #[derive(Debug)]
 pub struct Sort {
-    pub range: Expr,
-    pub cmp:   Expr,
+    pub range: WkExpr,
+    pub cmp:   WkExpr,
 }
 
 #[derive(Debug)]
 pub struct Group {
-    pub range: Expr,
-    pub pred:  Expr,
+    pub range: WkExpr,
+    pub pred:  WkExpr,
 }
 
 //
@@ -297,7 +290,8 @@ pub struct SQIR {
     pub tuple_types:    HashMap<Vec<RcType>, RcType>,
     pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
     pub relations:      HashMap<(RcType, String), Relation>,
-    pub globals:        BTreeMap<Option<String>, BTreeMap<String, Expr>>,
+    pub globals:        BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
+    pub expressions:    Vec<RcExpr>,
 }
 
 
@@ -376,6 +370,7 @@ impl SQIR {
             function_types: HashMap::new(),
             relations:      HashMap::new(),
             globals:        BTreeMap::new(), // TODO(H2CO3): declare built-in functions
+            expressions:    Vec::new(),
         }
     }
 
