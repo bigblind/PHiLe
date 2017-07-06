@@ -1084,7 +1084,7 @@ impl SQIRGen {
 
     fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
         let (name, ty) = self.forward_declare_function(node)?;
-        let value = ExprValue::Placeholder;
+        let value = Value::Placeholder;
         let entry = self.sqir.globals.entry(None); // no namespace
         let globals = entry.or_insert_with(BTreeMap::new);
         let expr = Expr { ty, value };
@@ -1121,7 +1121,7 @@ impl SQIRGen {
         let mut ns = BTreeMap::new();
 
         for ((name, ty), node) in names_types.into_iter().zip(decls.iter()) {
-            let value = ExprValue::Placeholder;
+            let value = Value::Placeholder;
             let expr = Expr { ty, value };
 
             if ns.insert(name, expr).is_some() {
@@ -1255,14 +1255,14 @@ impl SQIRGen {
         };
 
         if ty == self.get_float_type() && expr.ty == self.get_int_type() {
-            let value = ExprValue::IntToFloat(Box::new(expr));
+            let value = Value::IntToFloat(Box::new(expr));
             return Ok(Expr { ty, value });
         }
 
         if let Type::Optional(ref inner) = *ty.borrow()? {
             if expr.ty == inner.as_rc()? {
                 let ty = ty.clone();
-                let value = ExprValue::OptionalWrap(Box::new(expr));
+                let value = Value::OptionalWrap(Box::new(expr));
                 return Ok(Expr { ty, value });
             }
         }
@@ -1276,7 +1276,7 @@ impl SQIRGen {
     }
 
     fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<Expr> {
-        let value = ExprValue::Nil;
+        let value = Value::Nil;
 
         let ty = match ctx.ty {
             Some(ty) => ty,
@@ -1293,28 +1293,28 @@ impl SQIRGen {
 
     fn generate_bool_literal(&self, ctx: TyCtx, b: bool) -> SemaResult<Expr> {
         let ty = self.get_bool_type();
-        let value = ExprValue::BoolConst(b);
+        let value = Value::BoolConst(b);
         let expr = Expr { ty, value };
         self.unify(expr, ctx)
     }
 
     fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<Expr> {
         let ty = self.get_int_type();
-        let value = ExprValue::IntConst(n);
+        let value = Value::IntConst(n);
         let expr = Expr { ty, value };
         self.unify(expr, ctx)
     }
 
     fn generate_float_literal(&self, ctx: TyCtx, x: f64) -> SemaResult<Expr> {
         let ty = self.get_float_type();
-        let value = ExprValue::FloatConst(x);
+        let value = Value::FloatConst(x);
         let expr = Expr { ty, value };
         self.unify(expr, ctx)
     }
 
     fn generate_string_literal(&self, ctx: TyCtx, s: &str) -> SemaResult<Expr> {
         let ty = self.get_string_type();
-        let value = ExprValue::StringConst(s.to_owned());
+        let value = Value::StringConst(s.to_owned());
         let expr = Expr { ty, value };
         self.unify(expr, ctx)
     }
@@ -1322,7 +1322,7 @@ impl SQIRGen {
     fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<Expr> {
         if let Some(local) = self.locals.get(name) {
             let ty = local.ty.clone();
-            let value = ExprValue::LocalNameRef(name.to_owned());
+            let value = Value::LocalNameRef(name.to_owned());
             let expr = Expr { ty, value };
             return self.unify(expr, ctx);
         }
@@ -1331,7 +1331,7 @@ impl SQIRGen {
         if let Some(top_ns) = self.sqir.globals.get(&None) {
             if let Some(global) = top_ns.get(name) {
                 let ty = global.ty.clone();
-                let value = ExprValue::GlobalNameRef(name.to_owned());
+                let value = Value::GlobalNameRef(name.to_owned());
                 let expr = Expr { ty, value };
                 return self.unify(expr, ctx);
             }
@@ -1343,7 +1343,7 @@ impl SQIRGen {
     fn generate_semi(&mut self, ctx: TyCtx, node: &Node) -> SemaResult<Expr> {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
-        let value = ExprValue::IgnoreValue(Box::new(subexpr));
+        let value = Value::Ignore(Box::new(subexpr));
         let expr = Expr { ty, value };
         self.unify(expr, ctx)
     }
@@ -1369,7 +1369,7 @@ impl SQIRGen {
             None => (vec![], self.get_unit_type()),
         };
 
-        let value = ExprValue::Seq(items);
+        let value = Value::Seq(items);
         let expr = Expr { ty, value };
 
         self.unify(expr, ctx)
@@ -1395,7 +1395,7 @@ impl SQIRGen {
         let ret_type = body.ty.clone();
 
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
-        let value = ExprValue::Function(Function { arg_names, body });
+        let value = Value::Function(Function { arg_names, body });
 
         Ok(Expr { ty, value })
     }

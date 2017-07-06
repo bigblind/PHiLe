@@ -132,11 +132,11 @@ pub struct Relation {
 #[derive(Debug)]
 pub struct Expr {
     pub ty:    RcType, // can be Rc: no cycles are possible
-    pub value: ExprValue,
+    pub value: Value,
 }
 
 #[derive(Debug)]
-pub enum ExprValue {
+pub enum Value {
     ////////////////////////////////////////////////////////////
     // Core -- only the variants below are emitted by SQIRGen //
     ////////////////////////////////////////////////////////////
@@ -164,7 +164,7 @@ pub enum ExprValue {
     // and explicit T -> unit (Semi)
     OptionalWrap(Box<Expr>),
     IntToFloat(Box<Expr>),
-    IgnoreValue(Box<Expr>),
+    Ignore(Box<Expr>),
 
     // Arithmetic, comparison, logical and set operations
     Neg(Box<Expr>),
