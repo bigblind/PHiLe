@@ -7,7 +7,7 @@
 //
 
 use std::io;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 use codegen::*;
@@ -40,24 +40,15 @@ pub fn generate_active_record(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut W
 
 impl<'a> Generator<'a> {
     fn generate_pod(mut self) -> io::Result<()> {
-        // For determinism, sort user-defined types by name
-        let types = self.types_sorted_by_name();
-        let wrs = self.writers_for_types(&types)?;
+        let wrs = self.writers_for_types(self.sqir.named_types.iter())?;
 
-        for typ in types {
+        for (name, typ) in &self.sqir.named_types {
+            let wr = &mut *wrs[name].borrow_mut();
+
             match *typ.borrow()? {
-                Type::Struct(ref st) => {
-                    let wr = &mut *wrs[&st.name].borrow_mut();
-                    self.write_fields(wr, &st.name, &st.fields)?;
-                },
-                Type::Class(ref ct)  => {
-                    let wr = &mut *wrs[&ct.name].borrow_mut();
-                    self.write_fields(wr, &ct.name, &ct.fields)?;
-                },
-                Type::Enum(ref et)   => {
-                    let wr = &mut *wrs[&et.name].borrow_mut();
-                    self.write_variants(wr, &et.name, &et.variants)?;
-                },
+                Type::Struct(ref st) => self.write_fields(wr, name, &st.fields)?,
+                Type::Class(ref ct)  => self.write_fields(wr, name, &ct.fields)?,
+                Type::Enum(ref et)   => self.write_variants(wr, name, &et.variants)?,
                 _ => continue, // primitive named types need no declaration
             }
         }
@@ -65,19 +56,19 @@ impl<'a> Generator<'a> {
         Ok(())
     }
 
-    fn writers_for_types(&mut self, types: &[RcType]) -> io::Result<HashMap<String, Rc<RefCell<io::Write>>>> {
-        let mut writers = HashMap::with_capacity(types.len());
+    fn writers_for_types<'b, I>(&mut self, types: I) -> io::Result<BTreeMap<String, Rc<RefCell<io::Write>>>>
+        where I: Iterator<Item=(&'b String, &'b RcType)> {
 
-        for typ in types {
-            let name = match *typ.borrow()? {
-                Type::Struct(ref st) => st.name.to_owned(),
-                Type::Class(ref ct)  => ct.name.to_owned(),
-                Type::Enum(ref et)   => et.name.to_owned(),
-                _ => continue, // primitive named types need no declaration
-            };
+        let mut writers = BTreeMap::new();
 
-            let writer = self.writer_with_preamble(&name)?;
-            writers.insert(name, writer);
+        for (name, typ) in types {
+            // primitive named types need no declaration
+            match *typ.borrow()? {
+                Type::Struct(_) | Type::Class(_) | Type::Enum(_) => (),
+                _ => continue,
+            }
+
+            writers.insert(name.clone(), self.writer_with_preamble(name)?);
         }
 
         Ok(writers)
@@ -95,33 +86,27 @@ impl<'a> Generator<'a> {
         &self,
         wr: &mut io::Write,
         raw_struct_name: &str,
-        fields: &HashMap<String, WkType>,
+        fields: &BTreeMap<String, WkType>,
     ) -> io::Result<()> {
         // Respect the type name transform
         let struct_name = transform_type_name(raw_struct_name, &self.params);
         writeln!(wr, "type {} struct {{", struct_name)?;
 
-        // For determinism, sort fields by name.
-        // Respect the field name transform too.
+        // Respect the field name transform
         // TODO(H2CO3): For efficiency, sort fields by alignment.
-        let sorted_fields = {
-            let mut fs: Vec<_> = fields.iter().map(|(fname, typ)| {
-                let field_name = transform_field_name(fname, &self.params);
-                (field_name, typ)
-            }).collect();
+        let transformed_fields: Vec<_> = fields.iter().map(|(fname, typ)| {
+            let field_name = transform_field_name(fname, &self.params);
+            (field_name, typ)
+        }).collect();
 
-            fs.sort_by(|lhs, rhs| Ord::cmp(&lhs.0, &rhs.0));
-            fs
-        };
-
-        let max_len = sorted_fields.iter()
+        let max_len = transformed_fields.iter()
             .map(|&(ref name, _)| grapheme_count(name))
             .max().unwrap_or(0);
 
         let pad = " ".repeat(max_len);
 
         // Indexing `pad` with grapheme counts is safe because it's ASCII-only.
-        for (fname, ftype) in sorted_fields {
+        for (fname, ftype) in transformed_fields {
             write!(wr, "    {}{} ", fname, &pad[grapheme_count(&fname)..])?;
             self.write_type(wr, ftype)?;
             writeln!(wr)?;
@@ -137,7 +122,7 @@ impl<'a> Generator<'a> {
         &self,
         wr: &mut io::Write,
         raw_enum_name: &str,
-        variants: &HashMap<String, WkType>,
+        variants: &BTreeMap<String, WkType>,
     ) -> io::Result<()> {
         // Respect the type name transform
         let enum_name = transform_type_name(raw_enum_name, &self.params);
@@ -154,30 +139,24 @@ impl<'a> Generator<'a> {
         writeln!(wr, "    Value   interface{{}}")?;
         writeln!(wr, "}}\n")?;
 
-        // For determinism, sort variants by name.
-        // Respect the variant name transform too.
+        // Respect the variant name transform.
         // For correctly prefixing each variant name, first
         // they are prefixed with the name of the variant and
         // an underscore, which is a word boundary according
         // to the case transforms in the Heck crate. Then, the
         // composed 'raw' variant name is transformed to obtain
         // the final, correctly cased and prefixed variant name.
-        let sorted_variants = {
-            let mut vs: Vec<_> = variants.keys().map(|vname| {
-                let variant_name = raw_enum_name.to_owned() + "_" + vname;
-                transform_variant_name(&variant_name, &self.params)
-            }).collect();
+        let transformed_variants: Vec<_> = variants.keys().map(|vname| {
+            let variant_name = raw_enum_name.to_owned() + "_" + vname;
+            transform_variant_name(&variant_name, &self.params)
+        }).collect();
 
-            vs.sort();
-            vs
-        };
-
-        let max_len = sorted_variants.iter().map(String::len).max().unwrap_or(0);
+        let max_len = transformed_variants.iter().map(String::len).max().unwrap_or(0);
         let pad = " ".repeat(max_len);
 
         writeln!(wr, "const (")?;
 
-        for vname in &sorted_variants {
+        for vname in &transformed_variants {
             writeln!(wr, "    {}{} = \"{}\"", vname, &pad[grapheme_count(vname)..], vname)?;
         }
 
@@ -247,12 +226,6 @@ impl<'a> Generator<'a> {
     //
     // Common Helpers
     //
-
-    fn types_sorted_by_name(&self) -> Vec<RcType> {
-        let mut types: Vec<_> = self.sqir.named_types.iter().collect();
-        types.sort_by_key(|&(name, _)| name);
-        types.iter().map(|&(_, typ)| typ.clone()).collect()
-    }
 
     fn write_header(&self, wr: &mut io::Write) -> io::Result<()> {
         self.write_comment_header(wr)?;

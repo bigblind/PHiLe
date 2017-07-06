@@ -13,9 +13,10 @@ use error::{ DerefError, DerefResult, SyntaxResult };
 use unicode_segmentation::UnicodeSegmentation;
 
 
-macro_rules! hash_map {
-    ($($k: expr => $v: expr),*) => ({
-        let mut _tmp = ::std::collections::HashMap::new();
+// Generic macro for building an associated container literal
+macro_rules! assoc_map {
+    ($t: ident, $($k: expr => $v: expr),*) => ({
+        let mut _tmp = ::std::collections::$t::new();
         $({
             let key = $k;
             let val = $v;
@@ -24,8 +25,21 @@ macro_rules! hash_map {
             );
         })*
         _tmp
-    });
-    ($($k: expr => $v: expr),+,) => (hash_map!($($k => $v),+))
+    })
+}
+
+macro_rules! hash_map {
+    ($($k: expr => $v: expr),*) => {
+        assoc_map!(HashMap, $($k => $v),*)
+    };
+    ($($k: expr => $v: expr),+,) => { hash_map!($($k => $v),+) };
+}
+
+macro_rules! btree_map {
+    ($($k: expr => $v: expr),*) => {
+        assoc_map!(BTreeMap, $($k => $v),*)
+    };
+    ($($k: expr => $v: expr),+,) => { btree_map!($($k => $v),+) };
 }
 
 
@@ -46,7 +60,7 @@ pub fn grapheme_count(string: &str) -> usize {
 
 pub fn unescape_string_literal(string: &str) -> SyntaxResult<String> {
     if string.contains('\\') {
-        unimplemented!()
+        unimplemented!() // TODO(H2CO3): escape string literals
     } else {
         Ok(string.to_owned())
     }

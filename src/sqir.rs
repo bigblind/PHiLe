@@ -6,8 +6,7 @@
 // on 07/04/2017
 //
 
-use std::collections::{ HashMap, HashSet };
-use std::hash::{ Hash, Hasher };
+use std::collections::{ HashMap, BTreeMap, BTreeSet };
 use std::cmp::*;
 use util::*;
 
@@ -79,19 +78,19 @@ pub enum ComplexTypeKind {
 #[derive(Debug)]
 pub struct EnumType {
     pub name:     String,
-    pub variants: HashMap<String, WkType>,
+    pub variants: BTreeMap<String, WkType>,
 }
 
 #[derive(Debug)]
 pub struct StructType {
     pub name:   String,
-    pub fields: HashMap<String, WkType>,
+    pub fields: BTreeMap<String, WkType>,
 }
 
 #[derive(Debug)]
 pub struct ClassType {
     pub name:   String,
-    pub fields: HashMap<String, WkType>,
+    pub fields: BTreeMap<String, WkType>,
 }
 
 #[derive(Debug, Clone)]
@@ -198,7 +197,7 @@ pub enum ExprValue {
     Seq(Vec<Expr>),
     ArrayLiteral(Vec<Expr>),
     TupleLiteral(Vec<Expr>),
-    StructLiteral(HashMap<String, Expr>),
+    StructLiteral(BTreeMap<String, Expr>),
 
     // Generalized Built-in DB operations
     Map(Box<Map>),       // projections etc.
@@ -290,7 +289,7 @@ pub struct Group {
 
 #[derive(Debug)]
 pub struct SQIR {
-    pub named_types:    HashMap<String, RcType>,
+    pub named_types:    BTreeMap<String, RcType>,
     pub decimal_types:  HashMap<(usize, usize), RcType>,
     pub optional_types: HashMap<RcType, RcType>,
     pub pointer_types:  HashMap<RcType, RcType>,
@@ -298,7 +297,7 @@ pub struct SQIR {
     pub tuple_types:    HashMap<Vec<RcType>, RcType>,
     pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
     pub relations:      HashMap<(RcType, String), Relation>,
-    pub globals:        HashMap<Option<String>, HashMap<String, Expr>>,
+    pub globals:        BTreeMap<Option<String>, BTreeMap<String, Expr>>,
 }
 
 
@@ -339,21 +338,26 @@ impl PartialEq for Relation {
 
 impl Eq for Relation {}
 
-// This is how you generate order-independent
-// hashes in a hostile, state-only environment.
-impl Hash for Relation {
-    fn hash<H: Hasher>(&self, hasher: &mut H) {
-        let mini = min(&self.lhs, &self.rhs);
-        let maxi = max(&self.lhs, &self.rhs);
-        mini.hash(hasher);
-        maxi.hash(hasher);
+impl PartialOrd for Relation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Relation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_min  = min(&self.lhs,  &self.rhs);
+        let self_max  = max(&self.lhs,  &self.rhs);
+        let other_min = min(&other.lhs, &other.rhs);
+        let other_max = max(&other.lhs, &other.rhs);
+        Ord::cmp(&(self_min, self_max), &(other_min, other_max))
     }
 }
 
 impl SQIR {
     pub fn new() -> SQIR {
         // TODO(H2CO3): match these with get_bool_type(), etc. in sqirgen.rs
-        let named_types = hash_map![
+        let named_types = btree_map![
             "bool"   => RcCell::new(Type::Bool),
             "int"    => RcCell::new(Type::Int),
             "float"  => RcCell::new(Type::Float),
@@ -364,14 +368,14 @@ impl SQIR {
 
         SQIR {
             named_types:    named_types,
-            decimal_types:  hash_map![],
-            optional_types: hash_map![],
-            pointer_types:  hash_map![],
-            array_types:    hash_map![],
-            tuple_types:    hash_map![],
-            function_types: hash_map![],
-            relations:      hash_map![],
-            globals:        hash_map![], // TODO(H2CO3): declare built-in functions
+            decimal_types:  HashMap::new(),
+            optional_types: HashMap::new(),
+            pointer_types:  HashMap::new(),
+            array_types:    HashMap::new(),
+            tuple_types:    HashMap::new(),
+            function_types: HashMap::new(),
+            relations:      HashMap::new(),
+            globals:        BTreeMap::new(), // TODO(H2CO3): declare built-in functions
         }
     }
 
@@ -383,7 +387,7 @@ impl SQIR {
     // way that the RelationSide corresponding to the key
     // appears on the LHS, whereas the referred RelationSide
     // is the RHS.
-    pub fn unique_relations(&self) -> HashSet<&Relation> {
+    pub fn unique_relations(&self) -> BTreeSet<&Relation> {
         self.relations.values().collect()
     }
 }

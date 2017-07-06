@@ -6,8 +6,8 @@
 // on 07/04/2017
 //
 
-use std::collections::HashMap;
-use std::collections::hash_map::Entry;
+use std::collections::{ HashMap, BTreeMap };
+use std::collections::btree_map::Entry;
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
@@ -120,7 +120,7 @@ impl SQIRGen {
     fn new() -> SQIRGen {
         SQIRGen {
             sqir:   SQIR::new(),
-            locals: hash_map![],
+            locals: HashMap::new(),
         }
     }
 
@@ -353,8 +353,8 @@ impl SQIRGen {
     // Helpers for struct types
     //
 
-    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<HashMap<String, WkType>> {
-        let mut fields = HashMap::with_capacity(decl.fields.len());
+    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<BTreeMap<String, WkType>> {
+        let mut fields = BTreeMap::new();
 
         for node in &decl.fields {
             let field = match node.value {
@@ -384,8 +384,8 @@ impl SQIRGen {
     // Helpers for class types
     //
 
-    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<HashMap<String, WkType>> {
-        let mut fields = HashMap::with_capacity(decl.fields.len());
+    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<BTreeMap<String, WkType>> {
+        let mut fields = BTreeMap::new();
 
         for node in &decl.fields {
             let field = match node.value {
@@ -410,8 +410,8 @@ impl SQIRGen {
     // Helpers for enum types
     //
 
-    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<HashMap<String, WkType>> {
-        let mut variants = HashMap::with_capacity(decl.variants.len());
+    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<BTreeMap<String, WkType>> {
+        let mut variants = BTreeMap::new();
 
         for node in &decl.variants {
             let variant = match node.value {
@@ -1086,7 +1086,7 @@ impl SQIRGen {
         let (name, ty) = self.forward_declare_function(node)?;
         let value = ExprValue::Placeholder;
         let entry = self.sqir.globals.entry(None); // no namespace
-        let globals = entry.or_insert_with(HashMap::new);
+        let globals = entry.or_insert_with(BTreeMap::new);
         let expr = Expr { ty, value };
 
         if globals.insert(name, expr).is_none() {
@@ -1114,11 +1114,11 @@ impl SQIRGen {
     }
 
     fn impl_from_functions(names_types: Vec<(String, RcType)>, decls: &[Node])
-        -> SemaResult<HashMap<String, Expr>> {
+        -> SemaResult<BTreeMap<String, Expr>> {
 
         assert!(names_types.len() == decls.len());
 
-        let mut ns = HashMap::with_capacity(names_types.len());
+        let mut ns = BTreeMap::new();
 
         for ((name, ty), node) in names_types.into_iter().zip(decls.iter()) {
             let value = ExprValue::Placeholder;
