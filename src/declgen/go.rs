@@ -43,13 +43,17 @@ impl<'a> Generator<'a> {
         let wrs = self.writers_for_types(self.sqir.named_types.iter())?;
 
         for (name, typ) in &self.sqir.named_types {
-            let wr = &mut *wrs[name].borrow_mut();
+            // primitive named types have no associated writer
+            let mut wr = match wrs.get(name) {
+                Some(w) => w.borrow_mut(),
+                None    => continue,
+            };
 
             match *typ.borrow()? {
-                Type::Struct(ref st) => self.write_fields(wr, name, &st.fields)?,
-                Type::Class(ref ct)  => self.write_fields(wr, name, &ct.fields)?,
-                Type::Enum(ref et)   => self.write_variants(wr, name, &et.variants)?,
-                _ => continue, // primitive named types need no declaration
+                Type::Struct(ref st) => self.write_fields(&mut *wr, name, &st.fields)?,
+                Type::Class(ref ct)  => self.write_fields(&mut *wr, name, &ct.fields)?,
+                Type::Enum(ref et)   => self.write_variants(&mut *wr, name, &et.variants)?,
+                _ => unreachable!("Attempt to declare primitive type?!"),
             }
         }
 
