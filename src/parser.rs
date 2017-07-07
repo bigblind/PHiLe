@@ -372,11 +372,8 @@ impl<'a> Parser<'a> {
             Some(_) => Some(self.parse_type()?),
             None    => None,
         };
-        let init_expr = match self.accept("=") {
-            Some(_) => Some(self.parse_expr()?),
-            None    => None,
-        };
 
+        let init_expr = self.expect("=").and_then(|_| self.parse_expr())?;
         let semicolon = self.expect(";")?;
         let name = name_tok.value;
         let range = make_range(let_keyword, semicolon);

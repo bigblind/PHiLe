@@ -130,7 +130,7 @@ pub struct Impl<'a> {
 pub struct VarDecl<'a> {
     pub name:      &'a str,
     pub type_decl: Option<Node<'a>>,
-    pub init_expr: Option<Node<'a>>,
+    pub init_expr: Node<'a>,
 }
 
 #[derive(Debug)]
