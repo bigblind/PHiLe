@@ -330,9 +330,7 @@ impl Ord for RelationSide {
 
 impl PartialEq for Relation {
     fn eq(&self, other: &Self) -> bool {
-        self.lhs == other.lhs && self.rhs == other.rhs
-        ||
-        self.lhs == other.rhs && self.rhs == other.lhs
+        self.cmp(other) == Ordering::Equal
     }
 }
 
