@@ -247,13 +247,13 @@ fn main() {
         )
     });
 
-    let mut sqir = stopwatch!("Typechecking and generating SQIR", {
+    let raw_sqir = stopwatch!("Typechecking and generating SQIR", {
         generate_sqir(&program).unwrap_or_else(
             |error| panic!(format_sema_error(&error, &args.sources))
         )
     });
 
-    stopwatch!("Optimizing SQIR", optimize_sqir(&mut sqir));
+    let sqir = stopwatch!("Optimizing SQIR", optimize_sqir(raw_sqir));
 
     let mut wp = writer_provider_with_args(&args);
 
