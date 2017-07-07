@@ -171,7 +171,7 @@ fn transform_name<D>(
 ) -> String
     where D: FnOnce(Language) -> NameTransform {
 
-    match transform.unwrap_or_else(|| default(lang)) {
+    match transform.unwrap_or(default(lang)) {
         NameTransform::Identity       => name.to_owned(),
         NameTransform::LowerSnakeCase => name.to_snake_case(),
         NameTransform::UpperSnakeCase => name.to_shouty_snake_case(),
