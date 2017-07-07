@@ -161,9 +161,15 @@ pub enum Value {
     Call(Call),
 
     // Type conversions: implicit T -> T?, Int -> Float,
-    // and explicit T -> unit (Semi)
-    OptionalWrap(WkExpr),
-    IntToFloat(WkExpr),
+    // and explicit T -> unit (Semi).
+    // Implicit conversions are inserted by the unify()
+    // function, which always creates a new expression
+    // for each encountered implicit conversion. Therefore
+    // these conversions cannot form a reference cycle,
+    // so it's OK to make their argument strong, so that
+    // they don't have to be inserted into `temporaries`.
+    OptionalWrap(RcExpr),
+    IntToFloat(RcExpr),
     Ignore(WkExpr),
 
     // Arithmetic, comparison, logical and set operations
@@ -291,7 +297,7 @@ pub struct SQIR {
     pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
     pub relations:      HashMap<(RcType, String), Relation>,
     pub globals:        BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
-    pub expressions:    Vec<RcExpr>,
+    pub temporaries:    Vec<RcExpr>,
 }
 
 
@@ -370,7 +376,7 @@ impl SQIR {
             function_types: HashMap::new(),
             relations:      HashMap::new(),
             globals:        BTreeMap::new(), // TODO(H2CO3): declare built-in functions
-            expressions:    Vec::new(),
+            temporaries:    Vec::new(),
         }
     }
 

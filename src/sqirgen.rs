@@ -16,7 +16,7 @@ use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TyCtx {
     ty:    Option<RcType>, // type hint
     range: Range,
@@ -1227,19 +1227,28 @@ impl SQIRGen {
         let range = node.range;
         let ctx = TyCtx { ty, range };
 
-        match node.value {
-            NodeValue::NilLiteral           => self.generate_nil_literal(ctx),
-            NodeValue::BoolLiteral(b)       => self.generate_bool_literal(ctx, b),
-            NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx, n),
-            NodeValue::FloatLiteral(x)      => self.generate_float_literal(ctx, x),
-            NodeValue::StringLiteral(ref s) => self.generate_string_literal(ctx, s),
-            NodeValue::Identifier(name)     => self.generate_name_ref(ctx, name),
-            NodeValue::Semi(ref expr)       => self.generate_semi(ctx, expr),
-            NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx, binop),
-            NodeValue::Block(ref items)     => self.generate_block(ctx, items),
-            NodeValue::Function(ref func)   => self.generate_function(ctx, func),
+        let tmp = match node.value {
+            NodeValue::NilLiteral           => self.generate_nil_literal(ctx.clone()),
+            NodeValue::BoolLiteral(b)       => self.generate_bool_literal(b),
+            NodeValue::IntLiteral(n)        => self.generate_int_literal(n),
+            NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
+            NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
+            NodeValue::Identifier(name)     => self.generate_name_ref(ctx.clone(), name),
+            NodeValue::EmptyStmt            => self.generate_empty_stmt(ctx.clone()),
+            NodeValue::Semi(ref expr)       => self.generate_semi(expr),
+            NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
+            NodeValue::TupleLiteral(ref vs) => self.generate_tuple(ctx.clone(), vs),
+            NodeValue::ArrayLiteral(ref vs) => self.generate_array(ctx.clone(), vs),
+            NodeValue::Block(ref items)     => self.generate_block(ctx.clone(), items),
+            NodeValue::Function(ref func)   => self.generate_function(ctx.clone(), func),
             _ => unimplemented!(),
-        }
+        };
+
+        let expr = self.unify(tmp?, ctx)?;
+
+        self.sqir.temporaries.push(expr.clone());
+
+        Ok(expr)
     }
 
     // Try to unify the type of 'expr' with the type hint
@@ -1263,14 +1272,14 @@ impl SQIRGen {
         let expr_ref = expr.borrow()?;
 
         if ty == self.get_float_type() && expr_ref.ty == self.get_int_type() {
-            let value = Value::IntToFloat(expr.as_weak());
+            let value = Value::IntToFloat(expr.clone());
             return Ok(RcCell::new(Expr { ty, value }));
         }
 
         if let Type::Optional(ref inner) = *ty.borrow()? {
             if expr_ref.ty == inner.as_rc()? {
                 let ty = ty.clone();
-                let value = Value::OptionalWrap(expr.as_weak());
+                let value = Value::OptionalWrap(expr.clone());
                 return Ok(RcCell::new(Expr { ty, value }));
             }
         }
@@ -1299,58 +1308,65 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_bool_literal(&self, ctx: TyCtx, b: bool) -> SemaResult<RcExpr> {
+    fn generate_bool_literal(&self, b: bool) -> SemaResult<RcExpr> {
         let ty = self.get_bool_type();
         let value = Value::BoolConst(b);
-        let expr = RcCell::new(Expr { ty, value });
-        self.unify(expr, ctx)
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<RcExpr> {
+    fn generate_int_literal(&self, n: u64) -> SemaResult<RcExpr> {
         let ty = self.get_int_type();
         let value = Value::IntConst(n);
-        let expr = RcCell::new(Expr { ty, value });
-        self.unify(expr, ctx)
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_float_literal(&self, ctx: TyCtx, x: f64) -> SemaResult<RcExpr> {
+    fn generate_float_literal(&self, x: f64) -> SemaResult<RcExpr> {
         let ty = self.get_float_type();
         let value = Value::FloatConst(x);
-        let expr = RcCell::new(Expr { ty, value });
-        self.unify(expr, ctx)
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_string_literal(&self, ctx: TyCtx, s: &str) -> SemaResult<RcExpr> {
+    fn generate_string_literal(&self, s: &str) -> SemaResult<RcExpr> {
         let ty = self.get_string_type();
         let value = Value::StringConst(s.to_owned());
-        let expr = RcCell::new(Expr { ty, value });
-        self.unify(expr, ctx)
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
     fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<RcExpr> {
         if let Some(expr) = self.locals.get(name) {
-            return self.unify(expr.clone(), ctx);
+            return Ok(expr.clone())
         }
 
         // TODO(H2CO3): handle impl namespaces too
         if let Some(top_ns) = self.sqir.globals.get(&None) {
             if let Some(expr) = top_ns.get(name) {
-                return self.unify(expr.clone(), ctx);
+                return Ok(expr.clone())
             }
         }
 
         sema_error!(ctx, "Undeclared identifier: '{}'", name)
     }
 
-    fn generate_semi(&mut self, ctx: TyCtx, node: &Node) -> SemaResult<RcExpr> {
+    fn generate_empty_stmt(&mut self, ctx: TyCtx) -> SemaResult<RcExpr> {
+        self.generate_tuple(ctx, &[])
+    }
+
+    fn generate_semi(&mut self, node: &Node) -> SemaResult<RcExpr> {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
         let value = Value::Ignore(subexpr.as_weak());
-        let expr = RcCell::new(Expr { ty, value });
-        self.unify(expr, ctx)
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
     fn generate_binary_op(&mut self, ctx: TyCtx, op: &ast::BinaryOp) -> SemaResult<RcExpr> {
+        unimplemented!()
+    }
+
+    fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
+        unimplemented!()
+    }
+
+    fn generate_array(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
         unimplemented!()
     }
 
@@ -1372,9 +1388,8 @@ impl SQIRGen {
         };
 
         let value = Value::Seq(items);
-        let expr = RcCell::new(Expr { ty, value });
 
-        self.unify(expr, ctx)
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
     fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<RcExpr> {
