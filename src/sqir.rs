@@ -157,8 +157,14 @@ pub enum Value {
     // Function definition (lambda) + call.
     // Variable definitions (bindings) + references (substitutions)
     // are handled without explicit Expr nodes.
+    // The only exception is function arguments: those have no
+    // initializer expression; the only context they can refer to
+    // is the function they belong to.
+    // 'index' is to be interpreted within the function, and
+    // NOT within the context of all currently-visible locals.
     Function(Function),
     Call(Call),
+    FuncArg { func: WkExpr, index: usize },
 
     // Type conversions: implicit T -> T?, Int -> Float,
     // and explicit T -> unit (Semi).
@@ -235,8 +241,8 @@ pub enum Value {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub arg_names: Vec<String>, // TODO(H2CO3): maybe this should be a Vec<RcExpr> holding arguments?
-    pub body:      WkExpr,
+    pub args: Vec<RcExpr>, // FuncArg expressions
+    pub body: WkExpr,
 }
 
 #[derive(Debug)]

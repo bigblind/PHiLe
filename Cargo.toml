@@ -9,6 +9,18 @@ readme        = "README.md"
 documentation = "https://h2co3.github.io/"
 description   = "The Painless High-Level Persistence Engine"
 
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+
+[profile.bench]
+panic = "abort"
+
+[profile.doc]
+panic = "abort"
+
 [dependencies]
 clap                 = "2.23.3"
 unicode-segmentation = "1.1.0"

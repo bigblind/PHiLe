@@ -116,6 +116,12 @@ impl<T> Hash for RcCell<T> {
 }
 
 impl<T> WkCell<T> {
+    pub fn new() -> WkCell<T> {
+        WkCell {
+            ptr: Weak::new()
+        }
+    }
+
     pub fn as_rc(&self) -> DerefResult<RcCell<T>> {
         self.ptr.upgrade().map(|rc| RcCell { ptr: rc }).ok_or(DerefError::Strongify)
     }

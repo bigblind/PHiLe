@@ -22,6 +22,11 @@ struct TyCtx {
     range: Range,
 }
 
+#[derive(Debug)]
+struct ScopeGuard {
+    locals: RcCell<Vec<String>>,
+}
+
 #[allow(missing_debug_implementations)]
 struct SQIRGen {
     sqir:   SQIR,
@@ -1392,10 +1397,39 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value }))
     }
 
+    //
+    // Declaring locals, RAII, etc.
+    //
+
+    // Declares a local in the current (innermost/top-of-the-stack) scope.
+    // Returns an error if a local with the specified name already exists.
+    fn declare_local(&mut self, name: &str, expr: RcExpr) -> SemaResult<RcExpr> {
+        unimplemented!()
+    }
+
+    // Opens a new local scope. After this returns, 'declare_local()'
+    // will use the fresh new scope to declare locals in.
+    // The caller must hold on to the returned ScopeGuard as long as
+    // s/he wishes to keep the scope open. ScopeGuard::drop() will
+    // remove the topmost/innermost scope and all its declarations,
+    // and insert markers for destructors.
+    // TODO(H2CO3): insert destructors for temporaries too.
+    // Likely design: the reverse scope stack will not only contain
+    // a vector of named variables, but also a vector of references
+    // to temporaries. This will also be walked, in reverse order,
+    // by the cleanup code in ScopeGuard::drop().
+    fn begin_local_scope(&mut self) -> ScopeGuard {
+        unimplemented!()
+    }
+
+    //
+    // Actually generating SQIR for funcions
+    //
+
     fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<RcExpr> {
+        // Juggle types around, ensuring they are consistent
         let is_lambda = func.name.is_none();
         let range = ctx.range;
-        let arg_names = Self::arg_names_for_function(func);
         let type_hint = Self::type_hint_for_function(ctx)?;
 
         Self::check_function_arity(func, &type_hint, range)?;
@@ -1406,31 +1440,70 @@ impl SQIRGen {
             self.global_fn_return_type_hint(&type_hint, func)?
         };
 
-        // TODO(H2CO3): declare function arguments before generating body
+        // Declare function arguments before generating body
         let arg_types = self.arg_types_for_function(func, &type_hint)?;
+        let scope_guard = self.begin_local_scope();
+        let args = self.declare_function_arguments(func, &arg_types)?;
+        let tmp_args = args.clone();
+
+        // Generate body
+        // TODO(H2CO3): isn't it a problem that at this point, while the
+        // body is being generated, the arguments' parent function
+        // pointer points nowhere because it's an empty weak pointer?
         let body_rc = self.generate_expr(&func.body, ret_type_hint)?;
         let ret_type = body_rc.borrow()?.ty.clone();
         let body = body_rc.as_weak();
 
+        // Form the function expression
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
-        let value = Value::Function(Function { arg_names, body });
+        let value = Value::Function(Function { args, body });
+        let expr = RcCell::new(Expr { ty, value });
 
-        Ok(RcCell::new(Expr { ty, value }))
+        // Fix arguments so that they actually point back to the function.
+        // A copy of the original `args` vector is used, which should be
+        // OK, since they both contain pointers to the same set of Exprs.
+        Self::fixup_function_arguments(tmp_args, &expr);
+
+        Ok(expr)
     }
 
-    fn arg_names_for_function(func: &ast::Function) -> Vec<String> {
-        func.arguments.iter().map(|node| match node.value {
-            NodeValue::FuncArg(ref arg) => arg.name.to_owned(),
-            _ => unreachable!("Non-FuncArg argument?!"),
-        }).collect()
+    fn declare_function_arguments(
+        &mut self,
+        func:  &ast::Function,
+        types: &[RcType]
+    ) -> SemaResult<Vec<RcExpr>> {
+        assert!(func.arguments.len() == types.len());
+
+        func.arguments.iter().zip(types.iter()).enumerate().map(
+            |(index, (node, ty))| match node.value {
+                NodeValue::FuncArg(ref arg) => {
+                    let func = WkCell::new(); // dummy, points nowhere (yet)
+                    let ty = ty.clone();
+                    let value = Value::FuncArg { func, index };
+                    let expr = RcCell::new(Expr { ty, value });
+                    self.declare_local(arg.name, expr)
+                },
+                _ => unreachable!("Non-FuncArg argument?!"),
+            }
+        ).collect()
+    }
+
+    fn fixup_function_arguments(args: Vec<RcExpr>, fn_expr: &RcExpr) {
+        // TODO(H2CO3): do not unwrap()/expect() return value of borrow_mut()
+        for arg in args {
+            match arg.borrow_mut().expect("").value {
+                Value::FuncArg { ref mut func, .. } => *func = fn_expr.as_weak(),
+                _ => unreachable!("Non-FuncArg argument?!"),
+            }
+        }
     }
 
     fn arg_types_for_function(
         &mut self,
-        func:    &ast::Function,
-        fn_type: &Option<FunctionType>,
+        func:      &ast::Function,
+        type_hint: &Option<FunctionType>,
     ) -> SemaResult<Vec<RcType>> {
-        match *fn_type {
+        match *type_hint {
             Some(ref t) => {
                 func.arguments.iter()
                     .zip(t.arg_types.iter())
