@@ -7,7 +7,7 @@
 //
 
 use std::collections::{ HashMap, BTreeMap };
-use std::collections::btree_map::Entry;
+use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
@@ -141,8 +141,8 @@ impl Drop for ScopeGuard {
         scope.vars.reverse();
 
         // TODO(H2CO3): insert Drop instructions too (where?)
-        for var_name in scope.vars {
-            locals.var_map.remove(&var_name).expect("variable not in declaration map");
+        for var_name in &scope.vars {
+            locals.var_map.remove(var_name).expect("variable not in declaration map");
         }
 
         // TODO(H2CO3): insert Drop instructions for scope.temps (where?)
@@ -1138,12 +1138,12 @@ impl SQIRGen {
         let impl_name = Some(decl.name.to_owned());
 
         match self.sqir.globals.entry(impl_name) {
-            Entry::Vacant(ve) => {
+            Vacant(ve) => {
                 let ns = Self::impl_from_functions(names_types, &decl.functions)?;
                 ve.insert(ns);
                 Ok(())
             },
-            Entry::Occupied(_) => sema_error!(range, "Redefinition of impl '{}'", decl.name),
+            Occupied(_) => sema_error!(range, "Redefinition of impl '{}'", decl.name),
         }
     }
 
@@ -1475,21 +1475,28 @@ impl SQIRGen {
     // Declares a local in the current (innermost/top-of-the-stack) scope.
     // Returns an error if a local with the specified name already exists.
     fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> SemaResult<RcExpr> {
-        use std::collections::hash_map::Entry;
+        use std::collections::hash_map::Entry::{ Vacant, Occupied };
 
         let ty = self.get_unit_type();
         let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
 
-        match locals.var_map.entry(name.to_owned()) {
-            Entry::Vacant(entry) => {
+        // insert into map of all transitively-visible locals
+        let decl = match locals.var_map.entry(name.to_owned()) {
+            Vacant(entry) => {
                 let name = name.to_owned();
                 let value = Value::VarDecl { name, expr };
                 let decl = RcCell::new(Expr { ty, value });
 
-                Ok(entry.insert(decl).clone())
+                entry.insert(decl).clone()
             },
-            Entry::Occupied(_) => sema_error!(range, "Redefinition of '{}'", name),
-        }
+            Occupied(_) => return sema_error!(range, "Redefinition of '{}'", name),
+        };
+
+        // Add name to innermost (topmost) scope on the stack
+        let scope = locals.scope_stack.last_mut().expect("no innermost scope found");
+        scope.vars.push(name.to_owned());
+
+        Ok(decl)
     }
 
     // Opens a new local scope. After this returns, 'declare_local()'
@@ -1569,7 +1576,8 @@ impl SQIRGen {
                     let ty = ty.clone();
                     let value = Value::FuncArg { func, name, index };
                     let expr = RcCell::new(Expr { ty, value });
-                    self.declare_local(arg.name, expr, node)
+                    self.declare_local(arg.name, expr.clone(), node)?;
+                    Ok(expr) // return the FuncArg expression itself, not the VarDecl
                 },
                 _ => unreachable!("Non-FuncArg argument?!"),
             }
