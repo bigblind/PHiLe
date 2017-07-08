@@ -24,13 +24,25 @@ struct TyCtx {
 
 #[derive(Debug)]
 struct ScopeGuard {
-    locals: RcCell<Vec<String>>,
+    locals: RcCell<Locals>,
+}
+
+#[derive(Debug, Default)]
+struct Scope {
+    vars:  Vec<String>,
+    temps: Vec<RcExpr>,
+}
+
+#[derive(Debug, Default)]
+struct Locals {
+    var_map:     HashMap<String, RcExpr>,
+    scope_stack: Vec<Scope>,
 }
 
 #[allow(missing_debug_implementations)]
 struct SQIRGen {
-    sqir:   SQIR,
-    locals: HashMap<String, RcExpr>,
+    sqir:    SQIR,
+    locals:  RcCell<Locals>,
 }
 
 
@@ -120,12 +132,29 @@ impl Ranged for TyCtx {
     }
 }
 
+impl Drop for ScopeGuard {
+    fn drop(&mut self) {
+        let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
+        let mut scope = locals.scope_stack.pop().expect("no innermost scope found");
+
+        // Clean up variables in reverse order of declaration
+        scope.vars.reverse();
+
+        // TODO(H2CO3): insert Drop instructions too (where?)
+        for var_name in scope.vars {
+            locals.var_map.remove(&var_name).expect("variable not in declaration map");
+        }
+
+        // TODO(H2CO3): insert Drop instructions for scope.temps (where?)
+    }
+}
+
 impl SQIRGen {
     // Constructor
     fn new() -> SQIRGen {
         SQIRGen {
-            sqir:   SQIR::new(),
-            locals: HashMap::new(),
+            sqir:    SQIR::new(),
+            locals:  RcCell::new(Locals::default()),
         }
     }
 
@@ -1239,6 +1268,7 @@ impl SQIRGen {
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
             NodeValue::Identifier(name)     => self.generate_name_ref(ctx.clone(), name),
+            NodeValue::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
             NodeValue::EmptyStmt            => self.generate_empty_stmt(ctx.clone()),
             NodeValue::Semi(ref expr)       => self.generate_semi(expr),
             NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
@@ -1342,7 +1372,7 @@ impl SQIRGen {
     }
 
     fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<RcExpr> {
-        if let Some(expr) = self.locals.get(name) {
+        if let Some(expr) = self.locals.borrow()?.var_map.get(name) {
             return Self::generate_load(name, expr)
         }
 
@@ -1362,12 +1392,12 @@ impl SQIRGen {
         // otherwise just use the referred expression itself.
         let (ty, expr) = match ref_expr.borrow()?.value {
             Value::VarDecl { ref expr, .. } => {
-                let rc = expr.as_rc()?;
-                let ty = rc.borrow()?.ty.clone();
-                let expr = expr.clone();
+                let ty = expr.borrow()?.ty.clone();
+                let expr = expr.as_weak();
                 (ty, expr)
             },
             _ => {
+                // TODO(H2CO3): must be a global, assert that
                 let ty = ref_expr.borrow()?.ty.clone();
                 let expr = ref_expr.as_weak();
                 (ty, expr)
@@ -1378,6 +1408,17 @@ impl SQIRGen {
         let value = Value::Load { name, expr };
 
         Ok(RcCell::new(Expr { ty, value }))
+    }
+
+    fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> SemaResult<RcExpr> {
+        let init_type_hint = match decl.type_decl {
+            Some(ref node) => Some(self.type_from_decl(node)?),
+            None           => None,
+        };
+
+        let init = self.generate_expr(&decl.init_expr, init_type_hint)?;
+
+        self.declare_local(decl.name, init, &ctx)
     }
 
     fn generate_empty_stmt(&mut self, ctx: TyCtx) -> SemaResult<RcExpr> {
@@ -1404,6 +1445,8 @@ impl SQIRGen {
     }
 
     fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
+        let scope_guard = self.begin_local_scope();
+
         let (items, ty) = match nodes.split_last() {
             Some((last, firsts)) => {
                 let mut items: Vec<_> = firsts.iter().map(
@@ -1431,8 +1474,22 @@ impl SQIRGen {
 
     // Declares a local in the current (innermost/top-of-the-stack) scope.
     // Returns an error if a local with the specified name already exists.
-    fn declare_local(&mut self, name: &str, expr: RcExpr) -> SemaResult<RcExpr> {
-        unimplemented!()
+    fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> SemaResult<RcExpr> {
+        use std::collections::hash_map::Entry;
+
+        let ty = self.get_unit_type();
+        let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
+
+        match locals.var_map.entry(name.to_owned()) {
+            Entry::Vacant(entry) => {
+                let name = name.to_owned();
+                let value = Value::VarDecl { name, expr };
+                let decl = RcCell::new(Expr { ty, value });
+
+                Ok(entry.insert(decl).clone())
+            },
+            Entry::Occupied(_) => sema_error!(range, "Redefinition of '{}'", name),
+        }
     }
 
     // Opens a new local scope. After this returns, 'declare_local()'
@@ -1447,7 +1504,9 @@ impl SQIRGen {
     // to temporaries. This will also be walked, in reverse order,
     // by the cleanup code in ScopeGuard::drop().
     fn begin_local_scope(&mut self) -> ScopeGuard {
-        unimplemented!()
+        let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
+        locals.scope_stack.push(Scope::default());
+        ScopeGuard { locals: self.locals.clone() }
     }
 
     //
@@ -1510,7 +1569,7 @@ impl SQIRGen {
                     let ty = ty.clone();
                     let value = Value::FuncArg { func, name, index };
                     let expr = RcCell::new(Expr { ty, value });
-                    self.declare_local(arg.name, expr)
+                    self.declare_local(arg.name, expr, node)
                 },
                 _ => unreachable!("Non-FuncArg argument?!"),
             }

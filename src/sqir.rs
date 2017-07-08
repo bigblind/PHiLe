@@ -157,16 +157,18 @@ pub enum Value {
     // Function definition (lambda) + call;
     // Function argument and "variable" (binding)
     // definition + name reference (substitutions).
-    // 'index' is to be interpreted within the function, and
+    // A strong pointer inside a VarDecl is OK, since the
+    // initializer expression cannot refer back to the variable
+    // FuncArg::index is to be interpreted within the function,
     // NOT within the context of all currently-visible locals.
     // The wrapped expression of Load is the expression referred
     // to by the name -- either a global (of any kind), or the
-    // init expression of the local VarDecl, or a FuncArg argument.
+    // init expression of a local VarDecl (might be a FuncArg).
     // The loaded expression must be weak, because the body of a
     // named (eg. global) recursive function can refer to itself.
     Function(Function),
     Call(Call),
-    VarDecl { name: String, expr: WkExpr },
+    VarDecl { name: String, expr: RcExpr },
     FuncArg { func: WkExpr, name: String, index: usize },
     Load { name: String, expr: WkExpr },
 
