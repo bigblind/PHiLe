@@ -1289,6 +1289,10 @@ impl SQIRGen {
             }
         }
 
+        // TODO(H2CO3): tuple types: unify element-wise
+        // TODO(H2CO3): function types: unify using a wrapper function of a
+        // covariant return type and contravariant args (or the opposite?)
+
         sema_error!(
             ctx.range,
             "Cannot match types: expected {}; found {}",
@@ -1339,17 +1343,41 @@ impl SQIRGen {
 
     fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<RcExpr> {
         if let Some(expr) = self.locals.get(name) {
-            return Ok(expr.clone())
+            return Self::generate_load(name, expr)
         }
 
         // TODO(H2CO3): handle impl namespaces too
         if let Some(top_ns) = self.sqir.globals.get(&None) {
             if let Some(expr) = top_ns.get(name) {
-                return Ok(expr.clone())
+                return Self::generate_load(name, expr)
             }
         }
 
         sema_error!(ctx, "Undeclared identifier: '{}'", name)
+    }
+
+    // Helper for generate_name_ref()
+    fn generate_load(name: &str, ref_expr: &RcExpr) -> SemaResult<RcExpr> {
+        // If it's a local variable declaration, unwrap it,
+        // otherwise just use the referred expression itself.
+        let (ty, expr) = match ref_expr.borrow()?.value {
+            Value::VarDecl { ref expr, .. } => {
+                let rc = expr.as_rc()?;
+                let ty = rc.borrow()?.ty.clone();
+                let expr = expr.clone();
+                (ty, expr)
+            },
+            _ => {
+                let ty = ref_expr.borrow()?.ty.clone();
+                let expr = ref_expr.as_weak();
+                (ty, expr)
+            },
+        };
+
+        let name = name.to_owned();
+        let value = Value::Load { name, expr };
+
+        Ok(RcCell::new(Expr { ty, value }))
     }
 
     fn generate_empty_stmt(&mut self, ctx: TyCtx) -> SemaResult<RcExpr> {
@@ -1478,8 +1506,9 @@ impl SQIRGen {
             |(index, (node, ty))| match node.value {
                 NodeValue::FuncArg(ref arg) => {
                     let func = WkCell::new(); // dummy, points nowhere (yet)
+                    let name = arg.name.to_owned();
                     let ty = ty.clone();
-                    let value = Value::FuncArg { func, index };
+                    let value = Value::FuncArg { func, name, index };
                     let expr = RcCell::new(Expr { ty, value });
                     self.declare_local(arg.name, expr)
                 },
@@ -1491,7 +1520,7 @@ impl SQIRGen {
     fn fixup_function_arguments(args: Vec<RcExpr>, fn_expr: &RcExpr) {
         // TODO(H2CO3): do not unwrap()/expect() return value of borrow_mut()
         for arg in args {
-            match arg.borrow_mut().expect("").value {
+            match arg.borrow_mut().expect("argument not borrowable").value {
                 Value::FuncArg { ref mut func, .. } => *func = fn_expr.as_weak(),
                 _ => unreachable!("Non-FuncArg argument?!"),
             }

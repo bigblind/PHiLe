@@ -154,17 +154,31 @@ pub enum Value {
     StringConst(String),
 
     // Lambda calculus backbone:
-    // Function definition (lambda) + call.
-    // Variable definitions (bindings) + references (substitutions)
-    // are handled without explicit Expr nodes.
-    // The only exception is function arguments: those have no
-    // initializer expression; the only context they can refer to
-    // is the function they belong to.
+    // Function definition (lambda) + call;
+    // Function argument and "variable" (binding)
+    // definition + name reference (substitutions).
     // 'index' is to be interpreted within the function, and
     // NOT within the context of all currently-visible locals.
+    // The wrapped expression of Load is the expression referred
+    // to by the name -- either a global (of any kind), or the
+    // init expression of the local VarDecl, or a FuncArg argument.
+    // The loaded expression must be weak, because the body of a
+    // named (eg. global) recursive function can refer to itself.
     Function(Function),
     Call(Call),
-    FuncArg { func: WkExpr, index: usize },
+    VarDecl { name: String, expr: WkExpr },
+    FuncArg { func: WkExpr, name: String, index: usize },
+    Load { name: String, expr: WkExpr },
+
+    // Destructor call. This instruction is inserted automatically
+    // by SQIRGen in order to make memory management explicit,
+    // so as to help code generation for languages lacking
+    // reference counting or garbage collection.
+    // The argument always refers to a Load instruction.
+    // The argument is a strong pointer as no instruction refers
+    // back to Drop, so with this, we spare many .as_rc()? calls.
+    // TODO(H2CO3): actually make SQIRGen emit Drop instructions
+    Drop(RcExpr),
 
     // Type conversions: implicit T -> T?, Int -> Float,
     // and explicit T -> unit (Semi).
@@ -202,7 +216,6 @@ pub enum Value {
     SetDiff(WkExpr, WkExpr),
 
     // Branch
-    // TODO(H2CO3): generalize for match & arbitrary patterns
     Branch(Branch),
 
     // Blocks and aggreate literals
@@ -211,7 +224,7 @@ pub enum Value {
     TupleLiteral(Vec<WkExpr>),
     StructLiteral(BTreeMap<String, WkExpr>),
 
-    // Generalized Built-in DB operations
+    // Generalized built-in DB operations
     Map(Map),       // projections etc.
     Reduce(Reduce), // aggregations
     Filter(Filter), // selection
