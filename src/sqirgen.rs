@@ -475,7 +475,12 @@ impl SQIRGen {
     // value and entity types (struct, class, enum, tuple)
     //
 
-    fn validate_complex_type_item(&self, item_type: &WkType, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+    fn validate_complex_type_item<R: Ranged>(
+        &self,
+        item_type:   &WkType,
+        range:       &R,
+        parent_kind: ComplexTypeKind
+    ) -> SemaResult<()> {
         let rc = item_type.as_rc()?;
         let ptr = rc.borrow()?;
 
@@ -488,17 +493,17 @@ impl SQIRGen {
             // pointed type will be caught later in the worst case.
             Type::Pointer(_) => match parent_kind {
                 ComplexTypeKind::Entity => Ok(()),
-                ComplexTypeKind::Value  => sema_error!(node, "Pointer not allowed in value type"),
+                ComplexTypeKind::Value  => sema_error!(range, "Pointer not allowed in value type"),
             },
 
             // Class types without indirection are never allowed.
             Type::Class(ref t) => sema_error!(
-                node,
+                range,
                 "Class type '{}' not allowed without indirection",
                 t.name,
             ),
             Type::Placeholder { ref name, kind: PlaceholderKind::Class } => sema_error!(
-                node,
+                range,
                 "Class type '{}' not allowed without indirection",
                 name,
             ),
@@ -519,15 +524,15 @@ impl SQIRGen {
             Type::Placeholder { kind: PlaceholderKind::Enum, .. }   => Ok(()),
 
             // Function types are not allowed within user-defined types.
-            Type::Function(_) => sema_error!(node, "Function type not allowed in user-defined type"),
+            Type::Function(_) => sema_error!(range, "Function type not allowed in user-defined type"),
 
             // Optionals and arrays are checked for
             // explicitly and recursively, because they are
             // not like user-defined enums or structs in that
             // they might legitimately contain pointers when
             // contained within a class.
-            Type::Optional(ref t) => self.validate_optional(t, node, parent_kind),
-            Type::Array(ref t)    => self.validate_array(t, node, parent_kind),
+            Type::Optional(ref t) => self.validate_optional(t, range, parent_kind),
+            Type::Array(ref t)    => self.validate_array(t, range, parent_kind),
 
             // Atomic types (numbers, strings, blobs, and dates) are OK.
             Type::Bool | Type::Int | Type::Float   => Ok(()),
@@ -536,39 +541,39 @@ impl SQIRGen {
         }
     }
 
-    fn validate_optional(&self, wrapped_type: &WkType, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
-        let res = self.validate_complex_type_item(wrapped_type, node, ComplexTypeKind::Value);
+    fn validate_optional<R: Ranged>(&self, wrapped_type: &WkType, range: &R, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+        let res = self.validate_complex_type_item(wrapped_type, range, ComplexTypeKind::Value);
 
         match parent_kind {
             ComplexTypeKind::Value => res,
             ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
                 wrapped_type,
                 res,
-                node,
+                range,
                 "optional"
             ),
         }
     }
 
-    fn validate_array(&self, element_type: &WkType, node: &Node, parent_kind: ComplexTypeKind) -> SemaResult<()> {
-        let res = self.validate_complex_type_item(element_type, node, ComplexTypeKind::Value);
+    fn validate_array<R: Ranged>(&self, element_type: &WkType, range: &R, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+        let res = self.validate_complex_type_item(element_type, range, ComplexTypeKind::Value);
 
         match parent_kind {
             ComplexTypeKind::Value => res,
             ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
                 element_type,
                 res,
-                node,
+                range,
                 "array"
             ),
         }
     }
 
-    fn validate_wrapper_in_entity(
+    fn validate_wrapper_in_entity<R: Ranged>(
         &self,
-        wrapped_type: &WkType,
+        wrapped_type:      &WkType,
         validation_result: SemaResult<()>,
-        node: &Node,
+        range:             &R,
         wrapper_type_name: &str,
     ) -> SemaResult<()> {
         validation_result.or_else(|err| {
@@ -581,7 +586,7 @@ impl SQIRGen {
             match *ptr {
                 Type::Pointer(_) => Ok(()),
                 _ => sema_error!(
-                    node,
+                    range,
                     "Expected {} of pointer/value type ({})",
                     wrapper_type_name,
                     err.message,
@@ -725,24 +730,33 @@ impl SQIRGen {
         array_types
     }
 
-    fn get_tuple_type(&mut self, decls: &[Node]) -> SemaResult<RcType> {
+    fn get_tuple_type(&mut self, nodes: &[Node]) -> SemaResult<RcType> {
+        let types = nodes.iter()
+            .map(|node| self.type_from_decl(node))
+            .collect::<SemaResult<_>>()?;
+
+        self.get_tuple_type_from_types(types, nodes)
+    }
+
+    fn get_tuple_type_from_types<R: Ranged>(&mut self, types: Vec<RcType>, ranges: &[R]) -> SemaResult<RcType> {
+        assert!(types.len() == ranges.len());
+
         // A one-element tuple is converted to its element type,
         // _without_ validation of containment in a value type.
-        if decls.len() == 1 {
-            return self.type_from_decl(&decls[0])
+        if types.len() == 1 {
+            return Ok(types[0].clone())
         }
 
         // Tuples are full-fledged value types, similar to structs.
         // Therefore we must check their items during construction.
-        let types: Vec<_> = decls.iter().map(|decl| {
-            let item_type_rc = self.type_from_decl(decl)?;
-            let item_type_wk = item_type_rc.as_weak();
-            self.validate_complex_type_item(&item_type_wk, decl, ComplexTypeKind::Value)?;
-            Ok(item_type_rc)
+        let weak_types = types.iter().zip(ranges).map(|(ty, range)| {
+            let ty_wk = ty.as_weak();
+            self.validate_complex_type_item(&ty_wk, range, ComplexTypeKind::Value)?;
+            Ok(ty_wk)
         }).collect::<SemaResult<_>>()?;
 
-        let tuple = self.sqir.tuple_types.entry(types.clone()).or_insert_with(
-            || RcCell::new(Type::Tuple(types.iter().map(RcCell::as_weak).collect()))
+        let tuple = self.sqir.tuple_types.entry(types).or_insert_with(
+            || RcCell::new(Type::Tuple(weak_types))
         );
 
         Ok(tuple.clone())
@@ -1154,7 +1168,7 @@ impl SQIRGen {
 
         let mut ns = BTreeMap::new();
 
-        for ((name, ty), node) in names_types.into_iter().zip(decls.iter()) {
+        for ((name, ty), node) in names_types.into_iter().zip(decls) {
             let value = Value::Placeholder;
             let expr = RcCell::new(Expr { ty, value });
 
@@ -1435,7 +1449,46 @@ impl SQIRGen {
     }
 
     fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
-        unimplemented!()
+        // A one-element tuple is equivalent with its element
+        if nodes.len() == 1 {
+            return self.generate_expr(&nodes[0], ctx.ty)
+        }
+
+        let exprs = self.generate_tuple_items(ctx, nodes)?;
+        let items = exprs.iter().map(RcCell::as_weak).collect();
+        let types = exprs.iter()
+            .map(|expr| Ok(expr.borrow()?.ty.clone()))
+            .collect::<SemaResult<_>>()?;
+
+        let ty = self.get_tuple_type_from_types(types, nodes)?;
+        let value = Value::Tuple(items);
+
+        Ok(RcCell::new(Expr { ty, value }))
+    }
+
+    // helper for generate_tuple()
+    fn generate_tuple_items(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<Vec<RcExpr>> {
+        if let Some(hint) = ctx.ty {
+            if let Type::Tuple(ref types) = *hint.borrow()? {
+                let expected_len = types.len();
+                let actual_len = nodes.len();
+
+                return if expected_len == actual_len {
+                    nodes.iter().zip(types).map(
+                        |(node, ty)| self.generate_expr(node, Some(ty.as_rc()?))
+                    ).collect()
+                } else {
+                    sema_error!(
+                        ctx.range,
+                        "Expected {}-tuple, found {} items",
+                        expected_len,
+                        actual_len
+                    )
+                }
+            }
+        }
+
+        nodes.iter().map(|node| self.generate_expr(node, None)).collect()
     }
 
     fn generate_array(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
@@ -1566,7 +1619,7 @@ impl SQIRGen {
     ) -> SemaResult<Vec<RcExpr>> {
         assert!(func.arguments.len() == types.len());
 
-        func.arguments.iter().zip(types.iter()).enumerate().map(
+        func.arguments.iter().zip(types).enumerate().map(
             |(index, (node, ty))| match node.value {
                 NodeValue::FuncArg(ref arg) => {
                     let func = WkCell::new(); // dummy, points nowhere (yet)
@@ -1600,7 +1653,7 @@ impl SQIRGen {
         match *type_hint {
             Some(ref t) => {
                 func.arguments.iter()
-                    .zip(t.arg_types.iter())
+                    .zip(&t.arg_types)
                     .map(|(node, ty)| self.arg_type_with_hint(node, ty))
                     .collect()
             },

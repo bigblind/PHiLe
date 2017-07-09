@@ -221,8 +221,8 @@ pub enum Value {
 
     // Blocks and aggreate literals
     Seq(Vec<WkExpr>),
-    ArrayLiteral(Vec<WkExpr>),
-    TupleLiteral(Vec<WkExpr>),
+    Array(Vec<WkExpr>),
+    Tuple(Vec<WkExpr>),
     StructLiteral(BTreeMap<String, WkExpr>),
 
     // Generalized built-in DB operations
