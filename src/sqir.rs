@@ -182,7 +182,7 @@ pub enum Value {
     // TODO(H2CO3): actually make SQIRGen emit Drop instructions
     Drop(RcExpr),
 
-    // Type conversions: implicit T -> T?, Int -> Float,
+    // Type conversions: implicit T -> T?,
     // and explicit T -> unit (Semi).
     // Implicit conversions are inserted by the unify()
     // function, which always creates a new expression
@@ -191,7 +191,6 @@ pub enum Value {
     // so it's OK to make their argument strong, so that
     // they don't have to be inserted into `temporaries`.
     OptionalWrap(RcExpr),
-    IntToFloat(RcExpr),
     Ignore(WkExpr),
 
     // Arithmetic, comparison, logical and set operations

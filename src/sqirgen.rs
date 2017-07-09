@@ -1264,7 +1264,7 @@ impl SQIRGen {
         let tmp = match node.value {
             NodeValue::NilLiteral           => self.generate_nil_literal(ctx.clone()),
             NodeValue::BoolLiteral(b)       => self.generate_bool_literal(b),
-            NodeValue::IntLiteral(n)        => self.generate_int_literal(n),
+            NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx.clone(), n),
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
             NodeValue::Identifier(name)     => self.generate_name_ref(ctx.clone(), name),
@@ -1306,11 +1306,6 @@ impl SQIRGen {
 
         let expr_ref = expr.borrow()?;
 
-        if ty == self.get_float_type() && expr_ref.ty == self.get_int_type() {
-            let value = Value::IntToFloat(expr.clone());
-            return Ok(RcCell::new(Expr { ty, value }));
-        }
-
         if let Type::Optional(ref inner) = *ty.borrow()? {
             if expr_ref.ty == inner.as_rc()? {
                 let ty = ty.clone();
@@ -1318,10 +1313,6 @@ impl SQIRGen {
                 return Ok(RcCell::new(Expr { ty, value }));
             }
         }
-
-        // TODO(H2CO3): tuple types: unify element-wise
-        // TODO(H2CO3): function types: unify using a wrapper function of a
-        // covariant return type and contravariant args (or the opposite?)
 
         sema_error!(
             ctx.range,
@@ -1353,9 +1344,16 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_int_literal(&self, n: u64) -> SemaResult<RcExpr> {
+    fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<RcExpr> {
+        if let Some(hint) = ctx.ty {
+            if let Type::Float = *hint.borrow()? {
+                return self.generate_float_literal(n as f64)
+            }
+        }
+
         let ty = self.get_int_type();
         let value = Value::IntConst(n);
+
         Ok(RcCell::new(Expr { ty, value }))
     }
 
