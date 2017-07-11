@@ -44,6 +44,6 @@ fn write_global(wr: &mut io::Write, name: &str, expr: &Expr) -> io::Result<()> {
     write_function(wr, name, ty, func)
 }
 
-fn write_function(wr: &mut io::Write, name: &str, ty: &FunctionType, func: &Function) -> io::Result<()> {
+fn write_function(_wr: &mut io::Write, _name: &str, _ty: &FunctionType, _func: &Function) -> io::Result<()> {
     unimplemented!()
 }

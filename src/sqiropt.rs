@@ -8,7 +8,8 @@
 
 use sqir::*;
 
-pub fn optimize_sqir(mut sqir: SQIR) -> SQIR {
+
+pub fn optimize_sqir(mut _sqir: SQIR) -> SQIR {
     // trivial optimization: NOP
-    sqir
+    _sqir
 }

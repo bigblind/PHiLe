@@ -1444,7 +1444,7 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value }))
     }
 
-    fn generate_binary_op(&mut self, ctx: TyCtx, op: &ast::BinaryOp) -> SemaResult<RcExpr> {
+    fn generate_binary_op(&mut self, _ctx: TyCtx, _op: &ast::BinaryOp) -> SemaResult<RcExpr> {
         unimplemented!()
     }
 
@@ -1491,11 +1491,12 @@ impl SQIRGen {
         nodes.iter().map(|node| self.generate_expr(node, None)).collect()
     }
 
-    fn generate_array(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
+    fn generate_array(&mut self, _ctx: TyCtx, _nodes: &[Node]) -> SemaResult<RcExpr> {
         unimplemented!()
     }
 
     fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
+        #[allow(unused_variables)]
         let scope_guard = self.begin_local_scope();
 
         let (items, ty) = match nodes.split_last() {
@@ -1586,8 +1587,9 @@ impl SQIRGen {
         };
 
         // Declare function arguments before generating body
-        let arg_types = self.arg_types_for_function(func, &type_hint)?;
+        #[allow(unused_variables)]
         let scope_guard = self.begin_local_scope();
+        let arg_types = self.arg_types_for_function(func, &type_hint)?;
         let args = self.declare_function_arguments(func, &arg_types)?;
         let tmp_args = args.clone();
 
