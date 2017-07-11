@@ -9,6 +9,7 @@
 use std::io;
 use codegen::*;
 use sqir::*;
+use util::PACKAGE_INFO;
 
 
 pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
@@ -23,8 +24,8 @@ pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -
     write!(
         &mut *wr,
         include_str!("go_template.txt"),
-        version = env!["CARGO_PKG_VERSION"],
-        authors = env!["CARGO_PKG_AUTHORS"],
+        version = PACKAGE_INFO.version,
+        authors = PACKAGE_INFO.authors,
         namespace = package_name
     )
 }

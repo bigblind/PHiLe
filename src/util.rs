@@ -43,6 +43,15 @@ macro_rules! btree_map {
 }
 
 
+#[derive(Debug, Clone, Copy)]
+pub struct PackageInfo {
+    pub name:        &'static str,
+    pub version:     &'static str,
+    pub authors:     &'static str,
+    pub description: &'static str,
+    pub home_page:   &'static str,
+}
+
 #[derive(Debug)]
 pub struct RcCell<T: ?Sized> {
     ptr: Rc<RefCell<T>>,
@@ -65,6 +74,15 @@ pub fn unescape_string_literal(string: &str) -> SyntaxResult<String> {
         Ok(string.to_owned())
     }
 }
+
+pub static PACKAGE_INFO: PackageInfo = PackageInfo {
+    name:        env!["CARGO_PKG_NAME"],
+    version:     env!["CARGO_PKG_VERSION"],
+    authors:     env!["CARGO_PKG_AUTHORS"],
+    description: env!["CARGO_PKG_DESCRIPTION"],
+    home_page:   env!["CARGO_PKG_HOMEPAGE"],
+};
+
 
 impl<T> RcCell<T> {
     pub fn new(value: T) -> RcCell<T> {

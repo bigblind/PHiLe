@@ -21,6 +21,7 @@ use std::cell::RefCell;
 use std::io;
 use std::io::stdout;
 use std::io::prelude::*;
+use phile::util::PACKAGE_INFO;
 use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
@@ -60,10 +61,10 @@ macro_rules! stopwatch {
 
 fn get_args() -> ProgramArgs {
     let args = clap_app!(philec =>
-        (name:    env!["CARGO_PKG_NAME"])
-        (version: env!["CARGO_PKG_VERSION"])
-        (author:  env!["CARGO_PKG_AUTHORS"])
-        (about:   env!["CARGO_PKG_DESCRIPTION"])
+        (name:    PACKAGE_INFO.name)
+        (version: PACKAGE_INFO.version)
+        (author:  PACKAGE_INFO.authors)
+        (about:   PACKAGE_INFO.description)
         (@arg database:    -d --database   +takes_value +required "database engine")
         (@arg language:    -l --language   +takes_value +required "wrapping language")
         (@arg access:      -a --access     +takes_value           "database access mode")
