@@ -1,0 +1,55 @@
+class Foo {
+  foo: &Foo,
+}
+
+class Arr {
+  arr: [&Arr],
+}
+
+class Bar {
+  qux: &Qux,
+}
+
+class Qux {
+  bar: &Bar,
+}
+
+# impl Lol {}
+
+impl Qux {
+  fn useless() {}
+  fn hackathon_fib_demo(n: int) -> int { 34 }
+}
+
+fn not_a_tuple() -> (String) {
+    (((("Stringity-String!",))))
+}
+
+fn recursive_function_must_not_leak() {
+    recursive_function_must_not_leak;
+}
+
+fn bogus_tuple() -> (float, float?) {
+    ((1337.0, 42.0))
+}
+
+fn exercise_typechecker(foo: int, bar: String) -> (float, float) -> float? {
+    {
+        |x: bool| {
+            let y = 1.0;
+            x;
+            let z = x;
+        };
+        let c: (float, float) -> float? = |x, y| {
+            {
+                {
+                    let z: float = 1;
+                    let q: int = 2;
+                    let w: float = 42;
+                    y
+                }
+            }
+        };
+        c
+    }
+}

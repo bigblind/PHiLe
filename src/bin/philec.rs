@@ -230,13 +230,11 @@ fn main() {
             |location| panic!(format_lexer_error(&location, &args.sources))
         );
 
-        tmp_tokens.retain(
-            |token| match token.kind {
-                TokenKind::Whitespace => false,
-                TokenKind::Comment    => false,
-                _                     => true,
-            }
-        );
+        tmp_tokens.retain(|token| match token.kind {
+            TokenKind::Whitespace => false,
+            TokenKind::Comment    => false,
+            _                     => true,
+        });
 
         tmp_tokens
     });
