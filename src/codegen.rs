@@ -249,17 +249,3 @@ fn default_namespace_transform(lang: Language) -> NameTransform {
         Language::Java       => NameTransform::Identity,
     }
 }
-
-//
-// Errors
-//
-
-pub fn access_mode_error<T>(params: &CodegenParams) -> io::Result<T> {
-    let message = format!(
-        "Backend '{:#?}/{:#?}' does not support DB access mode '{:#?}'",
-        params.database,
-        params.language,
-        params.database_access_mode
-    );
-    Err(io::Error::new(io::ErrorKind::InvalidInput, message))
-}
