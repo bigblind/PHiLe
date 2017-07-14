@@ -16,86 +16,75 @@ use util::PACKAGE_INFO;
 // Type annotations for declarations, etc.
 //
 
-struct TypeWriter<'a> {
-    params: &'a CodegenParams,
-}
-
-
 pub fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> io::Result<()> {
-    TypeWriter { params }.write_type(wr, ty)
+    let rc = ty.as_rc()?;
+    let ptr = rc.borrow()?;
+
+    match *ptr {
+        Type::Bool  => write!(wr, "bool"),
+        Type::Int   => write!(wr, "int64"),
+        Type::Float => write!(wr, "float64"),
+        Type::Decimal { .. } => unimplemented!(),
+
+        Type::String => write!(wr, "string"),
+        Type::Blob   => write!(wr, "[]byte"),
+        Type::Date   => write!(wr, "time.Time"),
+
+        Type::Optional(ref wrapped) => write_optional_type(wr, wrapped, params),
+        Type::Pointer(ref pointed)  => write_pointer_type(wr, pointed, params),
+        Type::Array(ref element)    => write_array_type(wr, element, params),
+        Type::Tuple(ref types)      => write_tuple_type(wr, types, params),
+
+        // Respect type name transform
+        Type::Enum(ref et)   => write!(wr, "{}", transform_type_name(&et.name, params)),
+        Type::Struct(ref st) => write!(wr, "{}", transform_type_name(&st.name, params)),
+        Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, params)),
+
+        Type::Function(ref ft) => write_function_type(wr, ft, params),
+        Type::Placeholder { ref name, kind } => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
+    }
 }
 
-impl<'a> TypeWriter<'a> {
-    fn write_type(&self, wr: &mut io::Write, ty: &WkType) -> io::Result<()> {
-        let rc = ty.as_rc()?;
-        let ptr = rc.borrow()?;
+fn write_optional_type(wr: &mut io::Write, wrapped: &WkType, params: &CodegenParams) -> io::Result<()> {
+    write_pointer_type(wr, wrapped, params)
+}
 
-        match *ptr {
-            Type::Bool  => write!(wr, "bool"),
-            Type::Int   => write!(wr, "int64"),
-            Type::Float => write!(wr, "float64"),
-            Type::Decimal { .. } => unimplemented!(),
+fn write_pointer_type(wr: &mut io::Write, pointed: &WkType, params: &CodegenParams) -> io::Result<()> {
+    write!(wr, "*").and_then(|_| write_type(wr, pointed, params))
+}
 
-            Type::String => write!(wr, "string"),
-            Type::Blob   => write!(wr, "[]byte"),
-            Type::Date   => write!(wr, "time.Time"),
+fn write_array_type(wr: &mut io::Write, element: &WkType, params: &CodegenParams) -> io::Result<()> {
+    write!(wr, "[]").and_then(|_| write_type(wr, element, params))
+}
 
-            Type::Optional(ref wrapped) => self.write_optional_type(wr, wrapped),
-            Type::Pointer(ref pointed)  => self.write_pointer_type(wr, pointed),
-            Type::Array(ref element)    => self.write_array_type(wr, element),
-            Type::Tuple(ref types)      => self.write_tuple_type(wr, types),
+fn write_tuple_type(wr: &mut io::Write, types: &[WkType], params: &CodegenParams) -> io::Result<()> {
+    write!(wr, "struct {{ ")?;
 
-            // Respect type name transform
-            Type::Enum(ref et)   => write!(wr, "{}", transform_type_name(&et.name, self.params)),
-            Type::Struct(ref st) => write!(wr, "{}", transform_type_name(&st.name, self.params)),
-            Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, self.params)),
-
-            Type::Function(ref ft) => self.write_function_type(wr, ft),
-            Type::Placeholder { ref name, kind } => unreachable!("Unresolved Placeholder({}, {:#?})", name, kind),
-        }
+    for (idx, typ) in types.iter().enumerate() {
+        write!(wr, "F{} ", idx)?;
+        write_type(wr, typ, params)?;
+        write!(wr, "; ")?;
     }
 
-    fn write_optional_type(&self, wr: &mut io::Write, wrapped: &WkType) -> io::Result<()> {
-        self.write_pointer_type(wr, wrapped)
-    }
+    write!(wr, "}}")?;
 
-    fn write_pointer_type(&self, wr: &mut io::Write, pointed: &WkType) -> io::Result<()> {
-        write!(wr, "*").and_then(|_| self.write_type(wr, pointed))
-    }
+    Ok(())
+}
 
-    fn write_array_type(&self, wr: &mut io::Write, element: &WkType) -> io::Result<()> {
-        write!(wr, "[]").and_then(|_| self.write_type(wr, element))
-    }
+fn write_function_type(wr: &mut io::Write, ty: &FunctionType, params: &CodegenParams) -> io::Result<()> {
+    write!(wr, "func(")?;
 
-    fn write_tuple_type(&self, wr: &mut io::Write, types: &[WkType]) -> io::Result<()> {
-        write!(wr, "struct {{ ")?;
-
-        for (idx, typ) in types.iter().enumerate() {
-            write!(wr, "F{} ", idx)?;
-            self.write_type(wr, typ)?;
-            write!(wr, "; ")?;
+    for (i, arg) in ty.arg_types.iter().enumerate() {
+        if i > 0 {
+            write!(wr, ", ")?;
         }
 
-        write!(wr, "}}")?;
-
-        Ok(())
+        write_type(wr, arg, params)?;
     }
 
-    fn write_function_type(&self, wr: &mut io::Write, ty: &FunctionType) -> io::Result<()> {
-        write!(wr, "func(")?;
+    write!(wr, ") ")?;
 
-        for (i, arg) in ty.arg_types.iter().enumerate() {
-            if i > 0 {
-                write!(wr, ", ")?;
-            }
-
-            self.write_type(wr, arg)?;
-        }
-
-        write!(wr, ") ")?;
-
-        self.write_type(wr, &ty.ret_type)
-    }
+    write_type(wr, &ty.ret_type, params)
 }
 
 //
