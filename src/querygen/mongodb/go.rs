@@ -12,6 +12,10 @@ use codegen::*;
 use sqir::*;
 
 
+//
+// Top-level (global func + impl) generators
+//
+
 pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     // Write header for yet nonexistent file holding top-level funcs
     let toplevel_basename = "PHiLe-Query";
@@ -54,6 +58,14 @@ fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenPar
     write_function(wr, name, ty, func, params)
 }
 
+//
+// Expression Generators
+//
+
+fn generate_expr(wr: &mut io::Write, expr: &RcExpr) -> io::Result<()> {
+    Ok(()) // TODO(H2CO3): implement
+}
+
 fn write_function(
     wr:     &mut io::Write,
     name:   &str,
@@ -65,26 +77,32 @@ fn write_function(
     write_ctx_name_and_type(wr)?;
 
     for arg in &func.args {
-        let expr = arg.borrow()?;
+        assert_arg_consistency(arg);
         write!(wr, ", ")?;
         write_expr_name_and_type(wr, arg, params)?;
-
-        // TODO(H2CO3): this verbose assert is ugly af
-        match expr.value {
-            Value::FuncArg { .. } => match expr.id {
-                ExprId::Name(_) => (),
-                ExprId::Temp(_) => unreachable!("FuncArg has no name?!"),
-            },
-            _ => unreachable!("Non-FuncArg argument?!"),
-        }
     }
 
     write!(wr, ") ")?;
     write_type(wr, &ty.ret_type, params)?;
     writeln!(wr, " {{")?;
-    writeln!(wr, "    panic(\"not implemented\")")?;
+    generate_expr(wr, &func.body)?;
+    write!(wr, "    return ")?;
+    write_expr_name(wr, &func.body)?;
+    writeln!(wr)?;
     writeln!(wr, "}}")?;
     writeln!(wr)
+}
+
+fn assert_arg_consistency(expr: &RcExpr) {
+    let ptr = expr.borrow().expect("cannot borrow argument");
+
+    match ptr.value {
+        Value::FuncArg { .. } => match ptr.id {
+            ExprId::Name(_) => (),
+            ExprId::Temp(_) => unreachable!("FuncArg has no name?!"),
+        },
+        _ => unreachable!("Non-FuncArg argument?!"),
+    }
 }
 
 // The following functions write references (i.e. reads/loads) and
