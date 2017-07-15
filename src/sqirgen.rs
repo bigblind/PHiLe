@@ -27,16 +27,15 @@ struct ScopeGuard {
     locals: RcCell<Locals>,
 }
 
-#[derive(Debug, Default)]
-struct Scope {
-    vars:  Vec<String>,
-    temps: Vec<RcExpr>,
-}
-
+// var_map is the map of all currently-visible local variables,
+// transitively. That is, var_map.keys() ~ scope_stack.flat_map(id).
+// scope_stack is the vector of currently-active scopes: the higher
+// the index, the smaller/inner the corresponding scope is. Within
+// scope vectors, variable names are stored in order of declaration.
 #[derive(Debug, Default)]
 struct Locals {
     var_map:     HashMap<String, RcExpr>,
-    scope_stack: Vec<Scope>,
+    scope_stack: Vec<Vec<String>>,
 }
 
 #[allow(missing_debug_implementations)]
@@ -139,14 +138,11 @@ impl Drop for ScopeGuard {
         let mut scope = locals.scope_stack.pop().expect("no innermost scope found");
 
         // Clean up variables in reverse order of declaration
-        scope.vars.reverse();
+        scope.reverse();
 
-        // TODO(H2CO3): insert Drop instructions too (where?)
-        for var_name in &scope.vars {
+        for var_name in &scope {
             locals.var_map.remove(var_name).expect("variable not in declaration map");
         }
-
-        // TODO(H2CO3): insert Drop instructions for scope.temps (where?)
     }
 }
 
@@ -1551,7 +1547,7 @@ impl SQIRGen {
 
         // Add name to innermost (topmost) scope on the stack
         let scope = locals.scope_stack.last_mut().expect("no innermost scope found");
-        scope.vars.push(name.to_owned());
+        scope.push(name.to_owned());
 
         Ok(decl)
     }
@@ -1569,7 +1565,7 @@ impl SQIRGen {
     // by the cleanup code in ScopeGuard::drop().
     fn begin_local_scope(&mut self) -> ScopeGuard {
         let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
-        locals.scope_stack.push(Scope::default());
+        locals.scope_stack.push(Vec::new());
         ScopeGuard { locals: self.locals.clone() }
     }
 
