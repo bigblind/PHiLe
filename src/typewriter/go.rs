@@ -13,6 +13,25 @@ use util::PACKAGE_INFO;
 
 
 //
+// Naming Conventions for frequently-occurring types and variables
+//
+
+#[derive(Debug, Clone, Copy)]
+pub struct NamingConvention {
+    pub context_type: &'static str,
+    pub context_name: &'static str,
+    pub tmp_prefix:   &'static str,
+    pub var_prefix:   &'static str,
+}
+
+pub static NAMING_CONVENTION: NamingConvention = NamingConvention {
+    context_type: "PhileCtx",
+    context_name: "ctx",
+    tmp_prefix:   "tmp_",
+    var_prefix:   "var_",
+};
+
+//
 // Type annotations for declarations, etc.
 //
 
@@ -70,13 +89,10 @@ fn write_tuple_type(wr: &mut io::Write, types: &[WkType], params: &CodegenParams
 }
 
 fn write_function_type(wr: &mut io::Write, ty: &FunctionType, params: &CodegenParams) -> io::Result<()> {
-    write!(wr, "func(")?;
+    write!(wr, "func(*{}", NAMING_CONVENTION.context_type)?;
 
-    for (i, arg) in ty.arg_types.iter().enumerate() {
-        if i > 0 {
-            write!(wr, ", ")?;
-        }
-
+    for arg in &ty.arg_types {
+        write!(wr, ", ")?;
         write_type(wr, arg, params)?;
     }
 

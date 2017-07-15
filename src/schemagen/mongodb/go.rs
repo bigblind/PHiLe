@@ -10,6 +10,7 @@ use std::io;
 use codegen::*;
 use sqir::*;
 use util::PACKAGE_INFO;
+use typewriter::go::NAMING_CONVENTION;
 
 
 pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
@@ -26,6 +27,7 @@ pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -
         include_str!("go_template.txt"),
         version = PACKAGE_INFO.version,
         authors = PACKAGE_INFO.authors,
-        namespace = package_name
+        ctxtype = NAMING_CONVENTION.context_type,
+        namespace = package_name,
     )
 }
