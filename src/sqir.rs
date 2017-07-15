@@ -135,6 +135,7 @@ pub struct Relation {
 pub struct Expr {
     pub ty:    RcType, // can be Rc: no cycles are possible
     pub value: Value,
+    // pub id:    ExprId,
 }
 
 #[derive(Debug)]
@@ -155,8 +156,8 @@ pub enum Value {
 
     // Lambda calculus backbone:
     // Function definition (lambda) + call;
-    // Function argument and "variable" (binding)
-    // definition + name reference (substitutions).
+    // Function argument + name reference (substitutions).
+    // Variable declarations are implicit using named expressions.
     // A strong pointer inside a VarDecl is OK, since the
     // initializer expression cannot refer back to the variable
     // FuncArg::index is to be interpreted within the function,
@@ -168,19 +169,8 @@ pub enum Value {
     // named (eg. global) recursive function can refer to itself.
     Function(Function),
     Call(Call),
-    VarDecl { name: String, expr: RcExpr },
-    FuncArg { func: WkExpr, name: String, index: usize },
-    Load { name: String, expr: WkExpr },
-
-    // Destructor call. This instruction is inserted automatically
-    // by SQIRGen in order to make memory management explicit,
-    // so as to help code generation for languages lacking
-    // reference counting or garbage collection.
-    // The argument always refers to a Load instruction.
-    // The argument is a strong pointer as no instruction refers
-    // back to Drop, so with this, we spare many .as_rc()? calls.
-    // TODO(H2CO3): actually make SQIRGen emit Drop instructions
-    Drop(RcExpr),
+    FuncArg { func: WkExpr, index: usize },
+    Load(WkExpr),
 
     // Type conversions: implicit T -> T?,
     // and explicit T -> unit (Semi).
@@ -191,39 +181,39 @@ pub enum Value {
     // so it's OK to make their argument strong, so that
     // they don't have to be inserted into `temporaries`.
     OptionalWrap(RcExpr),
-    Ignore(WkExpr),
+    Ignore(RcExpr),
 
     // Arithmetic, comparison, logical and set operations
-    Neg(WkExpr),
-    Add(WkExpr, WkExpr),
-    Sub(WkExpr, WkExpr),
-    Mul(WkExpr, WkExpr),
-    Div(WkExpr, WkExpr),
-    Mod(WkExpr, WkExpr),
+    Neg(RcExpr),
+    Add(RcExpr, RcExpr),
+    Sub(RcExpr, RcExpr),
+    Mul(RcExpr, RcExpr),
+    Div(RcExpr, RcExpr),
+    Mod(RcExpr, RcExpr),
 
-    Eq(WkExpr, WkExpr),
-    Neq(WkExpr, WkExpr),
-    Lt(WkExpr, WkExpr),
-    LtEq(WkExpr, WkExpr),
-    Gt(WkExpr, WkExpr),
-    GtEq(WkExpr, WkExpr),
+    Eq(RcExpr, RcExpr),
+    Neq(RcExpr, RcExpr),
+    Lt(RcExpr, RcExpr),
+    LtEq(RcExpr, RcExpr),
+    Gt(RcExpr, RcExpr),
+    GtEq(RcExpr, RcExpr),
 
-    And(WkExpr, WkExpr),
-    Or(WkExpr, WkExpr),
-    Not(WkExpr),
+    And(RcExpr, RcExpr),
+    Or(RcExpr, RcExpr),
+    Not(RcExpr),
 
-    Intersect(WkExpr, WkExpr),
-    Union(WkExpr, WkExpr),
-    SetDiff(WkExpr, WkExpr),
+    Intersect(RcExpr, RcExpr),
+    Union(RcExpr, RcExpr),
+    SetDiff(RcExpr, RcExpr),
 
     // Branch
     Branch(Branch),
 
     // Blocks and aggreate literals
-    Seq(Vec<WkExpr>),
-    Array(Vec<WkExpr>),
-    Tuple(Vec<WkExpr>),
-    StructLiteral(BTreeMap<String, WkExpr>),
+    Seq(Vec<RcExpr>),
+    Array(Vec<RcExpr>),
+    Tuple(Vec<RcExpr>),
+    StructLiteral(BTreeMap<String, RcExpr>),
 
     // Generalized built-in DB operations
     Map(Map),       // projections etc.
@@ -253,53 +243,59 @@ pub enum Value {
     Max(RcType, String),
 }
 
+#[derive(Debug)]
+pub enum ExprId {
+    Temp(usize),
+    Name(String),
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     pub args: Vec<RcExpr>, // FuncArg expressions
-    pub body: WkExpr,
+    pub body: RcExpr,
 }
 
 #[derive(Debug)]
 pub struct Call {
-    pub callee: WkExpr,
-    pub args:   Vec<WkExpr>,
+    pub callee: RcExpr,
+    pub args:   Vec<RcExpr>,
 }
 
 #[derive(Debug)]
 pub struct Branch {
-    pub discriminant: WkExpr,
-    pub arms:         Vec<(WkExpr, WkExpr)>,
+    pub discriminant: RcExpr,
+    pub arms:         Vec<(RcExpr, RcExpr)>,
 }
 
 #[derive(Debug)]
 pub struct Map {
-    pub range: WkExpr,
-    pub op:    WkExpr,
+    pub range: RcExpr,
+    pub op:    RcExpr,
 }
 
 #[derive(Debug)]
 pub struct Reduce {
-    pub range: WkExpr,
-    pub zero:  WkExpr,
-    pub op:    WkExpr,
+    pub range: RcExpr,
+    pub zero:  RcExpr,
+    pub op:    RcExpr,
 }
 
 #[derive(Debug)]
 pub struct Filter {
-    pub range: WkExpr,
-    pub pred:  WkExpr,
+    pub range: RcExpr,
+    pub pred:  RcExpr,
 }
 
 #[derive(Debug)]
 pub struct Sort {
-    pub range: WkExpr,
-    pub cmp:   WkExpr,
+    pub range: RcExpr,
+    pub cmp:   RcExpr,
 }
 
 #[derive(Debug)]
 pub struct Group {
-    pub range: WkExpr,
-    pub pred:  WkExpr,
+    pub range: RcExpr,
+    pub pred:  RcExpr,
 }
 
 //
@@ -317,7 +313,6 @@ pub struct SQIR {
     pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
     pub relations:      HashMap<(RcType, String), Relation>,
     pub globals:        BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
-    pub temporaries:    Vec<RcExpr>,
 }
 
 
@@ -394,7 +389,6 @@ impl SQIR {
             function_types: HashMap::new(),
             relations:      HashMap::new(),
             globals:        BTreeMap::new(), // TODO(H2CO3): declare built-in functions
-            temporaries:    Vec::new(),
         }
     }
 

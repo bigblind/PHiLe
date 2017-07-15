@@ -66,13 +66,15 @@ fn write_function(
     for arg in &func.args {
         let expr = arg.borrow()?;
         match expr.value {
-            Value::FuncArg { ref name, index, .. } => {
+            Value::FuncArg { index, .. } => {
                 if index > 0 {
                     write!(wr, ", ")?
                 }
 
                 // TODO(H2CO3): do we need to transform the argument name?
-                write!(wr, "{} ", name)?;
+                // TODO(H2CO3): obtain argument name
+                unimplemented!();
+                write!(wr, "{} ", "$DUMMY_NAME$")?;
                 write_type(wr, &expr.ty.as_weak(), params)?;
             },
             _ => unreachable!("Non-FuncArg argument?!"),

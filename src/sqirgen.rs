@@ -43,6 +43,7 @@ struct Locals {
 struct SQIRGen {
     sqir:    SQIR,
     locals:  RcCell<Locals>,
+    tmp_idx: usize,
 }
 
 
@@ -155,6 +156,7 @@ impl SQIRGen {
         SQIRGen {
             sqir:    SQIR::new(),
             locals:  RcCell::new(Locals::default()),
+            tmp_idx: 0,
         }
     }
 
@@ -1293,11 +1295,7 @@ impl SQIRGen {
             _ => unimplemented!(),
         };
 
-        let expr = self.unify(tmp?, ctx)?;
-
-        self.sqir.temporaries.push(expr.clone());
-
-        Ok(expr)
+        self.unify(tmp?, ctx)
     }
 
     // Try to unify the type of 'expr' with the type hint
@@ -1385,13 +1383,13 @@ impl SQIRGen {
 
     fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<RcExpr> {
         if let Some(expr) = self.locals.borrow()?.var_map.get(name) {
-            return Self::generate_load(name, expr)
+            return Self::generate_load(expr)
         }
 
         // TODO(H2CO3): handle impl namespaces too
         if let Some(top_ns) = self.sqir.globals.get(&None) {
             if let Some(expr) = top_ns.get(name) {
-                return Self::generate_load(name, expr)
+                return Self::generate_load(expr)
             }
         }
 
@@ -1399,26 +1397,9 @@ impl SQIRGen {
     }
 
     // Helper for generate_name_ref()
-    fn generate_load(name: &str, ref_expr: &RcExpr) -> SemaResult<RcExpr> {
-        // If it's a local variable declaration, unwrap it,
-        // otherwise just use the referred expression itself.
-        let (ty, expr) = match ref_expr.borrow()?.value {
-            Value::VarDecl { ref expr, .. } => {
-                let ty = expr.borrow()?.ty.clone();
-                let expr = expr.as_weak();
-                (ty, expr)
-            },
-            _ => {
-                // TODO(H2CO3): must be a global, assert that
-                let ty = ref_expr.borrow()?.ty.clone();
-                let expr = ref_expr.as_weak();
-                (ty, expr)
-            },
-        };
-
-        let name = name.to_owned();
-        let value = Value::Load { name, expr };
-
+    fn generate_load(expr: &RcExpr) -> SemaResult<RcExpr> {
+        let ty = expr.borrow()?.ty.clone();
+        let value = Value::Load(expr.as_weak());
         Ok(RcCell::new(Expr { ty, value }))
     }
 
@@ -1440,7 +1421,7 @@ impl SQIRGen {
     fn generate_semi(&mut self, node: &Node) -> SemaResult<RcExpr> {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
-        let value = Value::Ignore(subexpr.as_weak());
+        let value = Value::Ignore(subexpr);
         Ok(RcCell::new(Expr { ty, value }))
     }
 
@@ -1455,13 +1436,12 @@ impl SQIRGen {
         }
 
         let exprs = self.generate_tuple_items(ctx, nodes)?;
-        let items = exprs.iter().map(RcCell::as_weak).collect();
         let types = exprs.iter()
             .map(|expr| Ok(expr.borrow()?.ty.clone()))
             .collect::<SemaResult<_>>()?;
 
         let ty = self.get_tuple_type_from_types(types, nodes)?;
-        let value = Value::Tuple(items);
+        let value = Value::Tuple(exprs);
 
         Ok(RcCell::new(Expr { ty, value }))
     }
@@ -1502,13 +1482,13 @@ impl SQIRGen {
         let (items, ty) = match nodes.split_last() {
             Some((last, firsts)) => {
                 let mut items: Vec<_> = firsts.iter().map(
-                    |node| self.generate_expr(node, None).map(|rc| rc.as_weak())
+                    |node| self.generate_expr(node, None)
                 ).collect::<SemaResult<_>>()?;
 
                 let last_expr = self.generate_expr(last, ctx.ty.clone())?;
                 let last_ty = last_expr.borrow()?.ty.clone();
 
-                items.push(last_expr.as_weak());
+                items.push(last_expr);
 
                 (items, last_ty)
             },
@@ -1529,17 +1509,13 @@ impl SQIRGen {
     fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> SemaResult<RcExpr> {
         use std::collections::hash_map::Entry::{ Vacant, Occupied };
 
-        let ty = self.get_unit_type();
         let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
 
         // insert into map of all transitively-visible locals
         let decl = match locals.var_map.entry(name.to_owned()) {
             Vacant(entry) => {
-                let name = name.to_owned();
-                let value = Value::VarDecl { name, expr };
-                let decl = RcCell::new(Expr { ty, value });
-
-                entry.insert(decl).clone()
+                // TODO(H2CO3): change name of 'expr' from Temp(_) to Name(name)
+                entry.insert(expr).clone()
             },
             Occupied(_) => return sema_error!(range, "Redefinition of '{}'", name),
         };
@@ -1597,9 +1573,8 @@ impl SQIRGen {
         // TODO(H2CO3): isn't it a problem that at this point, while the
         // body is being generated, the arguments' parent function
         // pointer points nowhere because it's an empty weak pointer?
-        let body_rc = self.generate_expr(&func.body, ret_type_hint)?;
-        let ret_type = body_rc.borrow()?.ty.clone();
-        let body = body_rc.as_weak();
+        let body = self.generate_expr(&func.body, ret_type_hint)?;
+        let ret_type = body.borrow()?.ty.clone();
 
         // Form the function expression
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
@@ -1625,9 +1600,8 @@ impl SQIRGen {
             |(index, (node, ty))| match node.value {
                 NodeValue::FuncArg(ref arg) => {
                     let func = WkCell::new(); // dummy, points nowhere (yet)
-                    let name = arg.name.to_owned();
                     let ty = ty.clone();
-                    let value = Value::FuncArg { func, name, index };
+                    let value = Value::FuncArg { func, index };
                     let expr = RcCell::new(Expr { ty, value });
                     self.declare_local(arg.name, expr.clone(), node)?;
                     Ok(expr) // return the FuncArg expression itself, not the VarDecl
