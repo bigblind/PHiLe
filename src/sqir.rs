@@ -135,7 +135,7 @@ pub struct Relation {
 pub struct Expr {
     pub ty:    RcType, // can be Rc: no cycles are possible
     pub value: Value,
-    // pub id:    ExprId,
+    pub id:    ExprId,
 }
 
 #[derive(Debug)]

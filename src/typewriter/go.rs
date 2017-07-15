@@ -66,9 +66,7 @@ fn write_tuple_type(wr: &mut io::Write, types: &[WkType], params: &CodegenParams
         write!(wr, "; ")?;
     }
 
-    write!(wr, "}}")?;
-
-    Ok(())
+    write!(wr, "}}")
 }
 
 fn write_function_type(wr: &mut io::Write, ty: &FunctionType, params: &CodegenParams) -> io::Result<()> {

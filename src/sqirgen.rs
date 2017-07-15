@@ -1135,9 +1135,10 @@ impl SQIRGen {
     fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
         let (name, ty) = self.forward_declare_function(node)?;
         let value = Value::Placeholder;
+        let id = ExprId::Name(name.clone());
         let entry = self.sqir.globals.entry(None); // no namespace
         let globals = entry.or_insert_with(BTreeMap::new);
-        let expr = RcCell::new(Expr { ty, value });
+        let expr = RcCell::new(Expr { ty, value, id });
 
         if globals.insert(name, expr).is_none() {
             Ok(())
@@ -1172,7 +1173,8 @@ impl SQIRGen {
 
         for ((name, ty), node) in names_types.into_iter().zip(decls) {
             let value = Value::Placeholder;
-            let expr = RcCell::new(Expr { ty, value });
+            let id = ExprId::Name(name.clone());
+            let expr = RcCell::new(Expr { ty, value, id });
 
             if ns.insert(name, expr).is_some() {
                 return sema_error!(node, "Redefinition of function")
@@ -1283,7 +1285,7 @@ impl SQIRGen {
             NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx.clone(), n),
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
-            NodeValue::Identifier(name)     => self.generate_name_ref(ctx.clone(), name),
+            NodeValue::Identifier(name)     => self.generate_name_ref(name, ctx.range),
             NodeValue::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
             NodeValue::EmptyStmt            => self.generate_empty_stmt(ctx.clone()),
             NodeValue::Semi(ref expr)       => self.generate_semi(expr),
@@ -1298,6 +1300,13 @@ impl SQIRGen {
         self.unify(tmp?, ctx)
     }
 
+    // Obtain a fresh ExprId for a temporary
+    fn next_temp_id(&mut self) -> ExprId {
+        let id = ExprId::Temp(self.tmp_idx);
+        self.tmp_idx += 1;
+        id
+    }
+
     // Try to unify the type of 'expr' with the type hint
     // specified in 'ctx'. This may be either an identity
     // transform or an implicit conversion (e.g. T -> T?).
@@ -1306,7 +1315,7 @@ impl SQIRGen {
     // * T <= T
     // * T <= T?          (results in an OptionalWrap)
     // * Int <= Float     (results in an IntToFloat conversion)
-    fn unify(&self, expr: RcExpr, ctx: TyCtx) -> SemaResult<RcExpr> {
+    fn unify(&mut self, expr: RcExpr, ctx: TyCtx) -> SemaResult<RcExpr> {
         let ty = match ctx.ty {
             None => return Ok(expr),
             Some(ty) => if ty == expr.borrow()?.ty {
@@ -1321,8 +1330,9 @@ impl SQIRGen {
         if let Type::Optional(ref inner) = *ty.borrow()? {
             if expr_ref.ty == inner.as_rc()? {
                 let ty = ty.clone();
+                let id = self.next_temp_id();
                 let value = Value::OptionalWrap(expr.clone());
-                return Ok(RcCell::new(Expr { ty, value }));
+                return Ok(RcCell::new(Expr { ty, value, id }));
             }
         }
 
@@ -1334,8 +1344,9 @@ impl SQIRGen {
         )
     }
 
-    fn generate_nil_literal(&self, ctx: TyCtx) -> SemaResult<RcExpr> {
+    fn generate_nil_literal(&mut self, ctx: TyCtx) -> SemaResult<RcExpr> {
         let value = Value::Nil;
+        let id = self.next_temp_id();
 
         let ty = match ctx.ty {
             Some(ty) => ty,
@@ -1347,16 +1358,17 @@ impl SQIRGen {
             _ => return sema_error!(ctx.range, "Nil must have optional type"),
         }
 
-        Ok(RcCell::new(Expr { ty, value }))
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_bool_literal(&self, b: bool) -> SemaResult<RcExpr> {
+    fn generate_bool_literal(&mut self, b: bool) -> SemaResult<RcExpr> {
         let ty = self.get_bool_type();
         let value = Value::BoolConst(b);
-        Ok(RcCell::new(Expr { ty, value }))
+        let id = self.next_temp_id();
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_int_literal(&self, ctx: TyCtx, n: u64) -> SemaResult<RcExpr> {
+    fn generate_int_literal(&mut self, ctx: TyCtx, n: u64) -> SemaResult<RcExpr> {
         if let Some(hint) = ctx.ty {
             if let Type::Float = *hint.borrow()? {
                 return self.generate_float_literal(n as f64)
@@ -1365,42 +1377,52 @@ impl SQIRGen {
 
         let ty = self.get_int_type();
         let value = Value::IntConst(n);
+        let id = self.next_temp_id();
 
-        Ok(RcCell::new(Expr { ty, value }))
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_float_literal(&self, x: f64) -> SemaResult<RcExpr> {
+    fn generate_float_literal(&mut self, x: f64) -> SemaResult<RcExpr> {
         let ty = self.get_float_type();
         let value = Value::FloatConst(x);
-        Ok(RcCell::new(Expr { ty, value }))
+        let id = self.next_temp_id();
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_string_literal(&self, s: &str) -> SemaResult<RcExpr> {
+    fn generate_string_literal(&mut self, s: &str) -> SemaResult<RcExpr> {
         let ty = self.get_string_type();
         let value = Value::StringConst(s.to_owned());
-        Ok(RcCell::new(Expr { ty, value }))
+        let id = self.next_temp_id();
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_name_ref(&self, ctx: TyCtx, name: &str) -> SemaResult<RcExpr> {
+    fn generate_name_ref<R: Ranged>(&mut self, name: &str, range: R) -> SemaResult<RcExpr> {
+        let expr = self.lookup_name(name, range)?;
+        self.generate_load(expr)
+    }
+
+    // Helper for generate_name_ref()
+    fn lookup_name<R: Ranged>(&self, name: &str, range: R) -> SemaResult<RcExpr> {
         if let Some(expr) = self.locals.borrow()?.var_map.get(name) {
-            return Self::generate_load(expr)
+            return Ok(expr.clone())
         }
 
         // TODO(H2CO3): handle impl namespaces too
         if let Some(top_ns) = self.sqir.globals.get(&None) {
             if let Some(expr) = top_ns.get(name) {
-                return Self::generate_load(expr)
+                return Ok(expr.clone())
             }
         }
 
-        sema_error!(ctx, "Undeclared identifier: '{}'", name)
+        sema_error!(range, "Undeclared identifier: '{}'", name)
     }
 
     // Helper for generate_name_ref()
-    fn generate_load(expr: &RcExpr) -> SemaResult<RcExpr> {
+    fn generate_load(&mut self, expr: RcExpr) -> SemaResult<RcExpr> {
         let ty = expr.borrow()?.ty.clone();
         let value = Value::Load(expr.as_weak());
-        Ok(RcCell::new(Expr { ty, value }))
+        let id = self.next_temp_id();
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
     fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> SemaResult<RcExpr> {
@@ -1411,6 +1433,7 @@ impl SQIRGen {
 
         let init = self.generate_expr(&decl.init_expr, init_type_hint)?;
 
+        // changes id of 'init' from ExprId::Temp(_) to ExprId::Name(decl.name)
         self.declare_local(decl.name, init, &ctx)
     }
 
@@ -1422,7 +1445,8 @@ impl SQIRGen {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
         let value = Value::Ignore(subexpr);
-        Ok(RcCell::new(Expr { ty, value }))
+        let id = self.next_temp_id();
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
     fn generate_binary_op(&mut self, _ctx: TyCtx, _op: &ast::BinaryOp) -> SemaResult<RcExpr> {
@@ -1442,8 +1466,9 @@ impl SQIRGen {
 
         let ty = self.get_tuple_type_from_types(types, nodes)?;
         let value = Value::Tuple(exprs);
+        let id = self.next_temp_id();
 
-        Ok(RcCell::new(Expr { ty, value }))
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
     // helper for generate_tuple()
@@ -1496,8 +1521,9 @@ impl SQIRGen {
         };
 
         let value = Value::Seq(items);
+        let id = self.next_temp_id();
 
-        Ok(RcCell::new(Expr { ty, value }))
+        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
     //
@@ -1506,6 +1532,8 @@ impl SQIRGen {
 
     // Declares a local in the current (innermost/top-of-the-stack) scope.
     // Returns an error if a local with the specified name already exists.
+    // Also changes the id of 'expr' to ExprId::Name(name.to_owned()).
+    // Returns the already-changed 'expr' for convenience.
     fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> SemaResult<RcExpr> {
         use std::collections::hash_map::Entry::{ Vacant, Occupied };
 
@@ -1514,7 +1542,8 @@ impl SQIRGen {
         // insert into map of all transitively-visible locals
         let decl = match locals.var_map.entry(name.to_owned()) {
             Vacant(entry) => {
-                // TODO(H2CO3): change name of 'expr' from Temp(_) to Name(name)
+                // Change id of generated temporary to the specified name
+                expr.borrow_mut()?.id = ExprId::Name(name.to_owned());
                 entry.insert(expr).clone()
             },
             Occupied(_) => return sema_error!(range, "Redefinition of '{}'", name),
@@ -1579,7 +1608,11 @@ impl SQIRGen {
         // Form the function expression
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
         let value = Value::Function(Function { args, body });
-        let expr = RcCell::new(Expr { ty, value });
+        let id = match func.name {
+            Some(name) => ExprId::Name(name.to_owned()),
+            None       => self.next_temp_id(),
+        };
+        let expr = RcCell::new(Expr { ty, value, id });
 
         // Fix arguments so that they actually point back to the function.
         // A copy of the original `args` vector is used, which should be
@@ -1602,9 +1635,10 @@ impl SQIRGen {
                     let func = WkCell::new(); // dummy, points nowhere (yet)
                     let ty = ty.clone();
                     let value = Value::FuncArg { func, index };
-                    let expr = RcCell::new(Expr { ty, value });
-                    self.declare_local(arg.name, expr.clone(), node)?;
-                    Ok(expr) // return the FuncArg expression itself, not the VarDecl
+                    let id = ExprId::Name(arg.name.to_owned());
+                    let expr = RcCell::new(Expr { ty, value, id });
+                    // Sets the id of the FuncArg to ExprId::Name (again, redundantly)
+                    self.declare_local(arg.name, expr.clone(), node)
                 },
                 _ => unreachable!("Non-FuncArg argument?!"),
             }
