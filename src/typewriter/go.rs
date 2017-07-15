@@ -108,13 +108,13 @@ fn write_comment_header(wr: &mut io::Write) -> io::Result<()> {
 // Namespace <-> package name
 // Respect namespace transform
 fn write_namespace(wr: &mut io::Write, params: &CodegenParams) -> io::Result<()> {
-    let package_name = params.namespace.as_ref().map(
+    params.namespace.as_ref().map(
         |ns| transform_namespace(ns, params)
     ).ok_or_else(
         || io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
-    )?;
-
-    writeln!(wr, "package {}\n", package_name)
+    ).and_then(
+        |ns| writeln!(wr, "package {}\n", ns)
+    )
 }
 
 fn write_imports(wr: &mut io::Write, params: &CodegenParams) -> io::Result<()> {
