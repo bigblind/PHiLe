@@ -160,3 +160,16 @@ fn write_dummy_uses(wr: &mut io::Write, params: &CodegenParams) -> io::Result<()
 
     writeln!(wr)
 }
+
+//
+// Escaping string literals
+//
+
+pub fn escape_string_literal(s: &str) -> String {
+    // printable characters need not be escaped
+    if s.chars().all(|c| 0x20 as char <= c && c <= 0x7e as char) {
+        s.to_owned()
+    } else {
+        unimplemented!() // TODO(H2CO3): escape string literals; NB escape_default()!
+    }
+}

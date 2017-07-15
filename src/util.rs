@@ -69,7 +69,7 @@ pub fn grapheme_count(string: &str) -> usize {
 
 pub fn unescape_string_literal(string: &str) -> SyntaxResult<String> {
     if string.contains('\\') {
-        unimplemented!() // TODO(H2CO3): escape string literals
+        unimplemented!() // TODO(H2CO3): unescape string literals
     } else {
         Ok(string.to_owned())
     }
