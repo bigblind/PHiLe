@@ -7,7 +7,7 @@
 //
 
 use std::io;
-use typewriter::go::*;
+use declgen::go::*;
 use codegen::*;
 use sqir::*;
 

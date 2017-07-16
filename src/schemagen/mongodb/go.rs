@@ -10,7 +10,7 @@ use std::io;
 use codegen::*;
 use sqir::*;
 use util::PACKAGE_INFO;
-use typewriter::go::NAMING_CONVENTION;
+use declgen::go::NAMING_CONVENTION;
 
 
 pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
