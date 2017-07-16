@@ -43,3 +43,8 @@ func (ctx *{ctxtype}) CreateSchema(dropDb bool) error {{
     // Therefore, the actual creation of collections is a no-op here.
     return nil
 }}
+
+//
+// Top-level Queries
+//
+

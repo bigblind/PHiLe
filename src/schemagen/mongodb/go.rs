@@ -14,7 +14,8 @@ use typewriter::go::NAMING_CONVENTION;
 
 
 pub fn generate(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
-    let wptr = wp("PHiLe-Context.go")?;
+    let file_name = TOPLEVEL_BASENAME.to_owned() + ".go";
+    let wptr = wp(&file_name)?;
     let mut wr = wptr.borrow_mut();
     let package_name = params.namespace.as_ref().map(
         |ns| transform_namespace(ns, params)
