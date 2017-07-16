@@ -25,6 +25,7 @@ pub struct NamingConvention {
     pub context_name: &'static str,
     pub tmp_prefix:   &'static str,
     pub var_prefix:   &'static str,
+    pub top_basename: &'static str,
 }
 
 pub static NAMING_CONVENTION: NamingConvention = NamingConvention {
@@ -32,6 +33,7 @@ pub static NAMING_CONVENTION: NamingConvention = NamingConvention {
     context_name: "ctx",
     tmp_prefix:   "tmp_",
     var_prefix:   "var_",
+    top_basename: "PHiLe-Context",
 };
 
 struct Generator<'a> {

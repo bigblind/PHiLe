@@ -19,22 +19,22 @@ func OpenCtx(connStr string) (*{ctxtype}, error) {{
     }}
 
     db := session.DB("")
-    ctx := &{ctxtype} {{
+    {ctxname} := &{ctxtype} {{
         Session: session,
         Db:      db,
     }}
 
-    return ctx, nil
+    return {ctxname}, nil
 }}
 
-func (ctx *{ctxtype}) CloseCtx() {{
-    ctx.Session.Close()
-    ctx.Db = nil
+func ({ctxname} *{ctxtype}) CloseCtx() {{
+    {ctxname}.Session.Close()
+    {ctxname}.Db = nil
 }}
 
-func (ctx *{ctxtype}) CreateSchema(dropDb bool) error {{
+func ({ctxname} *{ctxtype}) CreateSchema(dropDb bool) error {{
     if dropDb {{
-        if err := ctx.Db.DropDatabase(); err != nil {{
+        if err := {ctxname}.Db.DropDatabase(); err != nil {{
             return err
         }}
     }}

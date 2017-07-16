@@ -25,7 +25,7 @@ pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) ->
 //
 
 fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
-    let file_name = TOPLEVEL_BASENAME.to_owned() + ".go";
+    let file_name = NAMING_CONVENTION.top_basename.to_owned() + ".go";
     let wptr = wp(&file_name)?;
     let mut wr = wptr.borrow_mut();
     let package_name = params.namespace.as_ref().map(
@@ -39,6 +39,7 @@ fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider
         include_str!("go_template.txt"),
         version = PACKAGE_INFO.version,
         authors = PACKAGE_INFO.authors,
+        ctxname = NAMING_CONVENTION.context_name,
         ctxtype = NAMING_CONVENTION.context_type,
         namespace = package_name,
     )
@@ -56,7 +57,7 @@ fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) 
     for (ns_name, namespace) in &sqir.globals {
         for (raw_name, expr) in namespace {
             let namespace_or = |default| ns_name.as_ref().map_or(default, String::as_ref);
-            let file_name = namespace_or(TOPLEVEL_BASENAME).to_owned() + ".go";
+            let file_name = namespace_or(NAMING_CONVENTION.top_basename).to_owned() + ".go";
             let prefixed_name = namespace_or("").to_owned() + "_" + raw_name;
             let name = transform_func_name(&prefixed_name, params);
             let wptr = wp(&file_name)?;

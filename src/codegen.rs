@@ -68,8 +68,6 @@ pub struct CodegenParams {
     pub namespace_transform:    Option<NameTransform>,
 }
 
-pub static TOPLEVEL_BASENAME: &str = "PHiLe-Context";
-
 
 macro_rules! call_declgen {
     ($module: ident, $sqir: expr, $params: expr, $wp: expr) => {
