@@ -14,12 +14,10 @@ use std::collections::HashMap;
 use std::str;
 use std::fs::File;
 use std::path::PathBuf;
-use std::error::Error;
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::io;
-use std::io::stdout;
+use std::io::{ self, stdout };
 use std::io::prelude::*;
 use phile::util::PACKAGE_INFO;
 use phile::lexer::*;
@@ -39,17 +37,34 @@ struct ProgramArgs {
     sources:          Vec<String>,
 }
 
+#[derive(Debug)]
+struct Color {
+    reset:     &'static str,
+    info:      &'static str,
+    highlight: &'static str,
+    success:   &'static str,
+    error:     &'static str,
+}
+
+static COLOR: Color = Color {
+    reset:     "\x1b[0m",
+    info:      "\x1b[1;33m",
+    highlight: "\x1b[1;36m",
+    success:   "\x1b[1;32m",
+    error:     "\x1b[1;31m",
+};
+
 
 macro_rules! stopwatch {
     ($msg: expr, $code: expr) => ({
-        print!("{}... ", $msg);
+        print!("    {:.<40}", $msg);
         stdout().flush().expect("Could not flush stdout");
         let t0 = Instant::now();
         let val = $code;
         let t1 = Instant::now();
         let dt = t1 - t0;
         let secs = dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
-        println!("{:.0} ms", secs * 1e3);
+        println!("{}{:6.1} ms{}", COLOR.info, secs * 1e3, COLOR.reset);
         val
     })
 }
@@ -106,7 +121,7 @@ fn validate_database(dbname: &str) -> DatabaseEngine {
         "sqlite3" => DatabaseEngine::SQLite3,
         "mongodb" => DatabaseEngine::MongoDB,
         "mariadb" => DatabaseEngine::MariaDB,
-        _         => panic!("Unsupported database engine: '{}'", dbname),
+        _         => handle_argument_error("database engine", dbname),
     }
 }
 
@@ -121,7 +136,7 @@ fn validate_language(langname: &str) -> Language {
         "js"     => Language::JavaScript,
         "python" => Language::Python,
         "java"   => Language::Java,
-        _        => panic!("Unsupported language: '{}'", langname),
+        _        => handle_argument_error("language", langname),
     }
 }
 
@@ -131,7 +146,7 @@ fn validate_access(mode: Option<&str>) -> DatabaseAccessMode {
         |name| match name {
             "pod" => DatabaseAccessMode::POD,
             "acr" => DatabaseAccessMode::ActiveRecord,
-            _     => panic!("Invalid DB access mode: '{}'", name),
+            _     => handle_argument_error("DB access mode", name),
         }
     )
 }
@@ -144,7 +159,7 @@ fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {
         "upsnake"  => Some(NameTransform::UpperSnakeCase),
         "lowcamel" => Some(NameTransform::LowerCamelCase),
         "upcamel"  => Some(NameTransform::UpperCamelCase),
-        _          => panic!("Invalid name transform: '{}'", name),
+        _          => handle_argument_error("name transform", name),
     })
 }
 
@@ -194,42 +209,117 @@ fn writer_provider_with_args(args: &ProgramArgs) -> Box<WriterProvider> {
 
 //
 // Error Reporting
+// TODO(H2CO3): rewrite `write!(std::io::stderr(), args...).unwrap()`
+// using `eprint!(args...)` once Rust 1.19.0 is released
 //
 
-fn format_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> String {
-    let file = files[location.src_idx].as_ref();
-    format!("Lexical error in '{}' near {}", file, location)
+fn handle_argument_error(arg_name: &str, value: &str) -> ! {
+    write!(
+        std::io::stderr(),
+        "    Invalid {arg_name}: {clr_err}'{value}'{clr_rst}\n\n",
+        arg_name = arg_name,
+        value = value,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
 }
 
-fn format_syntax_error<P: AsRef<str>>(error: &SyntaxError, files: &[P]) -> String {
-    let file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref());
-    let range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r));
-    format!("Syntax error in '{}' near {}: {}", file, range, error.message)
+fn handle_read_error(error: io::Error) -> ! {
+    write!(
+        std::io::stderr(),
+        "\n\n    Error reading file: {clr_err}{error}{clr_rst}\n\n",
+        error = error,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
 }
 
-fn format_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> String {
-    let file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref());
-    let range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r));
-    format!("Semantic error in '{}' near {}: {}", file, range, error.message)
+fn handle_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> ! {
+    write!(
+        std::io::stderr(),
+        "\n\n    Syntax error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{location}{clr_rst}:\n        {clr_err}Invalid token{clr_rst}\n\n",
+        file = files[location.src_idx].as_ref(),
+        location = location,
+        clr_hgl = COLOR.highlight,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
 }
+
+fn handle_syntax_error<P: AsRef<str>>(error: &SyntaxError, files: &[P]) -> ! {
+    write!(
+        std::io::stderr(),
+        "\n\n    Syntax error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{range}{clr_rst}:\n        {clr_err}{message}{clr_rst}\n\n",
+        file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref()),
+        range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r)),
+        message = error.message,
+        clr_hgl = COLOR.highlight,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
+}
+
+fn handle_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> ! {
+    write!(
+        std::io::stderr(),
+        "\n\n    Semantic error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{range}{clr_rst}:\n        {clr_err}{message}{clr_rst}\n\n",
+        file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref()),
+        range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r)),
+        message = error.message,
+        clr_hgl = COLOR.highlight,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
+}
+
+fn handle_declgen_error(error: io::Error) -> ! {
+    write!(
+        std::io::stderr(),
+        "\n\n    Could not generate declarations: {clr_err}{error}{clr_rst}\n\n",
+        error = error,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
+}
+
+fn handle_dalgen_error(error: io::Error) -> ! {
+    write!(
+        std::io::stderr(),
+        "\n\n    Could not generate DAL: {clr_err}{error}{clr_rst}\n\n",
+        error = error,
+        clr_err = COLOR.error,
+        clr_rst = COLOR.reset,
+    ).unwrap();
+    ::std::process::exit(1)
+}
+
+//
+// Entry point
+//
 
 fn main() {
     println!();
-    println!("The PHiLe Compiler, version {}", PACKAGE_INFO.version);
-    println!("Copyright (C) 2017, {}", PACKAGE_INFO.authors);
+    println!("    The PHiLe Compiler, version {}", PACKAGE_INFO.version);
+    println!("    Copyright (C) 2017, {}", PACKAGE_INFO.authors);
     println!();
 
     let args = get_args();
 
     let sources = stopwatch!("Reading Sources", {
         read_files(&args.sources).unwrap_or_else(
-            |error| panic!("Error reading file: {}", error.description())
+            |error| handle_read_error(error)
         )
     });
 
     let tokens = stopwatch!("Lexing", {
         let mut tmp_tokens = lex(&sources).unwrap_or_else(
-            |location| panic!(format_lexer_error(&location, &args.sources))
+            |location| handle_lexer_error(&location, &args.sources)
         );
 
         tmp_tokens.retain(|token| match token.kind {
@@ -243,13 +333,13 @@ fn main() {
 
     let program = stopwatch!("Parsing", {
         parse(&tokens).unwrap_or_else(
-            |error| panic!(format_syntax_error(&error, &args.sources))
+            |error| handle_syntax_error(&error, &args.sources)
         )
     });
 
     let raw_sqir = stopwatch!("Typechecking and generating SQIR", {
         generate_sqir(&program).unwrap_or_else(
-            |error| panic!(format_sema_error(&error, &args.sources))
+            |error| handle_sema_error(&error, &args.sources)
         )
     });
 
@@ -259,17 +349,17 @@ fn main() {
 
     stopwatch!("Generating Declarations", {
         generate_declarations(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| panic!("Could not generate declarations: {}", error.description())
+            |error| handle_declgen_error(error)
         )
     });
 
     stopwatch!("Generating Database Abstraction Layer", {
         generate_dal(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| panic!("Could not generate DAL: {}", error.description())
+            |error| handle_dalgen_error(error)
         )
     });
 
     println!();
-    println!("Compilation Successful");
+    println!("    {}Compilation Successful{}", COLOR.success, COLOR.reset);
     println!();
 }
