@@ -129,9 +129,9 @@ fn validate_access(mode: Option<&str>) -> DatabaseAccessMode {
     mode.map_or(
         DatabaseAccessMode::POD,
         |name| match name {
-            "pod"       => DatabaseAccessMode::POD,
-            "activerec" => DatabaseAccessMode::ActiveRecord,
-            _           => panic!("Invalid DB access mode: '{}'", name),
+            "pod" => DatabaseAccessMode::POD,
+            "acr" => DatabaseAccessMode::ActiveRecord,
+            _     => panic!("Invalid DB access mode: '{}'", name),
         }
     )
 }
@@ -214,8 +214,9 @@ fn format_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> String {
 }
 
 fn main() {
-    println!("The PHiLe Compiler");
-    println!("Copyright (C) Arpad Goretity, 2017");
+    println!();
+    println!("The PHiLe Compiler, version {}", PACKAGE_INFO.version);
+    println!("Copyright (C) 2017, {}", PACKAGE_INFO.authors);
     println!();
 
     let args = get_args();
@@ -262,18 +263,13 @@ fn main() {
         )
     });
 
-    stopwatch!("Generating Schema", {
-        generate_schema(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| panic!("Could not generate schema: {}", error.description())
-        )
-    });
-
-    stopwatch!("Generating Queries", {
-        generate_queries(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| panic!("Could not generate queries: {}", error.description())
+    stopwatch!("Generating Database Abstraction Layer", {
+        generate_dal(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
+            |error| panic!("Could not generate DAL: {}", error.description())
         )
     });
 
     println!();
     println!("Compilation Successful");
+    println!();
 }

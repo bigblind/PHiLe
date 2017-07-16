@@ -12,8 +12,7 @@ use std::cell::RefCell;
 use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase };
 use sqir::SQIR;
 use declgen;
-use schemagen;
-use querygen;
+use dalgen;
 
 
 #[derive(Debug, Clone, Copy)]
@@ -100,19 +99,11 @@ pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &mut Write
     }
 }
 
-pub fn generate_schema(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_dal(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     match params.database {
-        DatabaseEngine::SQLite3 => schemagen::sqlite3::generate(sqir, params, wp),
-        DatabaseEngine::MongoDB => schemagen::mongodb::generate(sqir, params, wp),
-        DatabaseEngine::MariaDB => schemagen::mariadb::generate(sqir, params, wp),
-    }
-}
-
-pub fn generate_queries(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
-    match params.database {
-        DatabaseEngine::SQLite3 => querygen::sqlite3::generate(sqir, params, wp),
-        DatabaseEngine::MongoDB => querygen::mongodb::generate(sqir, params, wp),
-        DatabaseEngine::MariaDB => querygen::mariadb::generate(sqir, params, wp),
+        DatabaseEngine::SQLite3 => dalgen::sqlite3::generate(sqir, params, wp),
+        DatabaseEngine::MongoDB => dalgen::mongodb::generate(sqir, params, wp),
+        DatabaseEngine::MariaDB => dalgen::mariadb::generate(sqir, params, wp),
     }
 }
 

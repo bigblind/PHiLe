@@ -1,9 +1,9 @@
 //
-// querygen/mongodb/java.rs
+// dalgen/mongodb/python.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
-// on 09/07/2017
+// on 08/06/2017
 //
 
 use std::io;

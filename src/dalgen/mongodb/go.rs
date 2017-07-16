@@ -1,22 +1,58 @@
 //
-// querygen/mongodb/go.rs
+// dalgen/mongodb/go.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
-// on 09/07/2017
+// on 08/06/2017
 //
 
 use std::io;
-use declgen::go::*;
-use codegen::*;
 use sqir::*;
+use codegen::*;
+use declgen::go::*;
+use util::PACKAGE_INFO;
 
+
+pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+    generate_schema(sqir, params, wp)?;
+    generate_query(sqir, params, wp)?;
+
+    Ok(())
+}
+
+//
+// Generating the Schema (DDL)
+//
+
+fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+    let file_name = TOPLEVEL_BASENAME.to_owned() + ".go";
+    let wptr = wp(&file_name)?;
+    let mut wr = wptr.borrow_mut();
+    let package_name = params.namespace.as_ref().map(
+        |ns| transform_namespace(ns, params)
+    ).ok_or_else(
+        || io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
+    )?;
+
+    write!(
+        &mut *wr,
+        include_str!("go_template.txt"),
+        version = PACKAGE_INFO.version,
+        authors = PACKAGE_INFO.authors,
+        ctxtype = NAMING_CONVENTION.context_type,
+        namespace = package_name,
+    )
+}
+
+//
+// Generating Queries (DML)
+//
 
 //
 // Top-level (global func + impl) generators
 //
 
-pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
     for (ns_name, namespace) in &sqir.globals {
         for (raw_name, expr) in namespace {
             let namespace_or = |default| ns_name.as_ref().map_or(default, String::as_ref);
@@ -46,7 +82,7 @@ fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenPar
         _ => unreachable!("Non-Function global?!"),
     };
 
-    write_function(wr, name, ty, func, params)
+    generate_function(wr, name, ty, func, params)
 }
 
 //
@@ -151,7 +187,7 @@ fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: 
     }
 }
 
-fn write_function(
+fn generate_function(
     wr:     &mut io::Write,
     name:   &str,
     ty:     &FunctionType,

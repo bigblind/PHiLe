@@ -1,9 +1,9 @@
 //
-// querygen/mongodb/c.rs
+// dalgen/sqlite3/mod.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
-// on 09/07/2017
+// on 02/06/2017
 //
 
 use std::io;

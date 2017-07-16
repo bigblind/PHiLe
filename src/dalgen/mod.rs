@@ -1,5 +1,5 @@
 //
-// querygen/mod.rs
+// dalgen/mod.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)

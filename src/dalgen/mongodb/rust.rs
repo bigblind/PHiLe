@@ -1,5 +1,5 @@
 //
-// schemagen/mongodb/js.rs
+// dalgen/mongodb/rust.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
