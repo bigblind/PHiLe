@@ -1,53 +1,32 @@
 //
-// dalgen/mongodb/go.rs
+// dalgen/go/mod.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
-// on 08/06/2017
+// on 18/07/2017
 //
 
 use std::io;
-use sqir::*;
 use codegen::*;
+use sqir::*;
 use declgen::go::*;
-use util::PACKAGE_INFO;
+
+pub mod sqlite3;
+pub mod mongodb;
+pub mod mariadb;
 
 
 pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
-    generate_schema(sqir, params, wp)?;
-    generate_query(sqir, params, wp)?;
+    // First, generate the schema
+    match params.database {
+        DatabaseEngine::SQLite3 => sqlite3::generate_schema(sqir, params, wp)?,
+        DatabaseEngine::MongoDB => mongodb::generate_schema(sqir, params, wp)?,
+        DatabaseEngine::MariaDB => mariadb::generate_schema(sqir, params, wp)?,
+    }
 
-    Ok(())
+    // Then, generate queries
+    generate_query(sqir, params, wp)
 }
-
-//
-// Generating the Schema (DDL)
-//
-
-fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
-    let file_name = NAMING_CONVENTION.top_basename.to_owned() + ".go";
-    let wptr = wp(&file_name)?;
-    let mut wr = wptr.borrow_mut();
-    let package_name = params.namespace.as_ref().map(
-        |ns| transform_namespace(ns, params)
-    ).ok_or_else(
-        || io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
-    )?;
-
-    write!(
-        &mut *wr,
-        include_str!("go_template.txt"),
-        version = PACKAGE_INFO.version,
-        authors = PACKAGE_INFO.authors,
-        ctxname = NAMING_CONVENTION.context_name,
-        ctxtype = NAMING_CONVENTION.context_type,
-        namespace = package_name,
-    )
-}
-
-//
-// Generating Queries (DML)
-//
 
 //
 // Top-level (global func + impl) generators

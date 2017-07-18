@@ -5,7 +5,10 @@
 
 package {namespace}
 
+import "time"
 import "gopkg.in/mgo.v2"
+
+type _ time.Time
 
 type {ctxtype} struct {{
     Session *mgo.Session

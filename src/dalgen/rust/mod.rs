@@ -1,9 +1,9 @@
 //
-// dalgen/sqlite3/mod.rs
+// dalgen/rust/mod.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
-// on 02/06/2017
+// on 18/07/2017
 //
 
 use std::io;
