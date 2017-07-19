@@ -254,7 +254,7 @@ fn write_tuple_type(wr: &mut io::Write, types: &[WkType], params: &CodegenParams
 }
 
 fn write_function_type(wr: &mut io::Write, ty: &FunctionType, params: &CodegenParams) -> io::Result<()> {
-    write!(wr, "func(*{}", NAMING_CONVENTION.context_type)?;
+    write!(wr, "func({}", NAMING_CONVENTION.context_type)?;
 
     for arg in &ty.arg_types {
         write!(wr, ", ")?;

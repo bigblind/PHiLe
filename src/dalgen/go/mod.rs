@@ -85,17 +85,17 @@ fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> i
     // as function arguments are not serialized by generate_expr().
     // That's OK though, as unused arguments are not an error in Go.
     write!(wr, "    _ = ")?;
-    write_expr_id(wr, &ptr.id)?;
+    write_expr_id(wr, &ptr.id, params)?;
     writeln!(wr)?;
 
     match ptr.value {
         Value::Placeholder => unreachable!("Placeholder should have been replaced"),
-        Value::Nil                => generate_nil_literal(wr, &ptr.id),
-        Value::BoolConst(b)       => generate_bool_literal(wr, &ptr.id, b),
-        Value::IntConst(n)        => generate_int_literal(wr, &ptr.id, n),
-        Value::FloatConst(x)      => generate_float_literal(wr, &ptr.id, x),
-        Value::StringConst(ref s) => generate_string_literal(wr, &ptr.id, s),
-        Value::Load(ref expr)     => generate_load(wr, &ptr.id, expr),
+        Value::Nil                => generate_nil_literal(wr, &ptr.id, params),
+        Value::BoolConst(b)       => generate_bool_literal(wr, &ptr.id, b, params),
+        Value::IntConst(n)        => generate_int_literal(wr, &ptr.id, n, params),
+        Value::FloatConst(x)      => generate_float_literal(wr, &ptr.id, x, params),
+        Value::StringConst(ref s) => generate_string_literal(wr, &ptr.id, s, params),
+        Value::Load(ref expr)     => generate_load(wr, &ptr.id, expr, params),
         Value::OptionalWrap(_)    => unimplemented!(),
         Value::Ignore(ref expr)   => generate_ignore(wr, &ptr.id, expr, params),
         Value::Seq(ref exprs)     => generate_sequence(wr, &ptr.id, exprs, params),
@@ -103,49 +103,49 @@ fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> i
     }
 }
 
-fn generate_nil_literal(wr: &mut io::Write, id: &ExprId) -> io::Result<()> {
+fn generate_nil_literal(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> io::Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, id)?;
+    write_expr_id(wr, id, params)?;
     writeln!(wr, " = nil")
 }
 
-fn generate_bool_literal(wr: &mut io::Write, id: &ExprId, b: bool) -> io::Result<()> {
+fn generate_bool_literal(wr: &mut io::Write, id: &ExprId, b: bool, params: &CodegenParams) -> io::Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, id)?;
+    write_expr_id(wr, id, params)?;
     writeln!(wr, " = {}", b)
 }
 
-fn generate_int_literal(wr: &mut io::Write, id: &ExprId, n: u64) -> io::Result<()> {
+fn generate_int_literal(wr: &mut io::Write, id: &ExprId, n: u64, params: &CodegenParams) -> io::Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, id)?;
+    write_expr_id(wr, id, params)?;
     writeln!(wr, " = {}", n)
 }
 
-fn generate_float_literal(wr: &mut io::Write, id: &ExprId, x: f64) -> io::Result<()> {
+fn generate_float_literal(wr: &mut io::Write, id: &ExprId, x: f64, params: &CodegenParams) -> io::Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, id)?;
+    write_expr_id(wr, id, params)?;
     writeln!(wr, " = {}", x)
 }
 
-fn generate_string_literal(wr: &mut io::Write, id: &ExprId, s: &str) -> io::Result<()> {
+fn generate_string_literal(wr: &mut io::Write, id: &ExprId, s: &str, params: &CodegenParams) -> io::Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, id)?;
+    write_expr_id(wr, id, params)?;
     writeln!(wr, " = {}", escape_string_literal(s))
 }
 
-fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr) -> io::Result<()> {
+fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr, params: &CodegenParams) -> io::Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, &id)?;
+    write_expr_id(wr, &id, params)?;
     write!(wr, " = ")?;
     let rc = expr.as_rc()?;
-    write_expr_id(wr, &rc.borrow()?.id)?;
+    write_expr_id(wr, &rc.borrow()?.id, params)?;
     writeln!(wr)
 }
 
 fn generate_ignore(wr: &mut io::Write, id: &ExprId, expr: &RcExpr, params: &CodegenParams) -> io::Result<()> {
     generate_expr(wr, expr, params)?;
     write!(wr, "    ")?;
-    write_expr_id(wr, &id)?;
+    write_expr_id(wr, &id, params)?;
     writeln!(wr, " = struct{{}}{{}}")
 }
 
@@ -155,12 +155,12 @@ fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: 
     }
 
     write!(wr, "    ")?;
-    write_expr_id(wr, &id)?;
+    write_expr_id(wr, &id, params)?;
     write!(wr, " = ")?;
 
     match exprs.last() {
         Some(expr) => {
-            write_expr_id(wr, &expr.borrow()?.id)?;
+            write_expr_id(wr, &expr.borrow()?.id, params)?;
             writeln!(wr)
         },
         None => writeln!(wr, "struct{{}}{{}}"),
@@ -176,7 +176,7 @@ fn generate_function(
 ) -> io::Result<()> {
     write!(
         wr,
-        "func ({} *{}) {}(",
+        "func ({} {}) {}(",
         NAMING_CONVENTION.context_name,
         NAMING_CONVENTION.context_type,
         name
@@ -186,9 +186,8 @@ fn generate_function(
         let ptr = arg.borrow()?;
         match ptr.value {
             Value::FuncArg { index, .. } => match ptr.id {
-                ExprId::Name(_) => if index > 0 {
-                    write!(wr, ", ")?
-                },
+                ExprId::Local(_) => if index > 0 { write!(wr, ", ")? },
+                ExprId::Global(_) => unreachable!("FuncArg is global?!"),
                 ExprId::Temp(_) => unreachable!("FuncArg has no name?!"),
             },
             _ => unreachable!("Non-FuncArg argument?!"),
@@ -202,7 +201,7 @@ fn generate_function(
     writeln!(wr, " {{")?;
     generate_expr(wr, &func.body, params)?;
     write!(wr, "    return ")?;
-    write_expr_id(wr, &func.body.borrow()?.id)?;
+    write_expr_id(wr, &func.body.borrow()?.id, params)?;
     writeln!(wr)?;
     writeln!(wr, "}}")?;
     writeln!(wr)
@@ -214,16 +213,17 @@ fn generate_function(
 // TODO(H2CO3): should these functions transform names according
 // to the name transforms specified by the provided CodegenParams?
 
-fn write_expr_id(wr: &mut io::Write, id: &ExprId) -> io::Result<()> {
+fn write_expr_id(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> io::Result<()> {
     match *id {
-        ExprId::Temp(index)    => write!(wr, "{}{}", NAMING_CONVENTION.tmp_prefix, index),
-        ExprId::Name(ref name) => write!(wr, "{}{}", NAMING_CONVENTION.var_prefix, name),
+        ExprId::Temp(index)      => write!(wr, "{}{}", NAMING_CONVENTION.tmp_prefix, index),
+        ExprId::Local(ref name)  => write!(wr, "{}{}", NAMING_CONVENTION.var_prefix, name),
+        ExprId::Global(ref name) => write!(wr, "{}.{}", NAMING_CONVENTION.context_type, transform_func_name(name, params)),
     }
 }
 
 fn write_expr_decl(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> io::Result<()> {
     let ptr = expr.borrow()?;
-    write_expr_id(wr, &ptr.id)?;
+    write_expr_id(wr, &ptr.id, params)?;
     write!(wr, " ")?;
     write_type(wr, &ptr.ty.as_weak(), params)
 }

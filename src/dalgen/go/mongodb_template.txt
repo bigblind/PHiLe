@@ -15,14 +15,14 @@ type {ctxtype} struct {{
     Db      *mgo.Database
 }}
 
-func OpenCtx(connStr string) (*{ctxtype}, error) {{
+func OpenCtx(connStr string) ({ctxtype}, error) {{
     session, err := mgo.Dial(connStr)
     if err != nil {{
-        return nil, err
+        return {ctxtype} {{ nil, nil }}, err
     }}
 
     db := session.DB("")
-    {ctxname} := &{ctxtype} {{
+    {ctxname} := {ctxtype} {{
         Session: session,
         Db:      db,
     }}
@@ -30,12 +30,12 @@ func OpenCtx(connStr string) (*{ctxtype}, error) {{
     return {ctxname}, nil
 }}
 
-func ({ctxname} *{ctxtype}) CloseCtx() {{
+func ({ctxname} {ctxtype}) CloseCtx() {{
     {ctxname}.Session.Close()
     {ctxname}.Db = nil
 }}
 
-func ({ctxname} *{ctxtype}) CreateSchema(dropDb bool) error {{
+func ({ctxname} {ctxtype}) CreateSchema(dropDb bool) error {{
     if dropDb {{
         if err := {ctxname}.Db.DropDatabase(); err != nil {{
             return err
@@ -50,4 +50,3 @@ func ({ctxname} *{ctxtype}) CreateSchema(dropDb bool) error {{
 //
 // Top-level Queries
 //
-

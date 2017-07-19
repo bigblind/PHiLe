@@ -246,7 +246,8 @@ pub enum Value {
 #[derive(Debug)]
 pub enum ExprId {
     Temp(usize),
-    Name(String),
+    Local(String),
+    Global(String),
 }
 
 #[derive(Debug, Clone)]

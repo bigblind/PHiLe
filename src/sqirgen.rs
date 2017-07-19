@@ -1131,7 +1131,7 @@ impl SQIRGen {
     fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
         let (name, ty) = self.forward_declare_function(node)?;
         let value = Value::Placeholder;
-        let id = ExprId::Name(name.clone());
+        let id = ExprId::Global(name.clone()); // XXX: assumes that function is global
         let entry = self.sqir.globals.entry(None); // no namespace
         let globals = entry.or_insert_with(BTreeMap::new);
         let expr = RcCell::new(Expr { ty, value, id });
@@ -1169,7 +1169,7 @@ impl SQIRGen {
 
         for ((name, ty), node) in names_types.into_iter().zip(decls) {
             let value = Value::Placeholder;
-            let id = ExprId::Name(name.clone());
+            let id = ExprId::Global(name.clone()); // XXX: assumes function is global
             let expr = RcCell::new(Expr { ty, value, id });
 
             if ns.insert(name, expr).is_some() {
@@ -1281,7 +1281,7 @@ impl SQIRGen {
             NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx.clone(), n),
             NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
             NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
-            NodeValue::Identifier(name)     => self.generate_name_ref(name, ctx.range),
+            NodeValue::Identifier(name)     => self.generate_name_ref(name, range),
             NodeValue::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
             NodeValue::EmptyStmt            => self.generate_empty_stmt(ctx.clone()),
             NodeValue::Semi(ref expr)       => self.generate_semi(expr),
@@ -1429,7 +1429,7 @@ impl SQIRGen {
 
         let init = self.generate_expr(&decl.init_expr, init_type_hint)?;
 
-        // changes id of 'init' from ExprId::Temp(_) to ExprId::Name(decl.name)
+        // changes id of 'init' from ExprId::Temp(_) to ExprId::Local(decl.name)
         self.declare_local(decl.name, init, &ctx)
     }
 
@@ -1528,7 +1528,7 @@ impl SQIRGen {
 
     // Declares a local in the current (innermost/top-of-the-stack) scope.
     // Returns an error if a local with the specified name already exists.
-    // Also changes the id of 'expr' to ExprId::Name(name.to_owned()).
+    // Also changes the id of 'expr' to ExprId::Local(name.to_owned()).
     // Returns the already-changed 'expr' for convenience.
     fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> SemaResult<RcExpr> {
         use std::collections::hash_map::Entry::{ Vacant, Occupied };
@@ -1539,7 +1539,7 @@ impl SQIRGen {
         let decl = match locals.var_map.entry(name.to_owned()) {
             Vacant(entry) => {
                 // Change id of generated temporary to the specified name
-                expr.borrow_mut()?.id = ExprId::Name(name.to_owned());
+                expr.borrow_mut()?.id = ExprId::Local(name.to_owned());
                 entry.insert(expr).clone()
             },
             Occupied(_) => return sema_error!(range, "Redefinition of '{}'", name),
@@ -1601,13 +1601,13 @@ impl SQIRGen {
         let body = self.generate_expr(&func.body, ret_type_hint)?;
         let ret_type = body.borrow()?.ty.clone();
 
-        // Form the function expression
+        // Form the function expression (XXX: assumes named func is global)
         let ty = self.get_function_type_from_types(arg_types, ret_type)?;
         let value = Value::Function(Function { args, body });
-        let id = match func.name {
-            Some(name) => ExprId::Name(name.to_owned()),
-            None       => self.next_temp_id(),
-        };
+        let id = func.name.map_or_else(
+            || self.next_temp_id(),
+            |name| ExprId::Global(name.to_owned())
+        );
         let expr = RcCell::new(Expr { ty, value, id });
 
         // Fix arguments so that they actually point back to the function.
@@ -1631,9 +1631,9 @@ impl SQIRGen {
                     let func = WkCell::new(); // dummy, points nowhere (yet)
                     let ty = ty.clone();
                     let value = Value::FuncArg { func, index };
-                    let id = ExprId::Name(arg.name.to_owned());
+                    let id = ExprId::Local(arg.name.to_owned());
                     let expr = RcCell::new(Expr { ty, value, id });
-                    // Sets the id of the FuncArg to ExprId::Name (again, redundantly)
+                    // Sets the id of the FuncArg to ExprId::Local (again, redundantly)
                     self.declare_local(arg.name, expr.clone(), node)
                 },
                 _ => unreachable!("Non-FuncArg argument?!"),

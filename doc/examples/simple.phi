@@ -1,0 +1,17 @@
+fn foo() -> int -> String? {
+   bar
+}
+
+fn bar(n: int) -> String? {
+   "foo"; nil
+}
+
+fn double(x: float) -> Lol? {
+   nil
+}
+
+struct Lol {}
+
+fn qux() -> float -> Lol? {
+    double
+}
