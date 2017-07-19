@@ -50,3 +50,4 @@ func ({ctxname} {ctxtype}) CreateSchema(dropDb bool) error {{
 //
 // Top-level Queries
 //
+
