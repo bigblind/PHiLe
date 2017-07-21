@@ -211,49 +211,43 @@ fn writer_provider_with_args(args: &ProgramArgs) -> Box<WriterProvider> {
 
 //
 // Error Reporting
-// TODO(H2CO3): rewrite `write!(std::io::stderr(), args...).unwrap()`
-// using `eprint!(args...)` once Rust 1.19.0 is released
 //
 
 fn handle_argument_error(arg_name: &str, value: &str) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "    Invalid {arg_name}: {clr_err}'{value}'{clr_rst}\n\n",
         arg_name = arg_name,
         value = value,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
 fn handle_read_error(error: io::Error) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "\n\n    Error reading file: {clr_err}{error}{clr_rst}\n\n",
         error = error,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
 fn handle_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "\n\n    Syntax error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{location}{clr_rst}:\n        {clr_err}Invalid token{clr_rst}\n\n",
         file = files[location.src_idx].as_ref(),
         location = location,
         clr_hgl = COLOR.highlight,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
 fn handle_syntax_error<P: AsRef<str>>(error: &SyntaxError, files: &[P]) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "\n\n    Syntax error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{range}{clr_rst}:\n        {clr_err}{message}{clr_rst}\n\n",
         file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref()),
         range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r)),
@@ -261,13 +255,12 @@ fn handle_syntax_error<P: AsRef<str>>(error: &SyntaxError, files: &[P]) -> ! {
         clr_hgl = COLOR.highlight,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
 fn handle_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "\n\n    Semantic error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{range}{clr_rst}:\n        {clr_err}{message}{clr_rst}\n\n",
         file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref()),
         range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r)),
@@ -275,29 +268,27 @@ fn handle_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> ! {
         clr_hgl = COLOR.highlight,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
 fn handle_declgen_error(error: io::Error) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "\n\n    Could not generate declarations: {clr_err}{error}{clr_rst}\n\n",
         error = error,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
 fn handle_dalgen_error(error: io::Error) -> ! {
-    write!(
-        std::io::stderr(),
+    eprint!(
         "\n\n    Could not generate DAL: {clr_err}{error}{clr_rst}\n\n",
         error = error,
         clr_err = COLOR.error,
         clr_rst = COLOR.reset,
-    ).unwrap();
+    );
     ::std::process::exit(1)
 }
 
