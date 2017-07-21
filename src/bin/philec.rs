@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::io::{ self, stdout };
+use std::io::{ self, stderr };
 use std::io::prelude::*;
 use phile::util::PACKAGE_INFO;
 use phile::lexer::*;
@@ -59,14 +59,14 @@ static COLOR: Color = Color {
 
 macro_rules! stopwatch {
     ($msg: expr, $code: expr) => ({
-        print!("    {:.<40}", $msg);
-        stdout().flush().expect("Could not flush stdout");
+        eprint!("    {:.<40}", $msg);
+        stderr().flush().expect("Could not flush stderr");
         let t0 = Instant::now();
         let val = $code;
         let t1 = Instant::now();
         let dt = t1 - t0;
         let secs = dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
-        println!("{}{:6.1} ms{}", COLOR.info, secs * 1e3, COLOR.reset);
+        eprintln!("{}{:6.1} ms{}", COLOR.info, secs * 1e3, COLOR.reset);
         val
     })
 }
@@ -297,10 +297,10 @@ fn handle_dalgen_error(error: io::Error) -> ! {
 //
 
 fn main() {
-    println!();
-    println!("    The PHiLe Compiler, version {}", PACKAGE_INFO.version);
-    println!("    Copyright (C) 2017, {}", PACKAGE_INFO.authors);
-    println!();
+    eprintln!();
+    eprintln!("    The PHiLe Compiler, version {}", PACKAGE_INFO.version);
+    eprintln!("    Copyright (C) 2017, {}", PACKAGE_INFO.authors);
+    eprintln!();
 
     let args = get_args();
 
@@ -352,7 +352,7 @@ fn main() {
         )
     });
 
-    println!();
-    println!("    {}Compilation Successful{}", COLOR.success, COLOR.reset);
-    println!();
+    eprintln!();
+    eprintln!("    {}Compilation Successful{}", COLOR.success, COLOR.reset);
+    eprintln!();
 }
