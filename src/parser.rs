@@ -198,18 +198,15 @@ impl<'a> Parser<'a> {
         Ok(Node { range, value })
     }
 
-    fn parse_field(&mut self) -> ParseResult<'a> {
+    fn parse_field(&mut self) -> SyntaxResult<Field<'a>> {
         let name_tok = self.expect_identifier()?;
         let name = name_tok.value;
         let ty = self.expect(":").and_then(|_| self.parse_type())?;
         let relation = self.maybe_parse_relation()?;
         let comma = self.expect(",")?;
-
-        let field = Field { name, ty, relation };
         let range = make_range(name_tok, comma);
-        let value = NodeValue::Field(Box::new(field));
 
-        Ok(Node { range, value })
+        Ok(Field { range, name, ty, relation })
     }
 
     fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<RelDecl<'a>>> {

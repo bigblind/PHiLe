@@ -13,7 +13,6 @@ use lexer::{ Range, Ranged };
 pub enum NodeValue<'a> {
     // Declarations / Definitions
     Program(Vec<Node<'a>>),
-    Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
     ClassDecl(ClassDecl<'a>),
     EnumDecl(EnumDecl<'a>),
@@ -70,13 +69,13 @@ pub struct Node<'a> {
 #[derive(Debug)]
 pub struct StructDecl<'a> {
     pub name:   &'a str,
-    pub fields: Vec<Node<'a>>,
+    pub fields: Vec<Field<'a>>,
 }
 
 #[derive(Debug)]
 pub struct ClassDecl<'a> {
     pub name:       &'a str,
-    pub fields:     Vec<Node<'a>>,
+    pub fields:     Vec<Field<'a>>,
 }
 
 #[derive(Debug)]
@@ -87,6 +86,7 @@ pub struct RelDecl<'a> {
 
 #[derive(Debug)]
 pub struct Field<'a> {
+    pub range:    Range,
     pub name:     &'a str,
     pub ty:       Node<'a>,
     pub relation: Option<RelDecl<'a>>,
@@ -198,6 +198,12 @@ pub struct FunctionType<'a> {
 
 
 impl<'a> Ranged for Node<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for Field<'a> {
     fn range(&self) -> Range {
         self.range
     }

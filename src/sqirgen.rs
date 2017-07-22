@@ -12,7 +12,7 @@ use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
 use ast::{ self, Node, NodeValue, FuncArg };
-use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
+use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl, Field };
 use error::{ SemaError, SemaResult };
 
 
@@ -388,24 +388,19 @@ impl SQIRGen {
     fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<BTreeMap<String, WkType>> {
         let mut fields = BTreeMap::new();
 
-        for node in &decl.fields {
-            let field = match node.value {
-                NodeValue::Field(ref field) => field,
-                _ => unreachable!("Struct fields must be Field values"),
-            };
-
+        for field in &decl.fields {
             // No relations are allowed in a struct.
             if field.relation.is_some() {
-                return sema_error!(node, "Field '{}' must not be part of a relation", field.name);
+                return sema_error!(field, "Field '{}' must not be part of a relation", field.name);
             }
 
             let field_type_rc = self.type_from_decl(&field.ty)?;
             let field_type_wk = field_type_rc.as_weak();
 
-            self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Value)?;
+            self.validate_complex_type_item(&field_type_wk, field, ComplexTypeKind::Value)?;
 
             if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
-                return sema_error!(node, "Duplicate field '{}'", field.name);
+                return sema_error!(field, "Duplicate field '{}'", field.name);
             }
         }
 
@@ -419,19 +414,14 @@ impl SQIRGen {
     fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<BTreeMap<String, WkType>> {
         let mut fields = BTreeMap::new();
 
-        for node in &decl.fields {
-            let field = match node.value {
-                NodeValue::Field(ref field) => field,
-                _ => unreachable!("Class fields must be Field values"),
-            };
-
+        for field in &decl.fields {
             let field_type_rc = self.type_from_decl(&field.ty)?;
             let field_type_wk = field_type_rc.as_weak();
 
-            self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Entity)?;
+            self.validate_complex_type_item(&field_type_wk, field, ComplexTypeKind::Entity)?;
 
             if fields.insert(field.name.to_owned(), field_type_wk).is_some() {
-                return sema_error!(node, "Duplicate field '{}'", field.name);
+                return sema_error!(field, "Duplicate field '{}'", field.name);
             }
         }
 
@@ -825,22 +815,16 @@ impl SQIRGen {
     //
 
     fn define_relations_for_class(&mut self, decl: &ClassDecl) -> SemaResult<()> {
-        let class_type = self.sqir.named_types[decl.name].as_weak();
+        let class_type = self.sqir.named_types[decl.name].clone();
 
-        for node in &decl.fields {
-            self.define_relation_for_field(class_type.clone(), node)?
+        for field in &decl.fields {
+            self.define_relation_for_field(&class_type, field)?
         }
 
         Ok(())
     }
 
-    fn define_relation_for_field(&mut self, class_type: WkType, node: &Node) -> SemaResult<()> {
-        let field = match node.value {
-            NodeValue::Field(ref field) => field,
-            _ => unreachable!("Class fields must be Field values"),
-        };
-
-        let class_type_rc = class_type.as_rc()?;
+    fn define_relation_for_field(&mut self, class_type_rc: &RcType, field: &Field) -> SemaResult<()> {
         let class_type = class_type_rc.borrow()?;
 
         let class = match *class_type {
@@ -856,7 +840,7 @@ impl SQIRGen {
         // or [&T]), then implicitly form a relation.
         match field.relation {
             Some(ref rel) => self.define_explicit_relation(
-                &class_type_rc, &*field_type, field.name, rel, node
+                &class_type_rc, &*field_type, field.name, rel, field
             ),
             None => self.define_implicit_relation(
                 &class_type_rc, &*field_type, field.name
@@ -886,17 +870,17 @@ impl SQIRGen {
     //     refer to C::c, then C::c can only refer back to
     //     at most one of A::a or B::b.
     // TODO(H2CO3): this is too long; refactor
-    fn define_explicit_relation(
+    fn define_explicit_relation<R: Ranged>(
         &mut self,
         lhs_class_type: &RcType,
         lhs_field_type: &Type,
         lhs_field_name: &str,
         relation: &RelDecl,
-        node: &Node,
+        range: &R,
     ) -> SemaResult<()> {
         // Ensure that declared RHS cardinality matches with the field type
         let (lhs_card, rhs_card) = self.cardinalities_from_operator(relation.cardinality);
-        let rhs_class_type = self.validate_type_cardinality(lhs_field_type, rhs_card, node)?;
+        let rhs_class_type = self.validate_type_cardinality(lhs_field_type, rhs_card, range)?;
 
         let rhs_field_name = match relation.field {
             None => return self.define_unilateral_relation(
@@ -911,14 +895,14 @@ impl SQIRGen {
 
         // Check that the referring field doesn't refer back to itself
         if *lhs_class_type == rhs_class_type && lhs_field_name == rhs_field_name {
-            return sema_error!(node, "Field '{}' refers to itself", lhs_field_name)
+            return sema_error!(range, "Field '{}' refers to itself", lhs_field_name)
         }
 
         // Check that the RHS type contains a field with the specified name
         match *rhs_class_type.borrow()? {
             Type::Class(ref rhs_class) => if !rhs_class.fields.contains_key(rhs_field_name) {
                 return sema_error!(
-                    node,
+                    range,
                     "Class '{}' doesn't contain field '{}'",
                     rhs_class.name,
                     rhs_field_name,
@@ -994,14 +978,14 @@ impl SQIRGen {
     // Otherwise, if the type is either not a relational type,
     // or it doesn't correspond to the specified cardinality,
     // then return an error.
-    fn validate_type_cardinality(&self, t: &Type, cardinality: Cardinality, node: &Node) -> SemaResult<RcType> {
+    fn validate_type_cardinality<R: Ranged>(&self, t: &Type, cardinality: Cardinality, range: &R) -> SemaResult<RcType> {
         let not_relational_error = || sema_error!(
-            node,
+            range,
             "Field type is not relational: '{:#?}'",
             t,
         );
         let cardinality_mismatch_error = |name| sema_error!(
-            node,
+            range,
             "{} type can't have a cardinality of {:#?}",
             name,
             cardinality,
