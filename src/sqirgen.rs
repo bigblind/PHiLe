@@ -1627,7 +1627,7 @@ impl SQIRGen {
                 let id = ExprId::Local(arg.name.to_owned());
                 let expr = RcCell::new(Expr { ty, value, id });
                 // Sets the id of the FuncArg to ExprId::Local (again, redundantly)
-                self.declare_local(arg.name, expr.clone(), arg)
+                self.declare_local(arg.name, expr, arg)
             }
         ).collect()
     }
