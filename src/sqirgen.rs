@@ -445,12 +445,7 @@ impl SQIRGen {
     fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<BTreeMap<String, WkType>> {
         let mut variants = BTreeMap::new();
 
-        for node in &decl.variants {
-            let variant = match node.value {
-                NodeValue::Variant(ref variant) => variant,
-                _ => unreachable!("Enum variants must be Variant values"),
-            };
-
+        for variant in &decl.variants {
             let type_rc = match variant.ty {
                 Some(ref d) => self.type_from_decl(d)?,
                 None        => self.get_unit_type(),
@@ -458,10 +453,10 @@ impl SQIRGen {
 
             let type_wk = type_rc.as_weak();
 
-            self.validate_complex_type_item(&type_wk, node, ComplexTypeKind::Value)?;
+            self.validate_complex_type_item(&type_wk, variant, ComplexTypeKind::Value)?;
 
             if variants.insert(variant.name.to_owned(), type_wk).is_some() {
-                return sema_error!(node, "Duplicate variant '{}'", variant.name);
+                return sema_error!(variant, "Duplicate variant '{}'", variant.name);
             }
         }
 

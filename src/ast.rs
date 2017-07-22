@@ -16,7 +16,6 @@ pub enum NodeValue<'a> {
     Field(Box<Field<'a>>),
     StructDecl(StructDecl<'a>),
     ClassDecl(ClassDecl<'a>),
-    Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
     Function(Box<Function<'a>>),
     Impl(Impl<'a>),
@@ -96,13 +95,14 @@ pub struct Field<'a> {
 #[derive(Debug)]
 pub struct EnumDecl<'a> {
     pub name:     &'a str,
-    pub variants: Vec<Node<'a>>,
+    pub variants: Vec<Variant<'a>>,
 }
 
 #[derive(Debug)]
 pub struct Variant<'a> {
-    pub name: &'a str,
-    pub ty:   Option<Node<'a>>,
+    pub range: Range,
+    pub name:  &'a str,
+    pub ty:    Option<Node<'a>>,
 }
 
 #[derive(Debug)]
@@ -198,6 +198,12 @@ pub struct FunctionType<'a> {
 
 
 impl<'a> Ranged for Node<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for Variant<'a> {
     fn range(&self) -> Range {
         self.range
     }

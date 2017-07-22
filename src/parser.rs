@@ -258,7 +258,7 @@ impl<'a> Parser<'a> {
         Ok(Node { range, value })
     }
 
-    fn parse_variant(&mut self) -> ParseResult<'a> {
+    fn parse_variant(&mut self) -> SyntaxResult<Variant<'a>> {
         let name_tok = self.expect_identifier()?;
         let name = name_tok.value;
 
@@ -272,12 +272,9 @@ impl<'a> Parser<'a> {
         };
 
         let comma = self.expect(",")?;
-
-        let variant = Variant { name, ty };
         let range = make_range(name_tok, comma);
-        let value = NodeValue::Variant(Box::new(variant));
 
-        Ok(Node { range, value })
+        Ok(Variant { range, name, ty })
     }
 
     //
