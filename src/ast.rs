@@ -12,7 +12,6 @@ use lexer::{ Range, Ranged };
 #[derive(Debug)]
 pub enum NodeValue<'a> {
     // Declarations / Definitions
-    Program(Vec<Node<'a>>),
     StructDecl(StructDecl<'a>),
     ClassDecl(ClassDecl<'a>),
     EnumDecl(EnumDecl<'a>),
@@ -59,6 +58,8 @@ pub enum NodeValue<'a> {
     FunctionType(FunctionType<'a>),
     NamedType(&'a str),
 }
+
+pub type Program<'a> = Vec<Node<'a>>;
 
 #[derive(Debug)]
 pub struct Node<'a> {

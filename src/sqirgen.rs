@@ -11,8 +11,8 @@ use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
-use ast::{ self, Node, NodeValue, FuncArg };
-use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl, Field };
+use ast::{ self, Program, Node, NodeValue, FuncArg, Field };
+use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
@@ -109,7 +109,7 @@ macro_rules! reciprocity_error {
 }
 
 
-pub fn generate_sqir(program: &Node) -> SemaResult<SQIR> {
+pub fn generate_sqir(program: &Program) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
@@ -160,19 +160,14 @@ impl SQIRGen {
     // Top-level SQIR generation methods and helpers
     //
 
-    fn generate_sqir(mut self, node: &Node) -> SemaResult<SQIR> {
-        let children = match node.value {
-            NodeValue::Program(ref children) => children,
-            _ => return sema_error!(node, "Top-level node must be a Program"),
-        };
-
-        self.forward_declare_user_defined_types(children)?;
-        self.define_user_defined_types(children)?;
+    fn generate_sqir(mut self, program: &Program) -> SemaResult<SQIR> {
+        self.forward_declare_user_defined_types(program)?;
+        self.define_user_defined_types(program)?;
         self.occurs_check_user_defined_types()?;
-        self.define_relations(children)?;
+        self.define_relations(program)?;
         self.validate_relations()?;
-        self.forward_declare_functions(children)?;
-        self.generate_functions(children)?;
+        self.forward_declare_functions(program)?;
+        self.generate_functions(program)?;
 
         Ok(self.sqir)
     }

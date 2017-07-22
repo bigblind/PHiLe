@@ -21,7 +21,7 @@ pub type ParseResult<'a> = SyntaxResult<Node<'a>>;
 type LexResult<'a> = SyntaxResult<&'a Token<'a>>;
 
 
-pub fn parse<'a>(tokens: &'a [Token]) -> ParseResult<'a> {
+pub fn parse<'a>(tokens: &'a [Token]) -> SyntaxResult<Program<'a>> {
     Parser::new(tokens).parse()
 }
 
@@ -134,23 +134,14 @@ impl<'a> Parser<'a> {
 
     // Actual parser methods
 
-    fn parse(mut self) -> ParseResult<'a> {
-        let mut children = vec![];
-
-        let first_token = self.tokens.as_slice().first();
-        let last_token = self.tokens.as_slice().last();
+    fn parse(mut self) -> SyntaxResult<Program<'a>> {
+        let mut items = vec![];
 
         while self.has_tokens() {
-            children.push(self.parse_toplevel()?);
+            items.push(self.parse_toplevel()?);
         }
 
-        let range = match (first_token, last_token) {
-            (Some(first), Some(last)) => make_range(first, last),
-            _ => Range::default(),
-        };
-        let value = NodeValue::Program(children);
-
-        Ok(Node { range, value })
+        Ok(items)
     }
 
     fn parse_toplevel(&mut self) -> ParseResult<'a> {
