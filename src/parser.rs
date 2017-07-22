@@ -201,11 +201,11 @@ impl<'a> Parser<'a> {
     fn parse_field(&mut self) -> ParseResult<'a> {
         let name_tok = self.expect_identifier()?;
         let name = name_tok.value;
-        let type_decl = self.expect(":").and_then(|_| self.parse_type())?;
+        let ty = self.expect(":").and_then(|_| self.parse_type())?;
         let relation = self.maybe_parse_relation()?;
         let comma = self.expect(",")?;
 
-        let field = Field { name, type_decl, relation };
+        let field = Field { name, ty, relation };
         let range = make_range(name_tok, comma);
         let value = NodeValue::Field(Box::new(field));
 
@@ -262,7 +262,7 @@ impl<'a> Parser<'a> {
         let name_tok = self.expect_identifier()?;
         let name = name_tok.value;
 
-        let type_decl = match self.accept("(") {
+        let ty = match self.accept("(") {
             Some(_) => {
                 let decl = self.parse_type()?;
                 self.expect(")")?;
@@ -273,7 +273,7 @@ impl<'a> Parser<'a> {
 
         let comma = self.expect(",")?;
 
-        let variant = Variant { name, type_decl };
+        let variant = Variant { name, ty };
         let range = make_range(name_tok, comma);
         let value = NodeValue::Variant(Box::new(variant));
 
@@ -306,18 +306,18 @@ impl<'a> Parser<'a> {
 
     fn parse_decl_arg(&mut self) -> ParseResult<'a> {
         let name_tok = self.expect_identifier()?;
-        let type_decl = match self.accept(":") {
+        let ty = match self.accept(":") {
             Some(_) => Some(Box::new(self.parse_type()?)),
             None    => None,
         };
         let name = name_tok.value;
         let begin = name_tok.range.begin;
-        let end = type_decl.as_ref().map_or(
+        let end = ty.as_ref().map_or(
             name_tok.range.end,
             |decl| decl.range.end
         );
         let range = Range { begin, end };
-        let value = NodeValue::FuncArg(FuncArg { name, type_decl });
+        let value = NodeValue::FuncArg(FuncArg { name, ty });
 
         Ok(Node { range, value })
     }
@@ -366,16 +366,16 @@ impl<'a> Parser<'a> {
         let let_keyword = self.expect("let")?;
         let name_tok = self.expect_identifier()?;
 
-        let type_decl = match self.accept(":") {
+        let ty = match self.accept(":") {
             Some(_) => Some(self.parse_type()?),
             None    => None,
         };
 
-        let init_expr = self.expect("=").and_then(|_| self.parse_expr())?;
+        let expr = self.expect("=").and_then(|_| self.parse_expr())?;
         let semicolon = self.expect(";")?;
         let name = name_tok.value;
         let range = make_range(let_keyword, semicolon);
-        let decl = VarDecl { name, type_decl, init_expr };
+        let decl = VarDecl { name, ty, expr };
         let value = NodeValue::VarDecl(Box::new(decl));
 
         Ok(Node { range, value })

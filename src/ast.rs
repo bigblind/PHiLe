@@ -89,9 +89,9 @@ pub struct RelDecl<'a> {
 
 #[derive(Debug)]
 pub struct Field<'a> {
-    pub name:      &'a str,
-    pub type_decl: Node<'a>,
-    pub relation:  Option<RelDecl<'a>>,
+    pub name:     &'a str,
+    pub ty:       Node<'a>,
+    pub relation: Option<RelDecl<'a>>,
 }
 
 #[derive(Debug)]
@@ -102,8 +102,8 @@ pub struct EnumDecl<'a> {
 
 #[derive(Debug)]
 pub struct Variant<'a> {
-    pub name:      &'a str,
-    pub type_decl: Option<Node<'a>>,
+    pub name: &'a str,
+    pub ty:   Option<Node<'a>>,
 }
 
 #[derive(Debug)]
@@ -116,8 +116,8 @@ pub struct Function<'a> {
 
 #[derive(Debug)]
 pub struct FuncArg<'a> {
-    pub name:      &'a str,
-    pub type_decl: Option<Box<Node<'a>>>, // type node
+    pub name: &'a str,
+    pub ty:   Option<Box<Node<'a>>>, // type node
 }
 
 #[derive(Debug)]
@@ -128,9 +128,9 @@ pub struct Impl<'a> {
 
 #[derive(Debug)]
 pub struct VarDecl<'a> {
-    pub name:      &'a str,
-    pub type_decl: Option<Node<'a>>,
-    pub init_expr: Node<'a>,
+    pub name: &'a str,
+    pub ty:   Option<Node<'a>>,
+    pub expr: Node<'a>,
 }
 
 #[derive(Debug)]

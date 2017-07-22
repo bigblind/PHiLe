@@ -399,7 +399,7 @@ impl SQIRGen {
                 return sema_error!(node, "Field '{}' must not be part of a relation", field.name);
             }
 
-            let field_type_rc = self.type_from_decl(&field.type_decl)?;
+            let field_type_rc = self.type_from_decl(&field.ty)?;
             let field_type_wk = field_type_rc.as_weak();
 
             self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Value)?;
@@ -425,7 +425,7 @@ impl SQIRGen {
                 _ => unreachable!("Class fields must be Field values"),
             };
 
-            let field_type_rc = self.type_from_decl(&field.type_decl)?;
+            let field_type_rc = self.type_from_decl(&field.ty)?;
             let field_type_wk = field_type_rc.as_weak();
 
             self.validate_complex_type_item(&field_type_wk, node, ComplexTypeKind::Entity)?;
@@ -451,7 +451,7 @@ impl SQIRGen {
                 _ => unreachable!("Enum variants must be Variant values"),
             };
 
-            let type_rc = match variant.type_decl {
+            let type_rc = match variant.ty {
                 Some(ref d) => self.type_from_decl(d)?,
                 None        => self.get_unit_type(),
             };
@@ -1203,11 +1203,11 @@ impl SQIRGen {
     fn arg_types_for_toplevel_func(&mut self, args: &[Node]) -> SemaResult<Vec<RcType>> {
         args.iter().map(|node| match node.value {
             NodeValue::FuncArg(ref arg) => {
-                let type_decl = match arg.type_decl {
-                    Some(ref typ) => Ok(typ),
+                let ty = match arg.ty {
+                    Some(ref ty) => Ok(ty),
                     None => sema_error!(node, "Type required for argument"),
                 };
-                self.type_from_decl(type_decl?)
+                self.type_from_decl(ty?)
             },
             _ => unreachable!("Non-FuncArg argument?!"),
         }).collect()
@@ -1422,12 +1422,12 @@ impl SQIRGen {
     }
 
     fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> SemaResult<RcExpr> {
-        let init_type_hint = match decl.type_decl {
+        let init_type_hint = match decl.ty {
             Some(ref node) => Some(self.type_from_decl(node)?),
             None           => None,
         };
 
-        let init = self.generate_expr(&decl.init_expr, init_type_hint)?;
+        let init = self.generate_expr(&decl.expr, init_type_hint)?;
 
         // changes id of 'init' from ExprId::Temp(_) to ExprId::Local(decl.name)
         self.declare_local(decl.name, init, &ctx)
@@ -1673,11 +1673,11 @@ impl SQIRGen {
 
     fn arg_type_with_hint(&mut self, node: &Node, ty: &WkType) -> SemaResult<RcType> {
         match node.value {
-            NodeValue::FuncArg(ref arg) => match arg.type_decl {
+            NodeValue::FuncArg(ref arg) => match arg.ty {
                 None => Ok(ty.as_rc()?),
-                Some(ref type_decl) => {
+                Some(ref arg_ty) => {
                     let expected_type = ty.as_rc()?;
-                    let actual_type = self.type_from_decl(type_decl)?;
+                    let actual_type = self.type_from_decl(arg_ty)?;
 
                     if expected_type == actual_type {
                         Ok(actual_type)
@@ -1698,11 +1698,11 @@ impl SQIRGen {
     fn arg_type_no_hint(&mut self, node: &Node) -> SemaResult<RcType> {
         match node.value {
             NodeValue::FuncArg(ref arg) => {
-                let type_decl = match arg.type_decl {
+                let ty = match arg.ty {
                     Some(ref ty) => Ok(ty),
                     None => sema_error!(node, "Cannot infer argument type"),
                 };
-                self.type_from_decl(type_decl?)
+                self.type_from_decl(ty?)
             },
             _ => unreachable!("Non-FuncArg argument?!"),
         }

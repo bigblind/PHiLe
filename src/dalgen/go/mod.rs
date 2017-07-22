@@ -50,9 +50,9 @@ fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) 
 }
 
 fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenParams) -> io::Result<()> {
-    let typtr = expr.ty.borrow()?;
+    let ty_ptr = expr.ty.borrow()?;
 
-    let ty = match *typtr {
+    let ty = match *ty_ptr {
         Type::Function(ref ty) => ty,
         _ => unreachable!("Non-Function global?!"),
     };

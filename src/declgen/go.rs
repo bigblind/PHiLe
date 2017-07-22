@@ -67,14 +67,14 @@ impl<'a> Generator<'a> {
     fn generate_pod(mut self) -> io::Result<()> {
         let wrs = self.writers_for_types(self.sqir.named_types.iter())?;
 
-        for (name, typ) in &self.sqir.named_types {
+        for (name, ty) in &self.sqir.named_types {
             // primitive named types have no associated writer
             let mut wr = match wrs.get(name) {
                 Some(w) => w.borrow_mut(),
                 None    => continue,
             };
 
-            match *typ.borrow()? {
+            match *ty.borrow()? {
                 Type::Struct(ref st) => self.write_fields(&mut *wr, name, &st.fields)?,
                 Type::Class(ref ct)  => self.write_fields(&mut *wr, name, &ct.fields)?,
                 Type::Enum(ref et)   => self.write_variants(&mut *wr, name, &et.variants)?,
@@ -90,9 +90,9 @@ impl<'a> Generator<'a> {
 
         let mut writers = BTreeMap::new();
 
-        for (name, typ) in types {
+        for (name, ty) in types {
             // primitive named types need no declaration
-            match *typ.borrow()? {
+            match *ty.borrow()? {
                 Type::Struct(_) | Type::Class(_) | Type::Enum(_) => (),
                 _ => continue,
             }
@@ -123,10 +123,9 @@ impl<'a> Generator<'a> {
 
         // Respect the field name transform
         // TODO(H2CO3): For efficiency, sort fields by alignment.
-        let transformed_fields: Vec<_> = fields.iter().map(|(fname, typ)| {
-            let field_name = transform_field_name(fname, &self.params);
-            (field_name, typ)
-        }).collect();
+        let transformed_fields: Vec<_> = fields.iter().map(
+            |(name, ty)| (transform_field_name(name, &self.params), ty)
+        ).collect();
 
         let max_len = transformed_fields.iter()
             .map(|&(ref name, _)| grapheme_count(name))
@@ -135,9 +134,9 @@ impl<'a> Generator<'a> {
         let pad = " ".repeat(max_len);
 
         // Indexing `pad` with grapheme counts is safe because it's ASCII-only.
-        for (fname, ftype) in transformed_fields {
-            write!(wr, "    {}{} ", fname, &pad[grapheme_count(&fname)..])?;
-            write_type(wr, ftype, &self.params)?;
+        for (name, ty) in transformed_fields {
+            write!(wr, "    {}{} ", name, &pad[grapheme_count(&name)..])?;
+            write_type(wr, ty, &self.params)?;
             writeln!(wr)?;
         }
 
@@ -244,9 +243,9 @@ fn write_array_type(wr: &mut io::Write, element: &WkType, params: &CodegenParams
 fn write_tuple_type(wr: &mut io::Write, types: &[WkType], params: &CodegenParams) -> io::Result<()> {
     write!(wr, "struct {{ ")?;
 
-    for (idx, typ) in types.iter().enumerate() {
+    for (idx, ty) in types.iter().enumerate() {
         write!(wr, "F{} ", idx)?;
-        write_type(wr, typ, params)?;
+        write_type(wr, ty, params)?;
         write!(wr, "; ")?;
     }
 
