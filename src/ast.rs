@@ -19,7 +19,6 @@ pub enum NodeValue<'a> {
     Variant(Box<Variant<'a>>),
     EnumDecl(EnumDecl<'a>),
     Function(Box<Function<'a>>),
-    FuncArg(FuncArg<'a>),
     Impl(Impl<'a>),
 
     // Statements
@@ -109,15 +108,16 @@ pub struct Variant<'a> {
 #[derive(Debug)]
 pub struct Function<'a> {
     pub name:      Option<&'a str>,  // None iff closure
-    pub arguments: Vec<Node<'a>>,    // FuncArg nodes
+    pub arguments: Vec<FuncArg<'a>>,
     pub ret_type:  Option<Node<'a>>, // type node
     pub body:      Node<'a>,         // expression node
 }
 
 #[derive(Debug)]
 pub struct FuncArg<'a> {
-    pub name: &'a str,
-    pub ty:   Option<Box<Node<'a>>>, // type node
+    pub range: Range,
+    pub name:  &'a str,
+    pub ty:    Option<Box<Node<'a>>>, // type node
 }
 
 #[derive(Debug)]
@@ -187,7 +187,7 @@ pub struct If<'a> {
 #[derive(Debug)]
 pub struct Match<'a> {
     pub discriminant: Box<Node<'a>>,
-    pub arms:         Vec<Node<'a>>,
+    pub arms:         Vec<(Node<'a>, Node<'a>)>,
 }
 
 #[derive(Debug)]
@@ -198,6 +198,12 @@ pub struct FunctionType<'a> {
 
 
 impl<'a> Ranged for Node<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for FuncArg<'a> {
     fn range(&self) -> Range {
         self.range
     }

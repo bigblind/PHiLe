@@ -304,7 +304,7 @@ impl<'a> Parser<'a> {
         Ok(Node { range, value })
     }
 
-    fn parse_decl_arg(&mut self) -> ParseResult<'a> {
+    fn parse_decl_arg(&mut self) -> SyntaxResult<FuncArg<'a>> {
         let name_tok = self.expect_identifier()?;
         let ty = match self.accept(":") {
             Some(_) => Some(Box::new(self.parse_type()?)),
@@ -312,14 +312,10 @@ impl<'a> Parser<'a> {
         };
         let name = name_tok.value;
         let begin = name_tok.range.begin;
-        let end = ty.as_ref().map_or(
-            name_tok.range.end,
-            |decl| decl.range.end
-        );
+        let end = ty.as_ref().map_or(name_tok.range.end, |decl| decl.range.end);
         let range = Range { begin, end };
-        let value = NodeValue::FuncArg(FuncArg { name, ty });
 
-        Ok(Node { range, value })
+        Ok(FuncArg { range, name, ty })
     }
 
     fn parse_impl(&mut self) -> ParseResult<'a> {
@@ -841,14 +837,14 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_paren_delim<F>(
+    fn parse_paren_delim<P, V>(
         &mut self,
         open:    &str,
-        subexpr: F,
+        subexpr: P,
         delim:   &str,
         close:   &str
-    ) -> SyntaxResult<(Vec<Node<'a>>, Range)>
-        where F: Fn(&mut Self) -> ParseResult<'a> {
+    ) -> SyntaxResult<(Vec<V>, Range)>
+        where P: Fn(&mut Self) -> SyntaxResult<V> {
 
         let mut items = vec![];
         let open_tok = self.expect(open)?;

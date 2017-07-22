@@ -11,7 +11,7 @@ use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
-use ast::{ self, Node, NodeValue };
+use ast::{ self, Node, NodeValue, FuncArg };
 use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
@@ -1200,16 +1200,10 @@ impl SQIRGen {
         Ok((name, ty))
     }
 
-    fn arg_types_for_toplevel_func(&mut self, args: &[Node]) -> SemaResult<Vec<RcType>> {
-        args.iter().map(|node| match node.value {
-            NodeValue::FuncArg(ref arg) => {
-                let ty = match arg.ty {
-                    Some(ref ty) => Ok(ty),
-                    None => sema_error!(node, "Type required for argument"),
-                };
-                self.type_from_decl(ty?)
-            },
-            _ => unreachable!("Non-FuncArg argument?!"),
+    fn arg_types_for_toplevel_func(&mut self, args: &[FuncArg]) -> SemaResult<Vec<RcType>> {
+        args.iter().map(|arg| match arg.ty {
+            Some(ref ty) => self.type_from_decl(ty),
+            None => sema_error!(arg, "Type required for argument"),
         }).collect()
     }
 
@@ -1621,22 +1615,19 @@ impl SQIRGen {
     fn declare_function_arguments(
         &mut self,
         func:  &ast::Function,
-        types: &[RcType]
+        types: &[RcType],
     ) -> SemaResult<Vec<RcExpr>> {
         assert!(func.arguments.len() == types.len());
 
         func.arguments.iter().zip(types).enumerate().map(
-            |(index, (node, ty))| match node.value {
-                NodeValue::FuncArg(ref arg) => {
-                    let func = WkCell::new(); // dummy, points nowhere (yet)
-                    let ty = ty.clone();
-                    let value = Value::FuncArg { func, index };
-                    let id = ExprId::Local(arg.name.to_owned());
-                    let expr = RcCell::new(Expr { ty, value, id });
-                    // Sets the id of the FuncArg to ExprId::Local (again, redundantly)
-                    self.declare_local(arg.name, expr.clone(), node)
-                },
-                _ => unreachable!("Non-FuncArg argument?!"),
+            |(index, (arg, ty))| {
+                let func = WkCell::new(); // dummy, points nowhere (yet)
+                let ty = ty.clone();
+                let value = Value::FuncArg { func, index };
+                let id = ExprId::Local(arg.name.to_owned());
+                let expr = RcCell::new(Expr { ty, value, id });
+                // Sets the id of the FuncArg to ExprId::Local (again, redundantly)
+                self.declare_local(arg.name, expr.clone(), arg)
             }
         ).collect()
     }
@@ -1660,51 +1651,42 @@ impl SQIRGen {
             Some(ref t) => {
                 func.arguments.iter()
                     .zip(&t.arg_types)
-                    .map(|(node, ty)| self.arg_type_with_hint(node, ty))
+                    .map(|(arg, ty)| self.arg_type_with_hint(arg, ty))
                     .collect()
             },
             None => {
                 func.arguments.iter()
-                    .map(|node| self.arg_type_no_hint(node))
+                    .map(|arg| self.arg_type_no_hint(arg))
                     .collect()
             },
         }
     }
 
-    fn arg_type_with_hint(&mut self, node: &Node, ty: &WkType) -> SemaResult<RcType> {
-        match node.value {
-            NodeValue::FuncArg(ref arg) => match arg.ty {
-                None => Ok(ty.as_rc()?),
-                Some(ref arg_ty) => {
-                    let expected_type = ty.as_rc()?;
-                    let actual_type = self.type_from_decl(arg_ty)?;
+    fn arg_type_with_hint(&mut self, arg: &FuncArg, ty: &WkType) -> SemaResult<RcType> {
+        match arg.ty {
+            None => Ok(ty.as_rc()?),
+            Some(ref arg_ty) => {
+                let expected_type = ty.as_rc()?;
+                let actual_type = self.type_from_decl(arg_ty)?;
 
-                    if expected_type == actual_type {
-                        Ok(actual_type)
-                    } else {
-                        sema_error!(
-                            node,
-                            "Expected argument of type {}, found {}",
-                            format_type(&ty),
-                            format_type(&actual_type.as_weak()),
-                        )
-                    }
-                },
+                if expected_type == actual_type {
+                    Ok(actual_type)
+                } else {
+                    sema_error!(
+                        arg,
+                        "Expected argument of type {}, found {}",
+                        format_type(&ty),
+                        format_type(&actual_type.as_weak()),
+                    )
+                }
             },
-            _ => unreachable!("Non-FuncArg argument?!"),
         }
     }
 
-    fn arg_type_no_hint(&mut self, node: &Node) -> SemaResult<RcType> {
-        match node.value {
-            NodeValue::FuncArg(ref arg) => {
-                let ty = match arg.ty {
-                    Some(ref ty) => Ok(ty),
-                    None => sema_error!(node, "Cannot infer argument type"),
-                };
-                self.type_from_decl(ty?)
-            },
-            _ => unreachable!("Non-FuncArg argument?!"),
+    fn arg_type_no_hint(&mut self, arg: &FuncArg) -> SemaResult<RcType> {
+        match arg.ty {
+            Some(ref ty) => self.type_from_decl(ty),
+            None => sema_error!(arg, "Cannot infer argument type"),
         }
     }
 
