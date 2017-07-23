@@ -207,69 +207,37 @@ pub struct FunctionType<'a> {
     pub ret_type:  Box<Node<'a>>,
 }
 
+macro_rules! impl_ranged {
+    ($($name: ident),*) => ($(
+        impl<'a> Ranged for $name<'a> {
+            fn range(&self) -> Range {
+                self.range
+            }
+        }
+    )*);
+    ($($name: ident),*,) => { impl_ranged!($($name),*); };
+}
+
+impl_ranged! {
+    StructDecl,
+    ClassDecl,
+    Field,
+    EnumDecl,
+    Variant,
+    Function,
+    FuncArg,
+    Impl,
+    Node,
+}
 
 impl<'a> Ranged for Item<'a> {
     fn range(&self) -> Range {
         match *self {
             Item::StructDecl(ref s) => s.range,
-            Item::ClassDecl(ref c) => c.range,
-            Item::EnumDecl(ref e) => e.range,
-            Item::FuncDef(ref f) => f.range,
-            Item::Impl(ref i) => i.range,
+            Item::ClassDecl(ref c)  => c.range,
+            Item::EnumDecl(ref e)   => e.range,
+            Item::FuncDef(ref f)    => f.range,
+            Item::Impl(ref i)       => i.range,
         }
-    }
-}
-
-impl<'a> Ranged for StructDecl<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for ClassDecl<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for EnumDecl<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for Function<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for Impl<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for Node<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for Field<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for Variant<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-impl<'a> Ranged for FuncArg<'a> {
-    fn range(&self) -> Range {
-        self.range
     }
 }
