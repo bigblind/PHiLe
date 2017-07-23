@@ -144,16 +144,16 @@ impl<'a> Parser<'a> {
         Ok(items)
     }
 
-    fn parse_toplevel(&mut self) -> ParseResult<'a> {
-        let error = self.expectation_error("struct, class, enum, fn or impl");
-        let token = self.next_token().ok_or_else(|| error.clone())?;
+    fn parse_toplevel(&mut self) -> SyntaxResult<Item<'a>> {
+        let err_msg = "struct, class, enum, fn or impl";
+        let token = self.next_token().ok_or_else(|| self.expectation_error(err_msg))?;
 
         match token.value {
             "struct" | "class" => self.parse_struct_or_class(),
             "enum"             => self.parse_enum(),
-            "fn"               => self.parse_function(),
+            "fn"               => self.parse_toplevel_function(),
             "impl"             => self.parse_impl(),
-            _                  => Err(error),
+            _                  => Err(self.expectation_error(err_msg)),
         }
     }
 
@@ -161,7 +161,7 @@ impl<'a> Parser<'a> {
     // User-defined Type Definitions
     //
 
-    fn parse_struct_or_class(&mut self) -> ParseResult<'a> {
+    fn parse_struct_or_class(&mut self) -> SyntaxResult<Item<'a>> {
         let mut fields = vec![];
 
         let keyword = self.expect_one_of(&["struct", "class"])?;
@@ -176,17 +176,17 @@ impl<'a> Parser<'a> {
         let close_brace = self.expect("}")?;
 
         let range = make_range(keyword, close_brace);
-        let value = match keyword.value {
-            "struct" => NodeValue::StructDecl(
-                StructDecl { name, fields }
+        let item = match keyword.value {
+            "struct" => Item::StructDecl(
+                StructDecl { range, name, fields }
             ),
-            "class" => NodeValue::ClassDecl(
-                ClassDecl { name, fields }
+            "class" => Item::ClassDecl(
+                ClassDecl { range, name, fields }
             ),
             lexeme => unreachable!("Forgot to handle '{}'", lexeme),
         };
 
-        Ok(Node { range, value })
+        Ok(item)
     }
 
     fn parse_field(&mut self) -> SyntaxResult<Field<'a>> {
@@ -225,7 +225,7 @@ impl<'a> Parser<'a> {
         Ok(relation)
     }
 
-    fn parse_enum(&mut self) -> ParseResult<'a> {
+    fn parse_enum(&mut self) -> SyntaxResult<Item<'a>> {
         let mut variants = vec![];
 
         let enum_keyword = self.expect("enum")?;
@@ -238,12 +238,9 @@ impl<'a> Parser<'a> {
         }
 
         let close_brace = self.expect("}")?;
-
-        let decl = EnumDecl { name, variants };
         let range = make_range(enum_keyword, close_brace);
-        let value = NodeValue::EnumDecl(decl);
 
-        Ok(Node { range, value })
+        Ok(Item::EnumDecl(EnumDecl { range, name, variants }))
     }
 
     fn parse_variant(&mut self) -> SyntaxResult<Variant<'a>> {
@@ -269,7 +266,11 @@ impl<'a> Parser<'a> {
     // Functions and Type Implementations
     //
 
-    fn parse_function(&mut self) -> ParseResult<'a> {
+    fn parse_toplevel_function(&mut self) -> SyntaxResult<Item<'a>> {
+        Ok(Item::FuncDef(self.parse_function()?))
+    }
+
+    fn parse_function(&mut self) -> SyntaxResult<Function<'a>> {
         let fn_keyword = self.expect("fn")?;
         let name_tok = self.expect_identifier()?;
         let name = Some(name_tok.value);
@@ -283,10 +284,8 @@ impl<'a> Parser<'a> {
         };
         let body = self.parse_block()?;
         let range = make_range(fn_keyword, &body);
-        let decl = Function { name, arguments, ret_type, body };
-        let value = NodeValue::Function(Box::new(decl));
 
-        Ok(Node { range, value })
+        Ok(Function { range, name, arguments, ret_type, body })
     }
 
     fn parse_decl_arg(&mut self) -> SyntaxResult<FuncArg<'a>> {
@@ -303,7 +302,7 @@ impl<'a> Parser<'a> {
         Ok(FuncArg { range, name, ty })
     }
 
-    fn parse_impl(&mut self) -> ParseResult<'a> {
+    fn parse_impl(&mut self) -> SyntaxResult<Item<'a>> {
         let mut functions = vec![];
         let impl_keyword = self.expect("impl")?;
         let name = self.expect_identifier()?.value;
@@ -316,9 +315,8 @@ impl<'a> Parser<'a> {
 
         let close_brace = self.expect("}")?;
         let range = make_range(impl_keyword, close_brace);
-        let value = NodeValue::Impl(Impl { name, functions });
 
-        Ok(Node { range, value })
+        Ok(Item::Impl(Impl { range, name, functions }))
     }
 
     //
@@ -619,8 +617,8 @@ impl<'a> Parser<'a> {
         let end = body.range.end;
         let range = Range { begin, end };
         let name = None;
-        let decl = Function { name, arguments, ret_type, body };
-        let value = NodeValue::Function(Box::new(decl));
+        let decl = Function { range, name, arguments, ret_type, body };
+        let value = NodeValue::FuncExpr(Box::new(decl));
 
         Ok(Node { range, value })
     }

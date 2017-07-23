@@ -9,14 +9,19 @@
 use lexer::{ Range, Ranged };
 
 
+// Top-level items
 #[derive(Debug)]
-pub enum NodeValue<'a> {
-    // Declarations / Definitions
+pub enum Item<'a> {
     StructDecl(StructDecl<'a>),
     ClassDecl(ClassDecl<'a>),
     EnumDecl(EnumDecl<'a>),
-    Function(Box<Function<'a>>),
+    FuncDef(Function<'a>),
     Impl(Impl<'a>),
+}
+
+#[derive(Debug)]
+pub enum NodeValue<'a> {
+    FuncExpr(Box<Function<'a>>),
 
     // Statements
     VarDecl(Box<VarDecl<'a>>),
@@ -59,7 +64,7 @@ pub enum NodeValue<'a> {
     NamedType(&'a str),
 }
 
-pub type Program<'a> = Vec<Node<'a>>;
+pub type Program<'a> = Vec<Item<'a>>;
 
 #[derive(Debug)]
 pub struct Node<'a> {
@@ -69,14 +74,16 @@ pub struct Node<'a> {
 
 #[derive(Debug)]
 pub struct StructDecl<'a> {
+    pub range:  Range,
     pub name:   &'a str,
     pub fields: Vec<Field<'a>>,
 }
 
 #[derive(Debug)]
 pub struct ClassDecl<'a> {
-    pub name:       &'a str,
-    pub fields:     Vec<Field<'a>>,
+    pub range:  Range,
+    pub name:   &'a str,
+    pub fields: Vec<Field<'a>>,
 }
 
 #[derive(Debug)]
@@ -95,6 +102,7 @@ pub struct Field<'a> {
 
 #[derive(Debug)]
 pub struct EnumDecl<'a> {
+    pub range:    Range,
     pub name:     &'a str,
     pub variants: Vec<Variant<'a>>,
 }
@@ -108,6 +116,7 @@ pub struct Variant<'a> {
 
 #[derive(Debug)]
 pub struct Function<'a> {
+    pub range:     Range,
     pub name:      Option<&'a str>,  // None iff closure
     pub arguments: Vec<FuncArg<'a>>,
     pub ret_type:  Option<Node<'a>>, // type node
@@ -123,8 +132,9 @@ pub struct FuncArg<'a> {
 
 #[derive(Debug)]
 pub struct Impl<'a> {
+    pub range:     Range,
     pub name:      &'a str,
-    pub functions: Vec<Node<'a>>, // Function nodes
+    pub functions: Vec<Function<'a>>,
 }
 
 #[derive(Debug)]
@@ -197,6 +207,48 @@ pub struct FunctionType<'a> {
     pub ret_type:  Box<Node<'a>>,
 }
 
+
+impl<'a> Ranged for Item<'a> {
+    fn range(&self) -> Range {
+        match *self {
+            Item::StructDecl(ref s) => s.range,
+            Item::ClassDecl(ref c) => c.range,
+            Item::EnumDecl(ref e) => e.range,
+            Item::FuncDef(ref f) => f.range,
+            Item::Impl(ref i) => i.range,
+        }
+    }
+}
+
+impl<'a> Ranged for StructDecl<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for ClassDecl<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for EnumDecl<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for Function<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+impl<'a> Ranged for Impl<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
 
 impl<'a> Ranged for Node<'a> {
     fn range(&self) -> Range {

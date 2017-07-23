@@ -12,7 +12,7 @@ use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
 use ast::{ self, Program, Node, NodeValue, FuncArg, Field };
-use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
+use ast::{ Item, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
@@ -174,17 +174,18 @@ impl SQIRGen {
 
     // Forward declare every struct/class/enum definition
     // by inserting a placeholder type for each of them
-    fn forward_declare_user_defined_types(&mut self, children: &[Node]) -> SemaResult<()> {
-        for child in children {
-            let (name, kind) = match child.value {
-                NodeValue::StructDecl(ref s) => (s.name, PlaceholderKind::Struct),
-                NodeValue::ClassDecl(ref c)  => (c.name, PlaceholderKind::Class),
-                NodeValue::EnumDecl(ref e)   => (e.name, PlaceholderKind::Enum),
-                _ => continue,
+    fn forward_declare_user_defined_types(&mut self, items: &[Item]) -> SemaResult<()> {
+        for item in items {
+            let (name, kind) = match *item {
+                Item::StructDecl(ref s) => (s.name, PlaceholderKind::Struct),
+                Item::ClassDecl(ref c)  => (c.name, PlaceholderKind::Class),
+                Item::EnumDecl(ref e)   => (e.name, PlaceholderKind::Enum),
+                Item::FuncDef(_)        => continue,
+                Item::Impl(_)           => continue,
             };
 
             if self.sqir.named_types.contains_key(name) {
-                return sema_error!(child, "Redefinition of '{}'", name);
+                return sema_error!(item, "Redefinition of '{}'", name)
             }
 
             self.sqir.named_types.insert(
@@ -197,13 +198,14 @@ impl SQIRGen {
     }
 
     // Create semantic types out of AST and check their consistency
-    fn define_user_defined_types(&mut self, children: &[Node]) -> SemaResult<()> {
-        for child in children {
-            match child.value {
-                NodeValue::StructDecl(ref s) => self.define_struct_type(s)?,
-                NodeValue::ClassDecl(ref c)  => self.define_class_type(c)?,
-                NodeValue::EnumDecl(ref e)   => self.define_enum_type(e)?,
-                _ => continue,
+    fn define_user_defined_types(&mut self, items: &[Item]) -> SemaResult<()> {
+        for item in items {
+            match *item {
+                Item::StructDecl(ref s) => self.define_struct_type(s)?,
+                Item::ClassDecl(ref c)  => self.define_class_type(c)?,
+                Item::EnumDecl(ref e)   => self.define_enum_type(e)?,
+                Item::FuncDef(_)        => continue,
+                Item::Impl(_)           => continue,
             };
         }
 
@@ -222,11 +224,12 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn define_relations(&mut self, children: &[Node]) -> SemaResult<()> {
-        for child in children {
-            match child.value {
-                NodeValue::ClassDecl(ref c) => self.define_relations_for_class(c)?,
-                _ => continue,
+    fn define_relations(&mut self, items: &[Item]) -> SemaResult<()> {
+        for item in items {
+            match *item {
+                Item::ClassDecl(ref c) => self.define_relations_for_class(c)?,
+                Item::StructDecl(_) | Item::EnumDecl(_) => continue,
+                Item::FuncDef(_)    | Item::Impl(_)     => continue,
             }
         }
 
@@ -285,16 +288,12 @@ impl SQIRGen {
     // For each function: typecheck, and insert placeholder Function
     // into self.sqir.functions that has no actual body/implementation,
     // no instructions/basic blocks, only a type and argument names
-    fn forward_declare_functions(&mut self, children: &[Node]) -> SemaResult<()> {
-        for child in children {
-            match child.value {
-                NodeValue::Function(_) => {
-                    self.forward_declare_free_function(child)?
-                },
-                NodeValue::Impl(ref imp) => {
-                    self.forward_declare_impl(imp, child.range)?
-                },
-                _ => continue,
+    fn forward_declare_functions(&mut self, items: &[Item]) -> SemaResult<()> {
+        for item in items {
+            match *item {
+                Item::FuncDef(ref func) => self.forward_declare_free_function(func)?,
+                Item::Impl(ref imp)     => self.forward_declare_impl(imp)?,
+                Item::StructDecl(_) | Item::ClassDecl(_) | Item::EnumDecl(_) => continue,
             }
         }
 
@@ -302,16 +301,12 @@ impl SQIRGen {
     }
 
     // Generate SQIR for each function
-    fn generate_functions(&mut self, children: &[Node]) -> SemaResult<()> {
-        for child in children {
-            match child.value {
-                NodeValue::Function(_) => {
-                    self.generate_free_function(child)?
-                },
-                NodeValue::Impl(ref imp) => {
-                    self.generate_impl(imp, child.range)?
-                },
-                _ => continue,
+    fn generate_functions(&mut self, items: &[Item]) -> SemaResult<()> {
+        for item in items {
+            match *item {
+                Item::FuncDef(ref func) => self.generate_free_function(func)?,
+                Item::Impl(ref imp)     => self.generate_impl(imp)?,
+                Item::StructDecl(_) | Item::ClassDecl(_) | Item::EnumDecl(_) => continue,
             }
         }
 
@@ -1102,76 +1097,68 @@ impl SQIRGen {
     // Forward declaring functions and impls
     //
 
-    fn forward_declare_free_function(&mut self, node: &Node) -> SemaResult<()> {
-        let (name, ty) = self.forward_declare_function(node)?;
+    fn forward_declare_free_function(&mut self, func: &ast::Function) -> SemaResult<()> {
+        let name = func.name.expect("function name");
+        let ty = self.compute_type_of_function(func)?;
         let value = Value::Placeholder;
-        let id = ExprId::Global(name.clone()); // XXX: assumes that function is global
+        let id = ExprId::Global(name.to_owned()); // XXX: assumes that function is global
         let entry = self.sqir.globals.entry(None); // no namespace
         let globals = entry.or_insert_with(BTreeMap::new);
         let expr = RcCell::new(Expr { ty, value, id });
 
-        if globals.insert(name, expr).is_none() {
+        if globals.insert(name.to_owned(), expr).is_none() {
             Ok(())
         } else {
-            sema_error!(node, "Redefinition of function")
+            sema_error!(func, "Redefinition of function '{}'", name)
         }
     }
 
-    fn forward_declare_impl(&mut self, decl: &Impl, range: Range) -> SemaResult<()> {
-        let names_types: Vec<_> = decl.functions.iter().map(
-            |func_node| self.forward_declare_function(func_node)
+    fn forward_declare_impl(&mut self, decl: &Impl) -> SemaResult<()> {
+        let types: Vec<_> = decl.functions.iter().map(
+            |func_node| self.compute_type_of_function(func_node)
         ).collect::<SemaResult<_>>()?;
 
         let impl_name = Some(decl.name.to_owned());
 
         match self.sqir.globals.entry(impl_name) {
             Vacant(ve) => {
-                let ns = Self::impl_from_functions(names_types, &decl.functions)?;
+                let ns = Self::impl_from_functions(types, &decl.functions)?;
                 ve.insert(ns);
                 Ok(())
             },
-            Occupied(_) => sema_error!(range, "Redefinition of impl '{}'", decl.name),
+            Occupied(_) => sema_error!(decl, "Redefinition of impl '{}'", decl.name),
         }
     }
 
-    fn impl_from_functions(names_types: Vec<(String, RcType)>, decls: &[Node])
+    fn impl_from_functions(types: Vec<RcType>, funcs: &[ast::Function])
         -> SemaResult<BTreeMap<String, RcExpr>> {
 
-        assert!(names_types.len() == decls.len());
+        assert!(types.len() == funcs.len());
 
         let mut ns = BTreeMap::new();
 
-        for ((name, ty), node) in names_types.into_iter().zip(decls) {
+        for (ty, func) in types.into_iter().zip(funcs) {
+            let name = func.name.expect("function name");
             let value = Value::Placeholder;
-            let id = ExprId::Global(name.clone()); // XXX: assumes function is global
+            let id = ExprId::Global(name.to_owned()); // XXX: assumes function is global
             let expr = RcCell::new(Expr { ty, value, id });
 
-            if ns.insert(name, expr).is_some() {
-                return sema_error!(node, "Redefinition of function")
+            if ns.insert(name.to_owned(), expr).is_some() {
+                return sema_error!(func, "Redefinition of function '{}'", name)
             }
         }
 
         Ok(ns)
     }
 
-    fn forward_declare_function(&mut self, func: &Node) -> SemaResult<(String, RcType)> {
-        let decl = match func.value {
-            NodeValue::Function(ref f) => f,
-            _ => return sema_error!(func, "Non-function function node?!"),
-        };
-        let name = match decl.name {
-            Some(s) => s.to_owned(),
-            None => return sema_error!(func, "Function has no name"),
-        };
-        let ret_type = decl.ret_type.as_ref().map_or(
+    fn compute_type_of_function(&mut self, func: &ast::Function) -> SemaResult<RcType> {
+        let ret_type = func.ret_type.as_ref().map_or(
             Ok(self.get_unit_type()),
             |rt| self.type_from_decl(rt),
         )?;
+        let arg_types = self.arg_types_for_toplevel_func(&func.arguments)?;
 
-        let arg_types = self.arg_types_for_toplevel_func(&decl.arguments)?;
-        let ty = self.get_function_type_from_types(arg_types, ret_type)?;
-
-        Ok((name, ty))
+        self.get_function_type_from_types(arg_types, ret_type)
     }
 
     fn arg_types_for_toplevel_func(&mut self, args: &[FuncArg]) -> SemaResult<Vec<RcType>> {
@@ -1185,23 +1172,23 @@ impl SQIRGen {
     // Value-level SQIR generation (DML)
     //
 
-    fn generate_free_function(&mut self, func: &Node) -> SemaResult<()> {
+    fn generate_free_function(&mut self, func: &ast::Function) -> SemaResult<()> {
         self.generate_global_function(func, &None)
     }
 
-    fn generate_impl(&mut self, ns: &Impl, range: Range) -> SemaResult<()> {
+    fn generate_impl(&mut self, ns: &Impl) -> SemaResult<()> {
         match self.sqir.named_types.get(ns.name) {
             Some(rc) => {
                 match *rc.borrow()? {
                     Type::Enum(_) | Type::Struct(_) | Type::Class(_) => (),
                     _ => return sema_error!(
-                        range,
+                        ns,
                         "Cannot impl built-in type '{}'",
                         ns.name,
                     ),
                 }
             },
-            None => return sema_error!(range, "Unknown type: '{}'", ns.name),
+            None => return sema_error!(ns, "Unknown type: '{}'", ns.name),
         }
 
         let namespace = Some(ns.name.to_owned());
@@ -1213,22 +1200,24 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn generate_global_function(&mut self, node: &Node, ns: &Option<String>) -> SemaResult<()> {
-        let decl = match node.value {
-            NodeValue::Function(ref f) => f,
-            _ => unreachable!("Non-Function function node?!"),
+    fn generate_global_function(&mut self, func: &ast::Function, ns: &Option<String>) -> SemaResult<()> {
+        let ctx = TyCtx {
+            ty:    None,
+            range: func.range,
         };
+        let expr = self.generate_function(ctx.clone(), func)
+            .and_then(|tmp| self.unify(tmp, ctx))?;
 
-        let expr_rc = self.generate_expr(node, None)?;
-        let expr = expr_rc.borrow()?;
-        let name = decl.name.expect("function name");
+        let expr_ref = expr.borrow()?;
+        let name = func.name.expect("function name");
         let ns = self.sqir.globals.get_mut(ns).expect("namespace");
         let mut slot = ns.get(name).expect("forward-declared function").borrow_mut()?;
 
-        // Replace placeholder expr with actual, generated function
-        assert!(slot.ty == expr.ty);
+        // Sanity-check generate_function(), then replace
+        // placeholder expr with actual, generated function
+        assert!(slot.ty == expr_ref.ty);
 
-        slot.value = match expr.value {
+        slot.value = match expr_ref.value {
             Value::Function(ref func) => Value::Function(func.clone()),
             _ => unreachable!("Global function compiled to non-Function value?!"),
         };
@@ -1257,7 +1246,7 @@ impl SQIRGen {
             NodeValue::TupleLiteral(ref vs) => self.generate_tuple(ctx.clone(), vs),
             NodeValue::ArrayLiteral(ref vs) => self.generate_array(ctx.clone(), vs),
             NodeValue::Block(ref items)     => self.generate_block(ctx.clone(), items),
-            NodeValue::Function(ref func)   => self.generate_function(ctx.clone(), func),
+            NodeValue::FuncExpr(ref func)   => self.generate_function(ctx.clone(), func),
             _ => unimplemented!(),
         };
 
