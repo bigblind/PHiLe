@@ -71,8 +71,8 @@ impl<'a> Parser<'a> {
         let actual = token.map_or("end of input", |t| t.value);
 
         SyntaxError {
-            message: format!("Expected '{}'; found '{}'", expected, actual),
-            range:   token.map(|t| t.range),
+            message: format!("Expected {}; found {}", expected, actual),
+            range:   token.map(Ranged::range),
         }
     }
 
@@ -270,7 +270,7 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_toplevel_function(&mut self) -> ItemResult<'a> {
-        Ok(Item::FuncDef(self.parse_function()?))
+        self.parse_function().map(Item::FuncDef)
     }
 
     fn parse_function(&mut self) -> SyntaxResult<Function<'a>> {
@@ -298,9 +298,10 @@ impl<'a> Parser<'a> {
             None    => None,
         };
         let name = name_tok.value;
-        let begin = name_tok.range.begin;
-        let end = ty.as_ref().map_or(name_tok.range.end, |decl| decl.range.end);
-        let range = Range { begin, end };
+        let range = make_range(
+            name_tok,
+            &ty.as_ref().map_or(name_tok.range, Ranged::range)
+        );
 
         Ok(FuncArg { range, name, ty })
     }
