@@ -17,11 +17,14 @@ struct Parser<'a> {
     tokens: slice::Iter<'a, Token<'a>>,
 }
 
-pub type ParseResult<'a> = SyntaxResult<Node<'a>>;
-type LexResult<'a> = SyntaxResult<&'a Token<'a>>;
+pub type ProgResult<'a> = SyntaxResult<Prog<'a>>;
+pub type ItemResult<'a> = SyntaxResult<Item<'a>>;
+pub type ExpResult<'a>  = SyntaxResult<Exp<'a>>;
+pub type TyResult<'a>   = SyntaxResult<Ty<'a>>;
+pub type LexResult<'a>  = SyntaxResult<&'a Token<'a>>;
 
 
-pub fn parse<'a>(tokens: &'a [Token]) -> SyntaxResult<Program<'a>> {
+pub fn parse<'a>(tokens: &'a [Token]) -> ProgResult<'a> {
     Parser::new(tokens).parse()
 }
 
@@ -134,7 +137,7 @@ impl<'a> Parser<'a> {
 
     // Actual parser methods
 
-    fn parse(mut self) -> SyntaxResult<Program<'a>> {
+    fn parse(mut self) -> ProgResult<'a> {
         let mut items = vec![];
 
         while self.has_tokens() {
@@ -144,7 +147,7 @@ impl<'a> Parser<'a> {
         Ok(items)
     }
 
-    fn parse_toplevel(&mut self) -> SyntaxResult<Item<'a>> {
+    fn parse_toplevel(&mut self) -> ItemResult<'a> {
         let err_msg = "struct, class, enum, fn or impl";
         let token = self.next_token().ok_or_else(|| self.expectation_error(err_msg))?;
 
@@ -161,7 +164,7 @@ impl<'a> Parser<'a> {
     // User-defined Type Definitions
     //
 
-    fn parse_struct_or_class(&mut self) -> SyntaxResult<Item<'a>> {
+    fn parse_struct_or_class(&mut self) -> ItemResult<'a> {
         let mut fields = vec![];
 
         let keyword = self.expect_one_of(&["struct", "class"])?;
@@ -225,7 +228,7 @@ impl<'a> Parser<'a> {
         Ok(relation)
     }
 
-    fn parse_enum(&mut self) -> SyntaxResult<Item<'a>> {
+    fn parse_enum(&mut self) -> ItemResult<'a> {
         let mut variants = vec![];
 
         let enum_keyword = self.expect("enum")?;
@@ -266,7 +269,7 @@ impl<'a> Parser<'a> {
     // Functions and Type Implementations
     //
 
-    fn parse_toplevel_function(&mut self) -> SyntaxResult<Item<'a>> {
+    fn parse_toplevel_function(&mut self) -> ItemResult<'a> {
         Ok(Item::FuncDef(self.parse_function()?))
     }
 
@@ -291,7 +294,7 @@ impl<'a> Parser<'a> {
     fn parse_decl_arg(&mut self) -> SyntaxResult<FuncArg<'a>> {
         let name_tok = self.expect_identifier()?;
         let ty = match self.accept(":") {
-            Some(_) => Some(Box::new(self.parse_type()?)),
+            Some(_) => Some(self.parse_type()?),
             None    => None,
         };
         let name = name_tok.value;
@@ -302,7 +305,7 @@ impl<'a> Parser<'a> {
         Ok(FuncArg { range, name, ty })
     }
 
-    fn parse_impl(&mut self) -> SyntaxResult<Item<'a>> {
+    fn parse_impl(&mut self) -> ItemResult<'a> {
         let mut functions = vec![];
         let impl_keyword = self.expect("impl")?;
         let name = self.expect_identifier()?.value;
@@ -323,7 +326,7 @@ impl<'a> Parser<'a> {
     // Statements
     //
 
-    fn parse_stmt(&mut self) -> ParseResult<'a> {
+    fn parse_stmt(&mut self) -> ExpResult<'a> {
         let tok = self.next_token().ok_or_else(
             || self.expectation_error("statement")
         )?;
@@ -341,7 +344,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_vardecl(&mut self) -> ParseResult<'a> {
+    fn parse_vardecl(&mut self) -> ExpResult<'a> {
         let let_keyword = self.expect("let")?;
         let name_tok = self.expect_identifier()?;
 
@@ -355,19 +358,19 @@ impl<'a> Parser<'a> {
         let name = name_tok.value;
         let range = make_range(let_keyword, semicolon);
         let decl = VarDecl { name, ty, expr };
-        let value = NodeValue::VarDecl(Box::new(decl));
+        let kind = ExpKind::VarDecl(Box::new(decl));
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
-    fn parse_empty_stmt(&mut self) -> ParseResult<'a> {
-        self.expect(";").map(|semi| Node {
+    fn parse_empty_stmt(&mut self) -> ExpResult<'a> {
+        self.expect(";").map(|semi| Exp {
+            kind:  ExpKind::Empty,
             range: semi.range,
-            value: NodeValue::EmptyStmt,
         })
     }
 
-    fn parse_expr_stmt(&mut self) -> ParseResult<'a> {
+    fn parse_expr_stmt(&mut self) -> ExpResult<'a> {
         // If the expression ends with a block, i.e., if it is either
         // a block, an if, a match, a for or while loop (?), a lambda/fn
         // with block body, etc. (!!!), then the terminating semicolon
@@ -377,8 +380,8 @@ impl<'a> Parser<'a> {
 
         let node = if self.accept(";").is_some() {
             let range = expr.range; // TODO(H2CO3): include semicolon
-            let value = NodeValue::Semi(Box::new(expr));
-            Node { range, value }
+            let kind = ExpKind::Semi(Box::new(expr));
+            Exp { kind, range }
         } else if !self.is_at("}") {
             // no trailing semi but not the last statement of block
             return Err(self.expectation_error("} or ;"))
@@ -393,19 +396,19 @@ impl<'a> Parser<'a> {
     // Expressions
     //
 
-    fn parse_expr(&mut self) -> ParseResult<'a> {
+    fn parse_expr(&mut self) -> ExpResult<'a> {
         self.parse_assign_expr()
     }
 
-    fn parse_assign_expr(&mut self) -> ParseResult<'a> {
+    fn parse_assign_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_rightassoc(
             &["=", "+=", "-=", "*=", "/=", "%="],
             Self::parse_cond_expr
         )
     }
 
-    fn parse_cond_expr(&mut self) -> ParseResult<'a> {
-        let condition = self.parse_logic_or_expr()?;
+    fn parse_cond_expr(&mut self) -> ExpResult<'a> {
+        let condition = self.parse_or_expr()?;
 
         if self.accept("?").is_none() {
             return Ok(condition)
@@ -416,52 +419,52 @@ impl<'a> Parser<'a> {
         let false_val = self.parse_cond_expr()?;
 
         let range = make_range(&condition, &false_val);
-        let expr = CondExpr { condition, true_val, false_val };
-        let value = NodeValue::CondExpr(Box::new(expr));
+        let expr = CondExp { condition, true_val, false_val };
+        let kind = ExpKind::CondExp(Box::new(expr));
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
-    fn parse_logic_or_expr(&mut self) -> ParseResult<'a> {
+    fn parse_or_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_leftassoc(
             &["|"],
-            Self::parse_logic_and_expr
+            Self::parse_and_expr
         )
     }
 
-    fn parse_logic_and_expr(&mut self) -> ParseResult<'a> {
+    fn parse_and_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_leftassoc(
             &["&"],
             Self::parse_comparison_expr
         )
     }
 
-    fn parse_comparison_expr(&mut self) -> ParseResult<'a> {
+    fn parse_comparison_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_leftassoc(
             &["==", "!=", "<", ">", "<=", ">="],
             Self::parse_additive_expr
         )
     }
 
-    fn parse_additive_expr(&mut self) -> ParseResult<'a> {
+    fn parse_additive_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_leftassoc(
             &["+", "-"],
             Self::parse_multiplicative_expr
         )
     }
 
-    fn parse_multiplicative_expr(&mut self) -> ParseResult<'a> {
+    fn parse_multiplicative_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_leftassoc(
             &["*", "/", "%"],
             Self::parse_prefix_expr
         )
     }
 
-    fn parse_prefix_expr(&mut self) -> ParseResult<'a> {
-        let node_ctors: &[&Fn(Box<Node<'a>>) -> NodeValue] = &[
-            &NodeValue::UnaryPlus,
-            &NodeValue::UnaryMinus,
-            &NodeValue::LogicNot,
+    fn parse_prefix_expr(&mut self) -> ExpResult<'a> {
+        let node_ctors: &[&Fn(Box<Exp<'a>>) -> ExpKind] = &[
+            &ExpKind::UnaryPlus,
+            &ExpKind::UnaryMinus,
+            &ExpKind::LogicNot,
         ];
         self.parse_prefix(
             &["+", "-", "~"],
@@ -470,7 +473,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_postfix_expr(&mut self) -> ParseResult<'a> {
+    fn parse_postfix_expr(&mut self) -> ExpResult<'a> {
         let mut node = self.parse_term_expr()?;
 
         while let Some(token) = self.next_token() {
@@ -485,34 +488,34 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn parse_member_access_expr(&mut self, node: Node<'a>) -> ParseResult<'a> {
+    fn parse_member_access_expr(&mut self, node: Exp<'a>) -> ExpResult<'a> {
         let op = self.expect_one_of(&[".", "::"])?.value;
         let member_tok = self.expect_identifier()?;
         let base = Box::new(node);
         let member = member_tok.value;
         let range = make_range(&*base, member_tok);
-        let value = match op {
-            "."  => NodeValue::MemberAccess(MemberAccess { base, member }),
-            "::" => NodeValue::QualAccess(QualAccess { base, member }),
+        let kind = match op {
+            "."  => ExpKind::MemberAccess(MemberAccess { base, member }),
+            "::" => ExpKind::QualAccess(QualAccess { base, member }),
             _    => unreachable!("forgot to handle '{}'", op),
         };
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
-    fn parse_subscript_expr(&mut self, base: Node<'a>) -> ParseResult<'a> {
+    fn parse_subscript_expr(&mut self, base: Exp<'a>) -> ExpResult<'a> {
         self.expect("[")?;
 
         let index = self.parse_expr()?;
         let close_bracket = self.expect("]")?;
         let range = make_range(&base, close_bracket);
         let expr = Subscript { base, index };
-        let value = NodeValue::Subscript(Box::new(expr));
+        let kind = ExpKind::Subscript(Box::new(expr));
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
-    fn parse_func_call_expr(&mut self, callee: Node<'a>) -> ParseResult<'a> {
+    fn parse_func_call_expr(&mut self, callee: Exp<'a>) -> ExpResult<'a> {
         let (arguments, arg_range) = self.parse_paren_delim(
             "(", Self::parse_expr, ",", ")"
         )?;
@@ -520,13 +523,13 @@ impl<'a> Parser<'a> {
         let end = arg_range.end;
         let range = Range { begin, end };
         let function = Box::new(callee);
-        let value = NodeValue::FuncCall(FuncCall { function, arguments });
+        let kind = ExpKind::FuncCall(FuncCall { function, arguments });
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
     // TODO(H2CO3): parse struct literals and closures
-    fn parse_term_expr(&mut self) -> ParseResult<'a> {
+    fn parse_term_expr(&mut self) -> ExpResult<'a> {
         let token = self.next_token().ok_or_else(
             || self.expectation_error("a term")
         )?;
@@ -542,63 +545,63 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_atomic_expr(&mut self) -> ParseResult<'a> {
+    fn parse_atomic_expr(&mut self) -> ExpResult<'a> {
         if let Some(token) = self.accept_one_of(&["nil", "true", "false"]) {
             let range = token.range;
-            let value = match token.value {
-                "nil"   => NodeValue::NilLiteral,
-                "true"  => NodeValue::BoolLiteral(true),
-                "false" => NodeValue::BoolLiteral(false),
+            let kind = match token.value {
+                "nil"   => ExpKind::NilLiteral,
+                "true"  => ExpKind::BoolLiteral(true),
+                "false" => ExpKind::BoolLiteral(false),
                 lexeme  => unreachable!("forgot to handle '{}'", lexeme),
             };
-            return Ok(Node { range, value });
+            return Ok(Exp { kind, range });
         }
 
         // If the lexeme contains a decimal point or an exponent,
         // then it's floating-point, otherwise it's an integer.
         if let Some(token) = self.accept_of_kind(TokenKind::NumericLiteral) {
             let range = token.range;
-            let value = if token.value.contains(|c| "eE.".contains(c)) {
-                NodeValue::FloatLiteral(token.value.parse()?)
+            let kind = if token.value.contains(|c| "eE.".contains(c)) {
+                ExpKind::FloatLiteral(token.value.parse()?)
             } else {
-                NodeValue::IntLiteral(token.value.parse()?)
+                ExpKind::IntLiteral(token.value.parse()?)
             };
-            return Ok(Node { range, value });
+            return Ok(Exp { kind, range });
         }
 
         if let Some(token) = self.accept_of_kind(TokenKind::StringLiteral) {
             let s = unescape_string_literal(token.value)?;
             let range = token.range;
-            let value = NodeValue::StringLiteral(s);
-            return Ok(Node { range, value });
+            let kind = ExpKind::StringLiteral(s);
+            return Ok(Exp { kind, range });
         }
 
         if let Some(token) = self.accept_identifier() {
             let range = token.range;
-            let value = NodeValue::Identifier(token.value);
-            return Ok(Node { range, value });
+            let kind = ExpKind::Identifier(token.value);
+            return Ok(Exp { kind, range });
         }
 
         Err(self.expectation_error("literal or identifier"))
     }
 
-    fn parse_tuple_expr(&mut self) -> ParseResult<'a> {
+    fn parse_tuple_expr(&mut self) -> ExpResult<'a> {
         let (exprs, range) = self.parse_paren_delim("(", Self::parse_expr, ",", ")")?;
-        let value = NodeValue::TupleLiteral(exprs);
-        Ok(Node { range, value })
+        let kind = ExpKind::TupleLiteral(exprs);
+        Ok(Exp { kind, range })
     }
 
-    fn parse_array_expr(&mut self) -> ParseResult<'a> {
+    fn parse_array_expr(&mut self) -> ExpResult<'a> {
         let (exprs, range) = self.parse_paren_delim("[", Self::parse_expr, ",", "]")?;
-        let value = NodeValue::ArrayLiteral(exprs);
-        Ok(Node { range, value })
+        let kind = ExpKind::ArrayLiteral(exprs);
+        Ok(Exp { kind, range })
     }
 
-    fn parse_struct_expr(&mut self) -> ParseResult<'a> {
+    fn parse_struct_expr(&mut self) -> ExpResult<'a> {
         unimplemented!()
     }
 
-    fn parse_func_expr(&mut self) -> ParseResult<'a> {
+    fn parse_func_expr(&mut self) -> ExpResult<'a> {
         let (arguments, arg_range) = self.parse_paren_delim(
             "|", Self::parse_decl_arg, ",", "|"
         )?;
@@ -618,13 +621,13 @@ impl<'a> Parser<'a> {
         let range = Range { begin, end };
         let name = None;
         let decl = Function { range, name, arguments, ret_type, body };
-        let value = NodeValue::FuncExpr(Box::new(decl));
+        let kind = ExpKind::FuncExp(Box::new(decl));
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
     // TODO(H2CO3): this is ugly, refactor
-    fn parse_if(&mut self) -> ParseResult<'a> {
+    fn parse_if(&mut self) -> ExpResult<'a> {
         let if_keyword = self.expect("if")?;
         let condition = self.parse_expr()?;
         let then_arm = self.parse_block()?;
@@ -644,16 +647,16 @@ impl<'a> Parser<'a> {
             else_arm.as_ref().unwrap_or(&then_arm)
         );
         let if_expr = If { condition, then_arm, else_arm };
-        let value = NodeValue::If(Box::new(if_expr));
+        let kind = ExpKind::If(Box::new(if_expr));
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
-    fn parse_match(&mut self) -> ParseResult<'a> {
+    fn parse_match(&mut self) -> ExpResult<'a> {
         unimplemented!()
     }
 
-    fn parse_block(&mut self) -> ParseResult<'a> {
+    fn parse_block(&mut self) -> ExpResult<'a> {
         let mut items = vec![];
         let open_brace = self.expect("{")?;
 
@@ -663,17 +666,17 @@ impl<'a> Parser<'a> {
 
         let close_brace = self.expect("}")?;
         let range = make_range(open_brace, close_brace);
-        let value = NodeValue::Block(items);
+        let kind = ExpKind::Block(items);
 
-        Ok(Node { range, value })
+        Ok(Exp { kind, range })
     }
 
     //
     // Helpers for parsing expressions with binary infix operators
     //
 
-    fn parse_binop_leftassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ParseResult<'a>
-        where F: Fn(&mut Self) -> ParseResult<'a> {
+    fn parse_binop_leftassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ExpResult<'a>
+        where F: Fn(&mut Self) -> ExpResult<'a> {
 
         let mut lhs = subexpr(self)?;
 
@@ -682,16 +685,16 @@ impl<'a> Parser<'a> {
             let range = make_range(&lhs, &rhs);
             let op = tok.value;
             let expr = BinaryOp { op, lhs, rhs };
-            let value = NodeValue::BinaryOp(Box::new(expr));
+            let kind = ExpKind::BinaryOp(Box::new(expr));
 
-            lhs = Node { range, value };
+            lhs = Exp { kind, range };
         }
 
         Ok(lhs)
     }
 
-    fn parse_binop_rightassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ParseResult<'a>
-        where F: Fn(&mut Self) -> ParseResult<'a> {
+    fn parse_binop_rightassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ExpResult<'a>
+        where F: Fn(&mut Self) -> ExpResult<'a> {
 
         let lhs = subexpr(self)?;
 
@@ -700,9 +703,9 @@ impl<'a> Parser<'a> {
             let range = make_range(&lhs, &rhs);
             let op = tok.value;
             let expr = BinaryOp { op, lhs, rhs };
-            let value = NodeValue::BinaryOp(Box::new(expr));
+            let kind = ExpKind::BinaryOp(Box::new(expr));
 
-            Ok(Node { range, value })
+            Ok(Exp { kind, range })
         } else {
             Ok(lhs)
         }
@@ -712,12 +715,12 @@ impl<'a> Parser<'a> {
     // Built-in Type Declarations
     //
 
-    fn parse_type(&mut self) -> ParseResult<'a> {
+    fn parse_type(&mut self) -> TyResult<'a> {
         self.parse_function_type()
     }
 
     // TODO(H2CO3): should this be non-associative instead of right-associative?
-    fn parse_function_type(&mut self) -> ParseResult<'a> {
+    fn parse_function_type(&mut self) -> TyResult<'a> {
         let lhs = self.parse_postfix_type()?;
 
         if self.accept("->").is_none() {
@@ -728,40 +731,40 @@ impl<'a> Parser<'a> {
         let range = make_range(&lhs, &rhs);
 
         // decompose tuple type if it appears in argument position
-        let arg_types = match lhs.value {
-            NodeValue::TupleType(items) => items,
+        let arg_types = match lhs.kind {
+            TyKind::Tuple(items) => items,
             _ => vec![lhs],
         };
 
         let ret_type = Box::new(rhs);
-        let fn_type = FunctionType { arg_types, ret_type };
-        let value = NodeValue::FunctionType(fn_type);
+        let fn_type = FunctionTy { arg_types, ret_type };
+        let kind = TyKind::Function(fn_type);
 
-        Ok(Node { range, value })
+        Ok(Ty { kind, range })
     }
 
-    fn parse_postfix_type(&mut self) -> ParseResult<'a> {
+    fn parse_postfix_type(&mut self) -> TyResult<'a> {
         let mut node = self.parse_prefix_type()?;
 
         // currently, optional is the only postfix type
         while let Some(token) = self.accept("?") {
             let range = make_range(&node, token);
-            let value = NodeValue::OptionalType(Box::new(node));
-            node = Node { range, value };
+            let kind = TyKind::Optional(Box::new(node));
+            node = Ty { kind, range };
         }
 
         Ok(node)
     }
 
-    fn parse_prefix_type(&mut self) -> ParseResult<'a> {
+    fn parse_prefix_type(&mut self) -> TyResult<'a> {
         self.parse_prefix(
             &["&"],
-            &[&NodeValue::PointerType],
+            &[&TyKind::Pointer],
             Self::parse_term_type
         )
     }
 
-    fn parse_term_type(&mut self) -> ParseResult<'a> {
+    fn parse_term_type(&mut self) -> TyResult<'a> {
         let token = self.next_token().ok_or_else(
             || self.expectation_error("parenthesized, named, or array type")
         )?;
@@ -773,37 +776,38 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_tuple_type(&mut self) -> ParseResult<'a> {
+    fn parse_tuple_type(&mut self) -> TyResult<'a> {
         let (items, range) = self.parse_paren_delim("(", Self::parse_type, ",", ")")?;
-        let value = NodeValue::TupleType(items);
-        Ok(Node { range, value })
+        let kind = TyKind::Tuple(items);
+
+        Ok(Ty { kind, range })
     }
 
-    fn parse_array_type(&mut self) -> ParseResult<'a> {
+    fn parse_array_type(&mut self) -> TyResult<'a> {
         let open_bracket = self.expect("[")?;
         let element_type = self.parse_type()?;
         let close_bracket = self.expect("]")?;
         let range = make_range(open_bracket, close_bracket);
-        let value = NodeValue::ArrayType(Box::new(element_type));
+        let kind = TyKind::Array(Box::new(element_type));
 
-        Ok(Node { range, value })
+        Ok(Ty { kind, range })
     }
 
-    fn parse_named_type(&mut self) -> ParseResult<'a> {
+    fn parse_named_type(&mut self) -> TyResult<'a> {
         let token = self.expect_identifier()?;
         let range = token.range;
-        let value = NodeValue::NamedType(token.value);
+        let kind = TyKind::Named(token.value);
 
-        Ok(Node { range, value })
+        Ok(Ty { kind, range })
     }
 
     //
     // Generic helpers for parsing either expressions or types
     //
 
-    fn parse_prefix<N, S>(&mut self, tokens: &[&str], nodes: &[N], subexpr: S) -> ParseResult<'a>
-        where N: Fn(Box<Node<'a>>) -> NodeValue<'a>,
-              S: FnOnce(&mut Self) -> ParseResult<'a> {
+    fn parse_prefix<N, S, K>(&mut self, tokens: &[&str], nodes: &[N], subexpr: S) -> SyntaxResult<Node<K>>
+        where N: Fn(Box<Node<K>>) -> K,
+              S: FnOnce(&mut Self) -> SyntaxResult<Node<K>> {
 
         assert!(tokens.len() == nodes.len());
 
@@ -812,9 +816,9 @@ impl<'a> Parser<'a> {
                 let child = self.parse_prefix(tokens, nodes, subexpr)?;
                 let range = make_range(token, &child);
                 let index = tokens.iter().position(|v| *v == token.value).unwrap();
-                let value = nodes[index](Box::new(child));
+                let kind = nodes[index](Box::new(child));
 
-                Ok(Node { range, value })
+                Ok(Node { kind, range })
             },
             None => subexpr(self),
         }

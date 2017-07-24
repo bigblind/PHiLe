@@ -11,8 +11,8 @@ use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
-use ast::{ self, Program, Node, NodeValue, FuncArg, Field };
-use ast::{ Item, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
+use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, FuncArg, Field };
+use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ SemaError, SemaResult };
 
 
@@ -50,7 +50,7 @@ struct SQIRGen {
 // that simply wrap other types, e.g. &T, [T], T?, etc.
 macro_rules! implement_wrapping_type_getter {
     ($fn_name: ident, $variant: ident, $cache: ident) => {
-        fn $fn_name(&mut self, decl: &Node) -> SemaResult<RcType> {
+        fn $fn_name(&mut self, decl: &Ty) -> SemaResult<RcType> {
             // get the current wrapped type
             let wrapped = self.type_from_decl(decl)?;
 
@@ -109,7 +109,7 @@ macro_rules! reciprocity_error {
 }
 
 
-pub fn generate_sqir(program: &Program) -> SemaResult<SQIR> {
+pub fn generate_sqir(program: &[Item]) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
@@ -160,7 +160,7 @@ impl SQIRGen {
     // Top-level SQIR generation methods and helpers
     //
 
-    fn generate_sqir(mut self, program: &Program) -> SemaResult<SQIR> {
+    fn generate_sqir(mut self, program: &[Item]) -> SemaResult<SQIR> {
         self.forward_declare_user_defined_types(program)?;
         self.define_user_defined_types(program)?;
         self.occurs_check_user_defined_types()?;
@@ -639,19 +639,18 @@ impl SQIRGen {
     // Caching getters for types
     //
 
-    fn type_from_decl(&mut self, decl: &Node) -> SemaResult<RcType> {
-        match decl.value {
-            NodeValue::PointerType(ref pointed)  => self.get_pointer_type(pointed),
-            NodeValue::OptionalType(ref wrapped) => self.get_optional_type(wrapped),
-            NodeValue::ArrayType(ref element)    => self.get_array_type(element),
-            NodeValue::TupleType(ref types)      => self.get_tuple_type(types),
-            NodeValue::FunctionType(ref func)    => self.get_function_type(func),
-            NodeValue::NamedType(name)           => self.get_named_type(name, decl),
-            _ => unreachable!("Not a type declaration"),
+    fn type_from_decl(&mut self, decl: &Ty) -> SemaResult<RcType> {
+        match decl.kind {
+            TyKind::Pointer(ref pointed)  => self.get_pointer_type(pointed),
+            TyKind::Optional(ref wrapped) => self.get_optional_type(wrapped),
+            TyKind::Array(ref element)    => self.get_array_type(element),
+            TyKind::Tuple(ref types)      => self.get_tuple_type(types),
+            TyKind::Function(ref func)    => self.get_function_type(func),
+            TyKind::Named(name)           => self.get_named_type(name, decl),
         }
     }
 
-    fn get_pointer_type(&mut self, decl: &Node) -> SemaResult<RcType> {
+    fn get_pointer_type(&mut self, decl: &Ty) -> SemaResult<RcType> {
         let pointer_type = self.get_pointer_type_raw(decl)?;
 
         match *pointer_type.borrow()? {
@@ -677,11 +676,11 @@ impl SQIRGen {
         Ok(pointer_type)
     }
 
-    fn get_optional_type(&mut self, decl: &Node) -> SemaResult<RcType> {
+    fn get_optional_type(&mut self, decl: &Ty) -> SemaResult<RcType> {
         self.get_optional_type_raw(decl)
     }
 
-    fn get_array_type(&mut self, decl: &Node) -> SemaResult<RcType> {
+    fn get_array_type(&mut self, decl: &Ty) -> SemaResult<RcType> {
         self.get_array_type_raw(decl)
     }
 
@@ -703,7 +702,7 @@ impl SQIRGen {
         array_types
     }
 
-    fn get_tuple_type(&mut self, nodes: &[Node]) -> SemaResult<RcType> {
+    fn get_tuple_type(&mut self, nodes: &[Ty]) -> SemaResult<RcType> {
         let types = nodes.iter()
             .map(|node| self.type_from_decl(node))
             .collect::<SemaResult<_>>()?;
@@ -735,7 +734,7 @@ impl SQIRGen {
         Ok(tuple.clone())
     }
 
-    fn get_function_type(&mut self, fn_type: &ast::FunctionType) -> SemaResult<RcType> {
+    fn get_function_type(&mut self, fn_type: &ast::FunctionTy) -> SemaResult<RcType> {
         let arg_types = fn_type.arg_types.iter().map(
             |decl| self.type_from_decl(decl)
         ).collect::<SemaResult<_>>()?;
@@ -761,10 +760,10 @@ impl SQIRGen {
         Ok(rc.clone())
     }
 
-    fn get_named_type(&mut self, name: &str, node: &Node) -> SemaResult<RcType> {
+    fn get_named_type<R: Ranged>(&mut self, name: &str, range: &R) -> SemaResult<RcType> {
         match self.sqir.named_types.get(name) {
             Some(rc) => Ok(rc.clone()),
-            None => sema_error!(node, "Unknown type: '{}'", name),
+            None => sema_error!(range, "Unknown type: '{}'", name),
         }
     }
 
@@ -1205,9 +1204,7 @@ impl SQIRGen {
             ty:    None,
             range: func.range,
         };
-        let expr = self.generate_function(ctx.clone(), func)
-            .and_then(|tmp| self.unify(tmp, ctx))?;
-
+        let expr = self.generate_function(ctx, func)?;
         let expr_ref = expr.borrow()?;
         let name = func.name.expect("function name");
         let ns = self.sqir.globals.get_mut(ns).expect("namespace");
@@ -1228,26 +1225,36 @@ impl SQIRGen {
     // Top-level expression emitter.
     // 'ty' is a type hint from the caller, used
     // for the top-down part of type inference.
-    fn generate_expr(&mut self, node: &Node, ty: Option<RcType>) -> SemaResult<RcExpr> {
+    fn generate_expr(&mut self, node: &Exp, ty: Option<RcType>) -> SemaResult<RcExpr> {
         let range = node.range;
         let ctx = TyCtx { ty, range };
 
-        let tmp = match node.value {
-            NodeValue::NilLiteral           => self.generate_nil_literal(ctx.clone()),
-            NodeValue::BoolLiteral(b)       => self.generate_bool_literal(b),
-            NodeValue::IntLiteral(n)        => self.generate_int_literal(ctx.clone(), n),
-            NodeValue::FloatLiteral(x)      => self.generate_float_literal(x),
-            NodeValue::StringLiteral(ref s) => self.generate_string_literal(s),
-            NodeValue::Identifier(name)     => self.generate_name_ref(name, range),
-            NodeValue::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
-            NodeValue::EmptyStmt            => self.generate_empty_stmt(ctx.clone()),
-            NodeValue::Semi(ref expr)       => self.generate_semi(expr),
-            NodeValue::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
-            NodeValue::TupleLiteral(ref vs) => self.generate_tuple(ctx.clone(), vs),
-            NodeValue::ArrayLiteral(ref vs) => self.generate_array(ctx.clone(), vs),
-            NodeValue::Block(ref items)     => self.generate_block(ctx.clone(), items),
-            NodeValue::FuncExpr(ref func)   => self.generate_function(ctx.clone(), func),
-            _ => unimplemented!(),
+        let tmp = match node.kind {
+            ExpKind::NilLiteral           => self.generate_nil_literal(ctx.clone()),
+            ExpKind::BoolLiteral(b)       => self.generate_bool_literal(b),
+            ExpKind::IntLiteral(n)        => self.generate_int_literal(ctx.clone(), n),
+            ExpKind::FloatLiteral(x)      => self.generate_float_literal(x),
+            ExpKind::StringLiteral(ref s) => self.generate_string_literal(s),
+            ExpKind::Identifier(name)     => self.generate_name_ref(name, range),
+            ExpKind::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
+            ExpKind::Empty                => self.generate_empty_stmt(ctx.clone()),
+            ExpKind::Semi(ref expr)       => self.generate_semi(expr),
+            ExpKind::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
+            ExpKind::TupleLiteral(ref vs) => self.generate_tuple(ctx.clone(), vs),
+            ExpKind::ArrayLiteral(ref vs) => self.generate_array(ctx.clone(), vs),
+            ExpKind::Block(ref items)     => self.generate_block(ctx.clone(), items),
+            ExpKind::FuncExp(ref func)    => self.generate_function(ctx.clone(), func),
+            ExpKind::CondExp(_)           => unimplemented!(),
+            ExpKind::UnaryPlus(_)         => unimplemented!(),
+            ExpKind::UnaryMinus(_)        => unimplemented!(),
+            ExpKind::LogicNot(_)          => unimplemented!(),
+            ExpKind::Subscript(_)         => unimplemented!(),
+            ExpKind::MemberAccess(_)      => unimplemented!(),
+            ExpKind::QualAccess(_)        => unimplemented!(),
+            ExpKind::FuncCall(_)          => unimplemented!(),
+            ExpKind::StructLiteral(_)     => unimplemented!(),
+            ExpKind::If(_)                => unimplemented!(),
+            ExpKind::Match(_)             => unimplemented!(),
         };
 
         self.unify(tmp?, ctx)
@@ -1394,7 +1401,7 @@ impl SQIRGen {
         self.generate_tuple(ctx, &[])
     }
 
-    fn generate_semi(&mut self, node: &Node) -> SemaResult<RcExpr> {
+    fn generate_semi(&mut self, node: &Exp) -> SemaResult<RcExpr> {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
         let value = Value::Ignore(subexpr);
@@ -1406,7 +1413,7 @@ impl SQIRGen {
         unimplemented!()
     }
 
-    fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
+    fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Exp]) -> SemaResult<RcExpr> {
         // A one-element tuple is equivalent with its element
         if nodes.len() == 1 {
             return self.generate_expr(&nodes[0], ctx.ty)
@@ -1425,7 +1432,7 @@ impl SQIRGen {
     }
 
     // helper for generate_tuple()
-    fn generate_tuple_items(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<Vec<RcExpr>> {
+    fn generate_tuple_items(&mut self, ctx: TyCtx, nodes: &[Exp]) -> SemaResult<Vec<RcExpr>> {
         if let Some(hint) = ctx.ty {
             if let Type::Tuple(ref types) = *hint.borrow()? {
                 let expected_len = types.len();
@@ -1449,11 +1456,11 @@ impl SQIRGen {
         nodes.iter().map(|node| self.generate_expr(node, None)).collect()
     }
 
-    fn generate_array(&mut self, _ctx: TyCtx, _nodes: &[Node]) -> SemaResult<RcExpr> {
+    fn generate_array(&mut self, _ctx: TyCtx, _nodes: &[Exp]) -> SemaResult<RcExpr> {
         unimplemented!()
     }
 
-    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Node]) -> SemaResult<RcExpr> {
+    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Exp]) -> SemaResult<RcExpr> {
         #[allow(unused_variables)]
         let scope_guard = self.begin_local_scope();
 
@@ -1513,13 +1520,7 @@ impl SQIRGen {
     // will use the fresh new scope to declare locals in.
     // The caller must hold on to the returned ScopeGuard as long as
     // s/he wishes to keep the scope open. ScopeGuard::drop() will
-    // remove the topmost/innermost scope and all its declarations,
-    // and insert markers for destructors.
-    // TODO(H2CO3): insert destructors for temporaries too.
-    // Likely design: the reverse scope stack will not only contain
-    // a vector of named variables, but also a vector of references
-    // to temporaries. This will also be walked, in reverse order,
-    // by the cleanup code in ScopeGuard::drop().
+    // remove the topmost/innermost scope and all its declarations.
     fn begin_local_scope(&mut self) -> ScopeGuard {
         let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
         locals.scope_stack.push(Vec::new());
