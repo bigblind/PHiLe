@@ -379,18 +379,16 @@ impl<'a> Parser<'a> {
         // The semi is also optional after the last statement in a block.
         let expr = self.parse_expr()?;
 
-        let node = if self.accept(";").is_some() {
+        if self.accept(";").is_some() {
             let range = expr.range; // TODO(H2CO3): include semicolon
             let kind = ExpKind::Semi(Box::new(expr));
-            Exp { kind, range }
+            Ok(Exp { kind, range })
         } else if !self.is_at("}") {
             // no trailing semi but not the last statement of block
-            return Err(self.expectation_error("} or ;"))
+            Err(self.expectation_error("} or ;"))
         } else {
-            expr
-        };
-
-        Ok(node)
+            Ok(expr)
+        }
     }
 
     //
@@ -507,6 +505,7 @@ impl<'a> Parser<'a> {
     fn parse_subscript_expr(&mut self, base: Exp<'a>) -> ExpResult<'a> {
         self.expect("[")?;
 
+        // TODO(H2CO3): parse one or more comma-separated index exprs?
         let index = self.parse_expr()?;
         let close_bracket = self.expect("]")?;
         let range = make_range(&base, close_bracket);
@@ -520,9 +519,7 @@ impl<'a> Parser<'a> {
         let (arguments, arg_range) = self.parse_paren_delim(
             "(", Self::parse_expr, ",", ")"
         )?;
-        let begin = callee.range.begin;
-        let end = arg_range.end;
-        let range = Range { begin, end };
+        let range = make_range(&callee, &arg_range);
         let function = Box::new(callee);
         let kind = ExpKind::FuncCall(FuncCall { function, arguments });
 
@@ -617,9 +614,7 @@ impl<'a> Parser<'a> {
         } else {
             self.parse_expr()?
         };
-        let begin = arg_range.begin;
-        let end = body.range.end;
-        let range = Range { begin, end };
+        let range = make_range(&arg_range, &body);
         let name = None;
         let decl = Function { range, name, arguments, ret_type, body };
         let kind = ExpKind::FuncExp(Box::new(decl));
