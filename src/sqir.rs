@@ -105,14 +105,14 @@ pub struct FunctionType {
 // Relations (also part of the Schema)
 //
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationSide {
     pub class:       RcType,
     pub field:       Option<String>,
     pub cardinality: Cardinality,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Cardinality {
     ZeroOrOne,
     One,
@@ -325,14 +325,14 @@ pub fn unwrap_class_name(class: &RcType) -> String {
     }
 }
 
-// `RelationSide: PartialOrd + Ord` is necessary for
-// order-independent hashing of `Relation`s.
 impl PartialOrd for RelationSide {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
+// TODO(H2CO3): 2 calls to unwrap_class_name() means 2 allocations
+// per comparison. This is grossly wasteful and should be improved.
 impl Ord for RelationSide {
     fn cmp(&self, other: &Self) -> Ordering {
         let self_name  = unwrap_class_name(&self.class);

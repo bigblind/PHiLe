@@ -135,11 +135,10 @@ impl Ranged for TyCtx {
 impl Drop for ScopeGuard {
     fn drop(&mut self) {
         let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
-        let mut scope = locals.scope_stack.pop().expect("no innermost scope found");
+        let scope = locals.scope_stack.pop().expect("no innermost scope found");
 
-        // Clean up variables in reverse order of declaration
-        scope.reverse();
-
+        // TODO(H2CO3): if we ever implement destructors, then
+        // destroy local variables in _reverse_ order of init.
         for var_name in &scope {
             locals.var_map.remove(var_name).expect("variable not in declaration map");
         }
@@ -147,7 +146,6 @@ impl Drop for ScopeGuard {
 }
 
 impl SQIRGen {
-    // Constructor
     fn new() -> SQIRGen {
         SQIRGen {
             sqir:    SQIR::new(),
@@ -318,17 +316,15 @@ impl SQIRGen {
     //
 
     fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcType> {
-        let name = decl.name.to_owned();
-
         let struct_type = Type::Struct(
             StructType {
-                name:   name.clone(),
+                name:   decl.name.to_owned(),
                 fields: self.typecheck_struct_fields(decl)?,
             }
         );
 
         // Replace the placeholder type with the now-created actual type
-        let struct_type_rc = &self.sqir.named_types[&name];
+        let struct_type_rc = &self.sqir.named_types[decl.name];
 
         *struct_type_rc.borrow_mut()? = struct_type;
 
@@ -336,17 +332,15 @@ impl SQIRGen {
     }
 
     fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcType> {
-        let name = decl.name.to_owned();
-
         let class_type = Type::Class(
             ClassType {
-                name:   name.clone(),
+                name:   decl.name.to_owned(),
                 fields: self.typecheck_class_fields(decl)?,
             }
         );
 
         // Replace the placeholder type with the now-created actual type
-        let class_type_rc = &self.sqir.named_types[&name];
+        let class_type_rc = &self.sqir.named_types[decl.name];
 
         *class_type_rc.borrow_mut()? = class_type;
 
@@ -354,17 +348,15 @@ impl SQIRGen {
     }
 
     fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcType> {
-        let name = decl.name.to_owned();
-
         let enum_type = Type::Enum(
             EnumType {
-                name:     name.clone(),
+                name:     decl.name.to_owned(),
                 variants: self.typecheck_enum_variants(decl)?,
             }
         );
 
         // Replace the placeholder type with the now-created actual type
-        let enum_type_rc = &self.sqir.named_types[&name];
+        let enum_type_rc = &self.sqir.named_types[decl.name];
 
         *enum_type_rc.borrow_mut()? = enum_type;
 
@@ -921,11 +913,12 @@ impl SQIRGen {
         // symmetric, and thus when we process the now-RHS,
         // the same (actually, the reversed) relation will be added too.
         let key = (lhs_class_type.clone(), lhs_field_name.to_owned());
-        if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_some() {
+
+        if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_none() {
+            Ok(())
+        } else {
             unreachable!("Duplicate relation for field '{}'", lhs_field_name)
         }
-
-        Ok(())
     }
 
     // No RHS field name, no cry --- just create a one-sided
