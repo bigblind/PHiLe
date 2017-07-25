@@ -56,11 +56,8 @@ impl Error for DerefError {
     }
 }
 
-impl Display for DerefError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        Debug::fmt(self, f) // TODO(H2CO3): I'm lazy af
-    }
-}
+// TODO(H2CO3): I'm lazy af
+impl_display_as_debug! { DerefError }
 
 impl From<DerefError> for io::Error {
     fn from(err: DerefError) -> Self {

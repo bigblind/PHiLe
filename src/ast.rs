@@ -232,7 +232,7 @@ macro_rules! impl_ranged {
             }
         }
     )*);
-    ($($name: ident),*,) => { impl_ranged!($($name),*); };
+    ($($name: ident),+,) => { impl_ranged!($($name),+); };
 }
 
 impl_ranged! {

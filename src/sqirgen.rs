@@ -968,7 +968,7 @@ impl SQIRGen {
         );
         let cardinality_mismatch_error = |name| sema_error!(
             range,
-            "{} type can't have a cardinality of {:#?}",
+            "{} type can't have a cardinality of {}",
             name,
             cardinality,
         );

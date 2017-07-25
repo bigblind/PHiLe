@@ -6,6 +6,7 @@
 // on 07/04/2017
 //
 
+use std::fmt::{ self, Debug, Display, Formatter };
 use std::collections::{ HashMap, BTreeMap, BTreeSet };
 use std::cmp::*;
 use util::*;
@@ -323,6 +324,11 @@ pub fn unwrap_class_name(class: &RcType) -> String {
         Type::Class(ref c) => c.name.clone(),
         _ => unreachable!("Non-class class type?!"),
     }
+}
+
+impl_display_as_debug! {
+    PlaceholderKind,
+    Cardinality,
 }
 
 impl PartialOrd for RelationSide {
