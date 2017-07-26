@@ -444,8 +444,12 @@ impl SQIRGen {
             // assume that any errors in the transitive closure of the
             // pointed type will be caught later in the worst case.
             Type::Pointer(_) => match parent_kind {
-                ComplexTypeKind::Entity => Ok(()),
-                ComplexTypeKind::Value  => sema_error!(range, "Pointer not allowed in value type"),
+                ComplexTypeKind::Entity   => Ok(()),
+                ComplexTypeKind::Function => Ok(()),
+                ComplexTypeKind::Value    => sema_error!(
+                    range,
+                    "Pointer not allowed in value type"
+                ),
             },
 
             // Class types without indirection are never allowed.
@@ -476,7 +480,18 @@ impl SQIRGen {
             Type::Placeholder { kind: PlaceholderKind::Enum, .. }   => Ok(()),
 
             // Function types are not allowed within user-defined types.
-            Type::Function(_) => sema_error!(range, "Function type not allowed in user-defined type"),
+            Type::Function(ref fn_type) => match parent_kind {
+                ComplexTypeKind::Value | ComplexTypeKind::Entity => sema_error!(
+                    range,
+                    "Function type not allowed in user-defined type"
+                ),
+                ComplexTypeKind::Function => self.validate_function_type_components(
+                    fn_type.arg_types.iter(),
+                    &fn_type.ret_type,
+                    vec![range.range(); fn_type.arg_types.len()].iter(),
+                    range,
+                ),
+            },
 
             // Optionals and arrays are checked for
             // explicitly and recursively, because they are
@@ -493,30 +508,54 @@ impl SQIRGen {
         }
     }
 
-    fn validate_optional<R: Ranged>(&self, wrapped_type: &WkType, range: &R, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+    fn validate_optional<R: Ranged>(
+        &self,
+        wrapped_type: &WkType,
+        range:        &R,
+        parent_kind:  ComplexTypeKind,
+    ) -> SemaResult<()> {
         let res = self.validate_complex_type_item(wrapped_type, range, ComplexTypeKind::Value);
 
+        // In a function, any wild combination of optionals, pointers, arrays,
+        // etc. is allowed. TODO(H2CO3): is that correct/true?
         match parent_kind {
             ComplexTypeKind::Value => res,
             ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
                 wrapped_type,
                 res,
                 range,
-                "optional"
+                "optional",
+            ),
+            ComplexTypeKind::Function => self.validate_complex_type_item(
+                wrapped_type,
+                range,
+                parent_kind,
             ),
         }
     }
 
-    fn validate_array<R: Ranged>(&self, element_type: &WkType, range: &R, parent_kind: ComplexTypeKind) -> SemaResult<()> {
+    fn validate_array<R: Ranged>(
+        &self,
+        element_type: &WkType,
+        range:        &R,
+        parent_kind:  ComplexTypeKind,
+    ) -> SemaResult<()> {
         let res = self.validate_complex_type_item(element_type, range, ComplexTypeKind::Value);
 
+        // In a function, any wild combination of optionals, pointers, arrays,
+        // etc. is allowed. TODO(H2CO3): is that correct/true?
         match parent_kind {
             ComplexTypeKind::Value => res,
             ComplexTypeKind::Entity => self.validate_wrapper_in_entity(
                 element_type,
                 res,
                 range,
-                "array"
+                "array",
+            ),
+            ComplexTypeKind::Function => self.validate_complex_type_item(
+                element_type,
+                range,
+                parent_kind,
             ),
         }
     }
@@ -588,7 +627,7 @@ impl SQIRGen {
             // Occurs check is supposed to happen after type resolution
             Type::Placeholder { ref name, .. } => unreachable!(
                 "Placeholder type '{}' should have been resolved by now",
-                name
+                name,
             ),
         }
     }
@@ -720,23 +759,72 @@ impl SQIRGen {
 
         let ret_type = self.type_from_decl(&fn_type.ret_type)?;
 
-        self.get_function_type_from_types(arg_types, ret_type)
+        self.get_function_type_from_types(
+            arg_types,
+            ret_type,
+            fn_type.arg_types.iter(),
+            &*fn_type.ret_type,
+        )
     }
 
-    fn get_function_type_from_types(
+    fn get_function_type_from_types<'a, I, R1, R2>(
         &mut self,
         arg_types_rc: Vec<RcType>,
         ret_type_rc:  RcType,
-    ) -> SemaResult<RcType> {
+        arg_ranges:   I,
+        ret_range:    &R1,
+    ) -> SemaResult<RcType>
+        where I:  ExactSizeIterator<Item = &'a R2>,
+              R1: Ranged,
+              R2: Ranged + 'a {
+
+        let arg_types: Vec<_> = arg_types_rc.iter().map(RcCell::as_weak).collect();
+        let ret_type = ret_type_rc.as_weak();
+
+        self.validate_function_type_components(
+            arg_types.iter(),
+            &ret_type,
+            arg_ranges.map(|r| &*r), // items as pointers
+            ret_range,
+        )?;
+
         let key = (arg_types_rc.clone(), ret_type_rc.clone());
         let rc = self.sqir.function_types.entry(key).or_insert_with(|| {
-            let arg_types = arg_types_rc.iter().map(RcCell::as_weak).collect();
-            let ret_type = ret_type_rc.as_weak();
             let fn_type = FunctionType { arg_types, ret_type };
             RcCell::new(Type::Function(fn_type))
         });
 
         Ok(rc.clone())
+    }
+
+    // Helper for get_function_type_from_types()
+    fn validate_function_type_components<'a, T, I, R1, R2>(
+        &self,
+        arg_types:  T,
+        ret_type:   &WkType,
+        arg_ranges: I,
+        ret_range:  &R1,
+    ) -> SemaResult<()>
+        where T:  ExactSizeIterator<Item = &'a WkType>,
+              I:  ExactSizeIterator<Item = &'a R2>,
+              R1: Ranged,
+              R2: Ranged + 'a {
+
+        assert!(arg_types.len() == arg_ranges.len());
+
+        for (ty, range) in arg_types.zip(arg_ranges) {
+            self.validate_complex_type_item(
+                ty,
+                range,
+                ComplexTypeKind::Function,
+            )?
+        }
+
+        self.validate_complex_type_item(
+            ret_type,
+            ret_range,
+            ComplexTypeKind::Function,
+        )
     }
 
     fn get_named_type<R: Ranged>(&mut self, name: &str, range: &R) -> SemaResult<RcType> {
@@ -843,8 +931,8 @@ impl SQIRGen {
         lhs_class_type: &RcType,
         lhs_field_type: &Type,
         lhs_field_name: &str,
-        relation: &RelDecl,
-        range: &R,
+        relation:       &RelDecl,
+        range:          &R,
     ) -> SemaResult<()> {
         // Ensure that declared RHS cardinality matches with the field type
         let (lhs_card, rhs_card) = self.cardinalities_from_operator(relation.cardinality);
@@ -915,9 +1003,9 @@ impl SQIRGen {
     // impossible (one field can only declare one relation).
     fn define_unilateral_relation(
         &mut self,
-        lhs_type: &RcType,
-        rhs_type: &RcType,
-        lhs_field_name: &str,
+        lhs_type:        &RcType,
+        rhs_type:        &RcType,
+        lhs_field_name:  &str,
         lhs_cardinality: Cardinality,
         rhs_cardinality: Cardinality,
     ) -> SemaResult<()> {
@@ -947,7 +1035,12 @@ impl SQIRGen {
     // Otherwise, if the type is either not a relational type,
     // or it doesn't correspond to the specified cardinality,
     // then return an error.
-    fn validate_type_cardinality<R: Ranged>(&self, t: &Type, cardinality: Cardinality, range: &R) -> SemaResult<RcType> {
+    fn validate_type_cardinality<R: Ranged>(
+        &self,
+        t:           &Type,
+        cardinality: Cardinality,
+        range:       &R,
+    ) -> SemaResult<RcType> {
         let not_relational_error = || sema_error!(
             range,
             "Field type is not relational: {}",
@@ -1137,7 +1230,12 @@ impl SQIRGen {
         )?;
         let arg_types = self.arg_types_for_toplevel_func(&func.arguments)?;
 
-        self.get_function_type_from_types(arg_types, ret_type)
+        self.get_function_type_from_types(
+            arg_types,
+            ret_type,
+            func.arguments.iter(),
+            &func.ret_type.as_ref().map_or(func.range, Ranged::range),
+        )
     }
 
     fn arg_types_for_toplevel_func(&mut self, args: &[FuncArg]) -> SemaResult<Vec<RcType>> {
@@ -1367,8 +1465,12 @@ impl SQIRGen {
 
     fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> SemaResult<RcExpr> {
         let init_type_hint = match decl.ty {
-            Some(ref node) => Some(self.type_from_decl(node)?),
-            None           => None,
+            Some(ref node) => {
+                let ty = self.type_from_decl(node)?;
+                self.validate_complex_type_item(&ty.as_weak(), node, ComplexTypeKind::Function)?;
+                Some(ty)
+            },
+            None => None,
         };
 
         let init = self.generate_expr(&decl.expr, init_type_hint)?;
@@ -1540,7 +1642,12 @@ impl SQIRGen {
         let ret_type = body.borrow()?.ty.clone();
 
         // Form the function expression (XXX: assumes named func is global)
-        let ty = self.get_function_type_from_types(arg_types, ret_type)?;
+        let ty = self.get_function_type_from_types(
+            arg_types,
+            ret_type,
+            func.arguments.iter(),
+            &func.ret_type.as_ref().map_or(func.range, Ranged::range),
+        )?;
         let value = Value::Function(Function { args, body });
         let id = func.name.map_or_else(
             || self.next_temp_id(),

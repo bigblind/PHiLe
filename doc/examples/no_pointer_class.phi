@@ -1,0 +1,22 @@
+class User {
+    legal_name: String,
+    handle:     String,
+    email:      String,
+    avatar:     Image,
+}
+
+class OtherClass {
+}
+
+enum Image {
+    URL(String),
+    Data(Blob),
+}
+
+# substitue for unit testing: comment out pointers and see what happens
+fn foo(by_value: (([(&(User))])?)) -> [(((&(User,)),),)]? {
+    let x: &User? = nil;
+    let u: ([(User)]?,) = nil;
+    let lambda = |y: (&User,)| -> (((&User,)?)) { y };
+    by_value
+}

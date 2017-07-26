@@ -86,7 +86,7 @@ pub enum PlaceholderKind {
 }
 
 // A bit of terminology:
-// * Complex types include enum, struct, class and tuple types.
+// * Complex types include enum, struct, class, tuple and function types.
 // * Recursive but not complex types are pointers, optionals,
 //   and arrays.
 // * Placeholders are temporaries that stand in for named types.
@@ -98,10 +98,12 @@ pub enum PlaceholderKind {
 // * Product types are structs, classes and tuples.
 // * Value types are enums, structs, and tuples.
 // * Entity types are only classes (for now).
+// * Function types are... function types, obviously.
 #[derive(Debug, Clone, Copy)]
 pub enum ComplexTypeKind {
     Value,
     Entity,
+    Function,
 }
 
 #[derive(Debug)]
