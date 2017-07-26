@@ -113,19 +113,6 @@ pub fn generate_sqir(program: &[Item]) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
-fn format_type(t: &WkType) -> String {
-    let rc = match t.as_rc() {
-        Ok(rc) => rc,
-        Err(_) => return "[WkType; no backing RcCell]".to_owned(),
-    };
-    let ptr = match rc.borrow() {
-        Ok(ptr) => ptr,
-        Err(_)  => return "[WkType; not borrowable]".to_owned(),
-    };
-
-    format!("{:#?}", *ptr)
-}
-
 impl Ranged for TyCtx {
     fn range(&self) -> Range {
         self.range
@@ -594,8 +581,8 @@ impl SQIRGen {
 
             // Function types are not allowed within user-defined types
             Type::Function(_) => occurs_check_error!(
-                "Function type should not occur within user-defined type '{}'",
-                format_type(root),
+                "Function type should not occur within user-defined type {}",
+                WeakDisplay(root),
             ),
 
             // Occurs check is supposed to happen after type resolution
@@ -609,8 +596,8 @@ impl SQIRGen {
     fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> SemaResult<()> {
         if root.as_rc()? == child.as_rc()? {
             occurs_check_error!(
-                "Recursive type '{}' contains itself without indirection",
-                format_type(root),
+                "Recursive type {} contains itself without indirection",
+                WeakDisplay(root),
             )
         } else {
             self.occurs_check_type(root, child)
@@ -657,8 +644,8 @@ impl SQIRGen {
                     Type::Placeholder { kind: PlaceholderKind::Class, .. } => (),
                     _ => return sema_error!(
                         decl,
-                        "Pointer to non-class type '{}'",
-                        format_type(pointed_type),
+                        "Pointer to non-class type {}",
+                        *ptr,
                     ),
                 }
             },
@@ -768,27 +755,27 @@ impl SQIRGen {
     }
 
     fn get_bool_type(&self) -> RcType {
-        self.get_builtin_type("bool")
+        self.get_builtin_type(BUILTIN_NAME.bool_name)
     }
 
     fn get_int_type(&self) -> RcType {
-        self.get_builtin_type("int")
+        self.get_builtin_type(BUILTIN_NAME.int_name)
     }
 
     fn get_float_type(&self) -> RcType {
-        self.get_builtin_type("float")
+        self.get_builtin_type(BUILTIN_NAME.float_name)
     }
 
     fn get_string_type(&self) -> RcType {
-        self.get_builtin_type("String")
+        self.get_builtin_type(BUILTIN_NAME.string_name)
     }
 
     fn get_blob_type(&self) -> RcType {
-        self.get_builtin_type("Blob")
+        self.get_builtin_type(BUILTIN_NAME.blob_name)
     }
 
     fn get_date_type(&self) -> RcType {
-        self.get_builtin_type("Date")
+        self.get_builtin_type(BUILTIN_NAME.date_name)
     }
 
     //
@@ -963,7 +950,7 @@ impl SQIRGen {
     fn validate_type_cardinality<R: Ranged>(&self, t: &Type, cardinality: Cardinality, range: &R) -> SemaResult<RcType> {
         let not_relational_error = || sema_error!(
             range,
-            "Field type is not relational: '{:#?}'",
+            "Field type is not relational: {}",
             t,
         );
         let cardinality_mismatch_error = |name| sema_error!(
@@ -1292,8 +1279,8 @@ impl SQIRGen {
         sema_error!(
             ctx.range,
             "Cannot match types: expected {}; found {}",
-            format_type(&ty.as_weak()),
-            format_type(&expr_ref.ty.as_weak()),
+            *ty.borrow()?,
+            *expr_ref.ty.borrow()?,
         )
     }
 
@@ -1632,8 +1619,8 @@ impl SQIRGen {
                     sema_error!(
                         arg,
                         "Expected argument of type {}, found {}",
-                        format_type(&ty),
-                        format_type(&actual_type.as_weak()),
+                        *expected_type.borrow()?,
+                        *actual_type.borrow()?,
                     )
                 }
             },
@@ -1654,7 +1641,7 @@ impl SQIRGen {
                 _ => sema_error!(
                     ctx.range,
                     "Non-function type {} prescribed for function",
-                    format_type(&ty.as_weak()),
+                    *ty.borrow()?,
                 ),
             },
             None => Ok(None),
@@ -1701,8 +1688,8 @@ impl SQIRGen {
                     return sema_error!(
                         rt_decl,
                         "Expected return type {}, found {}",
-                        format_type(&t.ret_type),
-                        format_type(&self.type_from_decl(rt_decl)?.as_weak()),
+                        *expected_ret_type.borrow()?,
+                        *actual_ret_type.borrow()?,
                     )
                 }
             },

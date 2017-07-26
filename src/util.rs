@@ -9,6 +9,7 @@
 use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut };
 use std::hash::{ Hash, Hasher };
+use std::fmt::{ self, Display, Formatter };
 use error::{ DerefError, DerefResult, SyntaxResult };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -71,6 +72,9 @@ pub struct RcCell<T: ?Sized> {
 pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
+
+#[derive(Debug)]
+pub struct WeakDisplay<'a, T: 'a>(pub &'a WkCell<T>);
 
 
 pub fn grapheme_count(string: &str) -> usize {
@@ -160,5 +164,13 @@ impl<T> Clone for WkCell<T> {
         WkCell {
             ptr: self.ptr.clone()
         }
+    }
+}
+
+impl<'a, T> Display for WeakDisplay<'a, T> where T: Display {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let rc = self.0.as_rc().expect("cannot strongify WkCell");
+        let ptr = rc.borrow().expect("cannot borrow RcCell");
+        ptr.fmt(f)
     }
 }

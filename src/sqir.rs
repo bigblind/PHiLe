@@ -21,8 +21,30 @@ pub type WkExpr = WkCell<Expr>;
 // Types (part of the Schema)
 //
 
+#[derive(Debug, Clone, Copy)]
+pub struct BuiltinName {
+    pub bool_name:    &'static str,
+    pub int_name:     &'static str,
+    pub float_name:   &'static str,
+    pub decimal_name: &'static str,
+    pub string_name:  &'static str,
+    pub blob_name:    &'static str,
+    pub date_name:    &'static str,
+}
+
+pub static BUILTIN_NAME: BuiltinName = BuiltinName {
+    bool_name:    "bool",
+    int_name:     "int",
+    float_name:   "float",
+    decimal_name: "Decimal",
+    string_name:  "String",
+    blob_name:    "Blob",
+    date_name:    "Date",
+};
+
 #[derive(Debug)]
 pub enum Type {
+    // Numeric and Complex Built-in Types
     Bool,
     Int,
     Float,
@@ -35,17 +57,21 @@ pub enum Type {
     Blob,
     Date,
 
+    // Container/Wrapper Types
     Optional(WkType),
     Pointer(WkType),
     Array(WkType),
     Tuple(Vec<WkType>),
 
+    // User-defined Types
     Enum(EnumType),
     Struct(StructType),
     Class(ClassType),
 
+    // Function Type
     Function(FunctionType),
 
+    // Placeholder Type (only in type graph during typechecking)
     Placeholder {
         name: String,
         kind: PlaceholderKind,
@@ -326,6 +352,65 @@ pub fn unwrap_class_name(class: &RcType) -> String {
     }
 }
 
+fn write_many_types(f: &mut Formatter, types: &[WkType]) -> fmt::Result {
+    f.write_str("(")?;
+
+    for (index, ty) in types.iter().enumerate() {
+        let sep = if index > 0 { ", " } else { "" };
+        write!(f, "{}{}", sep, WeakDisplay(ty))?
+    }
+
+    f.write_str(")")
+}
+
+fn write_decimal_type(f: &mut Formatter, integral: usize, fractional: usize) -> fmt::Result {
+    write!(
+        f,
+        "{}<{}.{}>",
+        BUILTIN_NAME.decimal_name,
+        integral,
+        fractional
+    )
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match *self {
+            Type::Bool   => f.write_str(BUILTIN_NAME.bool_name),
+            Type::Int    => f.write_str(BUILTIN_NAME.int_name),
+            Type::Float  => f.write_str(BUILTIN_NAME.float_name),
+            Type::String => f.write_str(BUILTIN_NAME.string_name),
+            Type::Blob   => f.write_str(BUILTIN_NAME.blob_name),
+            Type::Date   => f.write_str(BUILTIN_NAME.date_name),
+
+            Type::Decimal { integral, fractional } => {
+                write_decimal_type(f, integral, fractional)
+            },
+            Type::Optional(ref wrapped) => {
+                write!(f, "({})?", WeakDisplay(wrapped))
+            },
+            Type::Pointer(ref pointed) => {
+                write!(f, "&({})", WeakDisplay(pointed))
+            },
+            Type::Array(ref element) => {
+                write!(f, "[{}]", WeakDisplay(element))
+            },
+            Type::Function(ref ty) => {
+                write_many_types(f, &ty.arg_types)?;
+                write!(f, " -> {}", WeakDisplay(&ty.ret_type))
+            },
+            Type::Placeholder { ref name, kind } => {
+                write!(f, "Placeholder({}, kind: {})", name, kind)
+            },
+
+            Type::Tuple(ref types) => write_many_types(f, types),
+            Type::Enum(ref e)   => f.write_str(&e.name),
+            Type::Struct(ref s) => f.write_str(&s.name),
+            Type::Class(ref c)  => f.write_str(&c.name),
+        }
+    }
+}
+
 impl_display_as_debug! {
     PlaceholderKind,
     Cardinality,
@@ -376,14 +461,13 @@ impl Ord for Relation {
 
 impl SQIR {
     pub fn new() -> SQIR {
-        // TODO(H2CO3): match these with get_bool_type(), etc. in sqirgen.rs
         let named_types = btree_map![
-            "bool"   => RcCell::new(Type::Bool),
-            "int"    => RcCell::new(Type::Int),
-            "float"  => RcCell::new(Type::Float),
-            "String" => RcCell::new(Type::String),
-            "Blob"   => RcCell::new(Type::Blob),
-            "Date"   => RcCell::new(Type::Date),
+            BUILTIN_NAME.bool_name   => RcCell::new(Type::Bool),
+            BUILTIN_NAME.int_name    => RcCell::new(Type::Int),
+            BUILTIN_NAME.float_name  => RcCell::new(Type::Float),
+            BUILTIN_NAME.string_name => RcCell::new(Type::String),
+            BUILTIN_NAME.blob_name   => RcCell::new(Type::Blob),
+            BUILTIN_NAME.date_name   => RcCell::new(Type::Date),
         ];
 
         SQIR {
