@@ -113,6 +113,14 @@ pub fn generate_sqir(program: &[Item]) -> SemaResult<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
+// This is to be used ONLY when you know you have a Class type
+fn unwrap_class_name(class: &RcType) -> String {
+    match *class.borrow().expect("Cannot borrow Type::Class?!") {
+        Type::Class(ref c) => c.name.clone(),
+        _ => unreachable!("Non-class class type?!"),
+    }
+}
+
 impl Ranged for TyCtx {
     fn range(&self) -> Range {
         self.range
@@ -1497,6 +1505,8 @@ impl SQIRGen {
     }
 
     fn generate_cast(&mut self, _ctx: TyCtx, _expr: &Exp, _ty: &Ty) -> SemaResult<RcExpr> {
+        // TODO(H2CO3): the type on the RHS must be checked using
+        // validate_complex_type_item(ComplexTypeKind::Function)!
         unimplemented!()
     }
 

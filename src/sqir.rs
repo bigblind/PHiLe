@@ -346,14 +346,6 @@ pub struct SQIR {
 }
 
 
-// This is to be used ONLY when you know you have a Class type
-pub fn unwrap_class_name(class: &RcType) -> String {
-    match *class.borrow().expect("Cannot borrow Type::Class?!") {
-        Type::Class(ref c) => c.name.clone(),
-        _ => unreachable!("Non-class class type?!"),
-    }
-}
-
 fn write_many_types(f: &mut Formatter, types: &[WkType]) -> fmt::Result {
     f.write_str("(")?;
 
@@ -424,12 +416,20 @@ impl PartialOrd for RelationSide {
     }
 }
 
-// TODO(H2CO3): 2 calls to unwrap_class_name() means 2 allocations
-// per comparison. This is grossly wasteful and should be improved.
 impl Ord for RelationSide {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_name  = unwrap_class_name(&self.class);
-        let other_name = unwrap_class_name(&other.class);
+        let self_ref = self.class.borrow().expect("self class");
+        let other_ref = other.class.borrow().expect("other class");
+
+        let self_name = match *self_ref {
+            Type::Class(ref c) => &c.name,
+            _ => unreachable!("Non-Class class type?!"),
+        };
+        let other_name = match *other_ref {
+            Type::Class(ref c) => &c.name,
+            _ => unreachable!("Non-Class class type?!"),
+        };
+
         let lhs = (self_name,  &self.field,  self.cardinality);
         let rhs = (other_name, &other.field, other.cardinality);
 
