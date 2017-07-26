@@ -32,6 +32,7 @@ pub enum Item<'a> {
 pub enum ExpKind<'a> {
     CondExp(Box<CondExp<'a>>), // ?: Elvis operator
     BinaryOp(Box<BinaryOp<'a>>),
+    Cast(Box<Exp<'a>>, Ty<'a>),
 
     UnaryPlus(Box<Exp<'a>>),    // }
     UnaryMinus(Box<Exp<'a>>),   // } Prefix ops

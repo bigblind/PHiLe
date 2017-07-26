@@ -1,0 +1,17 @@
+# fn casts_0() -> float {
+#    let n: int = 42;
+#    n as float
+# }
+# 
+# fn casts_1(x: ()) -> String? {
+#    "foo" as String as String?
+# }
+
+fn ranges_0(n: int, k: int) {
+   let half_open = n..(k...0);
+   let closed = n...k;
+}
+
+fn comparisons(a: float, b: float) -> bool {
+    a <= b > c
+}

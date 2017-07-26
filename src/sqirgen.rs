@@ -1318,6 +1318,7 @@ impl SQIRGen {
             ExpKind::Empty                => self.generate_empty_stmt(ctx.clone()),
             ExpKind::Semi(ref expr)       => self.generate_semi(expr),
             ExpKind::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
+            ExpKind::Cast(ref ex, ref ty) => self.generate_cast(ctx.clone(), ex, ty),
             ExpKind::TupleLiteral(ref vs) => self.generate_tuple(ctx.clone(), vs),
             ExpKind::ArrayLiteral(ref vs) => self.generate_array(ctx.clone(), vs),
             ExpKind::Block(ref items)     => self.generate_block(ctx.clone(), items),
@@ -1492,6 +1493,10 @@ impl SQIRGen {
     }
 
     fn generate_binary_op(&mut self, _ctx: TyCtx, _op: &ast::BinaryOp) -> SemaResult<RcExpr> {
+        unimplemented!()
+    }
+
+    fn generate_cast(&mut self, _ctx: TyCtx, _expr: &Exp, _ty: &Ty) -> SemaResult<RcExpr> {
         unimplemented!()
     }
 

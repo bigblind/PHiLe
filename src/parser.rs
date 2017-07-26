@@ -47,6 +47,7 @@ fn is_keyword(lexeme: &str) -> bool {
         "if",
         "else",
         "match",
+        "as",
         "nil",
         "true",
         "false",
@@ -131,6 +132,13 @@ impl<'a> Parser<'a> {
     fn is_at(&self, lexeme: &str) -> bool {
         match self.next_token() {
             Some(token) => token.value == lexeme,
+            None        => false,
+        }
+    }
+
+    fn is_at_one_of(&self, lexemes: &[&str]) -> bool {
+        match self.next_token() {
+            Some(token) => lexemes.contains(&token.value),
             None        => false,
         }
     }
@@ -396,18 +404,11 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_expr(&mut self) -> ExpResult<'a> {
-        self.parse_assign_expr()
-    }
-
-    fn parse_assign_expr(&mut self) -> ExpResult<'a> {
-        self.parse_binop_rightassoc(
-            &["=", "+=", "-=", "*=", "/=", "%="],
-            Self::parse_cond_expr
-        )
+        self.parse_cond_expr()
     }
 
     fn parse_cond_expr(&mut self) -> ExpResult<'a> {
-        let condition = self.parse_or_expr()?;
+        let condition = self.parse_range_expr()?;
 
         if self.accept("?").is_none() {
             return Ok(condition)
@@ -422,6 +423,13 @@ impl<'a> Parser<'a> {
         let kind = ExpKind::CondExp(Box::new(expr));
 
         Ok(Exp { kind, range })
+    }
+
+    fn parse_range_expr(&mut self) -> ExpResult<'a> {
+        self.parse_binop_noassoc(
+            &["..", "..."],
+            Self::parse_or_expr
+        )
     }
 
     fn parse_or_expr(&mut self) -> ExpResult<'a> {
@@ -439,7 +447,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_comparison_expr(&mut self) -> ExpResult<'a> {
-        self.parse_binop_leftassoc(
+        self.parse_binop_noassoc(
             &["==", "!=", "<", ">", "<=", ">="],
             Self::parse_additive_expr
         )
@@ -455,8 +463,22 @@ impl<'a> Parser<'a> {
     fn parse_multiplicative_expr(&mut self) -> ExpResult<'a> {
         self.parse_binop_leftassoc(
             &["*", "/", "%"],
-            Self::parse_prefix_expr
+            Self::parse_cast_expr
         )
+    }
+
+    fn parse_cast_expr(&mut self) -> ExpResult<'a> {
+        let mut expr = self.parse_prefix_expr()?;
+
+        while self.accept("as").is_some() {
+            let ty = self.parse_type()?;
+            let range = make_range(&expr, &ty);
+            let kind = ExpKind::Cast(Box::new(expr), ty);
+
+            expr = Exp { kind, range };
+        }
+
+        Ok(expr)
     }
 
     fn parse_prefix_expr(&mut self) -> ExpResult<'a> {
@@ -676,10 +698,10 @@ impl<'a> Parser<'a> {
 
         let mut lhs = subexpr(self)?;
 
-        while let Some(tok) = self.accept_one_of(tokens) {
+        while let Some(token) = self.accept_one_of(tokens) {
             let rhs = subexpr(self)?;
             let range = make_range(&lhs, &rhs);
-            let op = tok.value;
+            let op = token.value;
             let expr = BinaryOp { op, lhs, rhs };
             let kind = ExpKind::BinaryOp(Box::new(expr));
 
@@ -694,14 +716,40 @@ impl<'a> Parser<'a> {
 
         let lhs = subexpr(self)?;
 
-        if let Some(tok) = self.accept_one_of(tokens) {
+        if let Some(token) = self.accept_one_of(tokens) {
             let rhs = self.parse_binop_rightassoc(tokens, subexpr)?;
             let range = make_range(&lhs, &rhs);
-            let op = tok.value;
+            let op = token.value;
             let expr = BinaryOp { op, lhs, rhs };
             let kind = ExpKind::BinaryOp(Box::new(expr));
 
             Ok(Exp { kind, range })
+        } else {
+            Ok(lhs)
+        }
+    }
+
+    fn parse_binop_noassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ExpResult<'a>
+        where F: Fn(&mut Self) -> ExpResult<'a> {
+
+        let lhs = subexpr(self)?;
+
+        if let Some(token) = self.accept_one_of(tokens) {
+            let rhs = subexpr(self)?;
+            let op = token.value;
+
+            if self.is_at_one_of(tokens) {
+                let message = format!("Binary operator {} is not associative", op);
+                let range = self.next_token().map(Ranged::range);
+
+                Err(SyntaxError { message, range })
+            } else {
+                let range = make_range(&lhs, &rhs);
+                let expr = BinaryOp { op, lhs, rhs };
+                let kind = ExpKind::BinaryOp(Box::new(expr));
+
+                Ok(Exp { kind, range })
+            }
         } else {
             Ok(lhs)
         }
