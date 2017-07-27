@@ -488,7 +488,7 @@ impl SQIR {
     // Relations can be stored either once or twice in the
     // `relations` field (because they need to be associated
     // with named sides for easy querygen), but schemagen
-    // still requireds a non-redundant set of relations.
+    // still requires a non-redundant set of relations.
     // By convention, `relations` contains relations in a
     // way that the RelationSide corresponding to the key
     // appears on the LHS, whereas the referred RelationSide

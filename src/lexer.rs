@@ -107,7 +107,7 @@ impl<'a> Lexer<'a> {
         Lexer {
             source:   "",
             location: Location::default(),
-            tokens:   vec![],
+            tokens:   Vec::new(),
             regexes:  [
                 (TokenKind::Whitespace,     Regex::new(r"^\s+").unwrap()),
                 (TokenKind::Comment,        Regex::new(r"^#[^\n]*\n?").unwrap()),

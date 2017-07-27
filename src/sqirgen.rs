@@ -1574,7 +1574,7 @@ impl SQIRGen {
 
                 (items, last_ty)
             },
-            None => (vec![], self.get_unit_type()),
+            None => (Vec::new(), self.get_unit_type()),
         };
 
         let value = Value::Seq(items);

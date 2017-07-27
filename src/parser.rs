@@ -146,7 +146,7 @@ impl<'a> Parser<'a> {
     // Actual parser methods
 
     fn parse(mut self) -> ProgResult<'a> {
-        let mut items = vec![];
+        let mut items = Vec::new();
 
         while self.has_tokens() {
             items.push(self.parse_toplevel()?);
@@ -173,7 +173,7 @@ impl<'a> Parser<'a> {
     //
 
     fn parse_struct_or_class(&mut self) -> ItemResult<'a> {
-        let mut fields = vec![];
+        let mut fields = Vec::new();
 
         let keyword = self.expect_one_of(&["struct", "class"])?;
         let name = self.expect_identifier()?.value;
@@ -237,7 +237,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_enum(&mut self) -> ItemResult<'a> {
-        let mut variants = vec![];
+        let mut variants = Vec::new();
 
         let enum_keyword = self.expect("enum")?;
         let name = self.expect_identifier()?.value;
@@ -315,7 +315,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_impl(&mut self) -> ItemResult<'a> {
-        let mut functions = vec![];
+        let mut functions = Vec::new();
         let impl_keyword = self.expect("impl")?;
         let name = self.expect_identifier()?.value;
 
@@ -675,7 +675,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_block(&mut self) -> ExpResult<'a> {
-        let mut items = vec![];
+        let mut items = Vec::new();
         let open_brace = self.expect("{")?;
 
         while self.has_tokens() && !self.is_at("}") {
@@ -877,7 +877,7 @@ impl<'a> Parser<'a> {
     ) -> SyntaxResult<(Vec<V>, Range)>
         where P: Fn(&mut Self) -> SyntaxResult<V> {
 
-        let mut items = vec![];
+        let mut items = Vec::new();
         let open_tok = self.expect(open)?;
 
         while self.has_tokens() && !self.is_at(close) {
