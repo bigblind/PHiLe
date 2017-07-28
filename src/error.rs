@@ -16,6 +16,33 @@ use lexer::Range;
 use util::COLOR;
 
 
+// Indicates a compiler error. Basically a non-panicking 'unreachable'.
+macro_rules! bug {
+    () => { bug!("internal inconsistency") };
+    ($msg: expr) => { bug!("{}", $msg) };
+    ($fmt: expr, $($args: expr),+) => {
+        return Err(Error::Unreachable {
+            message: format!($fmt, $($args),+),
+            file:    file!(),
+            line:    line!() as usize,
+        })
+    };
+    ($fmt: expr, $($args: expr),+,) => {
+        bug!($fmt, $($args),+)
+    };
+}
+
+macro_rules! lazy_bug {
+    ($msg: expr) => {
+        || Error::Unreachable {
+            message: $msg.into(),
+            file:    file!(),
+            line:    line!() as usize,
+        }
+    }
+}
+
+
 // TODO(H2CO3): storing a stacktrace at the point of the failed
 // borrow, strongification, or unreachable code would be nice.
 #[derive(Debug)]

@@ -123,11 +123,11 @@ impl<T> RcCell<T> {
     }
 
     pub fn borrow(&self) -> Result<Ref<T>> {
-        self.ptr.try_borrow().map_err(Error::from)
+        self.ptr.try_borrow().map_err(From::from)
     }
 
     pub fn borrow_mut(&self) -> Result<RefMut<T>> {
-        self.ptr.try_borrow_mut().map_err(Error::from)
+        self.ptr.try_borrow_mut().map_err(From::from)
     }
 
     pub fn as_weak(&self) -> WkCell<T> {

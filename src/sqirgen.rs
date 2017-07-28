@@ -114,10 +114,10 @@ pub fn generate_sqir(program: &[Item]) -> Result<SQIR> {
 }
 
 // This is to be used ONLY when you know you have a Class type
-fn unwrap_class_name(class: &RcType) -> String {
-    match *class.borrow().expect("Cannot borrow Type::Class?!") {
-        Type::Class(ref c) => c.name.clone(),
-        _ => unreachable!("Non-class class type?!"),
+fn unwrap_class_name(class: &RcType) -> Result<String> {
+    match *class.borrow()? {
+        Type::Class(ref c) => Ok(c.name.clone()),
+        ref ty => bug!("Non-class class type?! {}", ty),
     }
 }
 
@@ -258,17 +258,17 @@ impl SQIRGen {
         match self.sqir.relations.get(&rhs_key) {
             None => return reciprocity_error!(
                 "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
-                unwrap_class_name(&lhs_type),
+                unwrap_class_name(&lhs_type)?,
                 lhs_field,
-                unwrap_class_name(&rhs_type),
+                unwrap_class_name(&rhs_type)?,
                 rhs_field,
             ),
             Some(ref inverse_relation) => if relation != *inverse_relation {
                 return reciprocity_error!(
                     "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
-                    unwrap_class_name(&lhs_type),
+                    unwrap_class_name(&lhs_type)?,
                     lhs_field,
-                    unwrap_class_name(&rhs_type),
+                    unwrap_class_name(&rhs_type)?,
                     rhs_field,
                 )
             },
@@ -415,7 +415,7 @@ impl SQIRGen {
         for variant in &decl.variants {
             let type_rc = match variant.ty {
                 Some(ref d) => self.type_from_decl(d)?,
-                None        => self.get_unit_type(),
+                None        => self.get_unit_type()?,
             };
 
             let type_wk = type_rc.as_weak();
@@ -633,7 +633,7 @@ impl SQIRGen {
             ),
 
             // Occurs check is supposed to happen after type resolution
-            Type::Placeholder { ref name, .. } => unreachable!(
+            Type::Placeholder { ref name, .. } => bug!(
                 "Placeholder type '{}' should have been resolved by now",
                 name,
             ),
@@ -696,7 +696,7 @@ impl SQIRGen {
                     ),
                 }
             },
-            _ => unreachable!("Non-pointer pointer type?!"),
+            ref ty => bug!("Non-pointer pointer type?! {}", ty),
         }
 
         Ok(pointer_type)
@@ -842,8 +842,8 @@ impl SQIRGen {
         }
     }
 
-    fn get_unit_type(&mut self) -> RcType {
-        self.get_tuple_type(&[]).expect("can't create unit type?!")
+    fn get_unit_type(&mut self) -> Result<RcType> {
+        self.get_tuple_type(&[])
     }
 
     fn get_builtin_type(&self, name: &str) -> RcType {
@@ -893,7 +893,7 @@ impl SQIRGen {
 
         let class = match *class_type {
             Type::Class(ref c) => c,
-            _ => unreachable!("Non-class class type?!"),
+            ref ty => bug!("Non-class class type?! {}", ty),
         };
 
         let field_type_rc = class.fields[field.name].as_rc()?;
@@ -972,7 +972,7 @@ impl SQIRGen {
                     rhs_field_name,
                 )
             },
-            _ => unreachable!("Non-class class type?!"),
+            ref ty => bug!("Non-class class type?! {}", ty),
         }
 
         // The rest of the validation is a separate task,
@@ -1000,7 +1000,7 @@ impl SQIRGen {
         if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_none() {
             Ok(())
         } else {
-            unreachable!("Duplicate relation for field '{}'", lhs_field_name)
+            bug!("Duplicate relation for field '{}'", lhs_field_name)
         }
     }
 
@@ -1033,7 +1033,7 @@ impl SQIRGen {
         if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_none() {
             Ok(())
         } else {
-            unreachable!("Duplicate relation for field '{}'", lhs_field_name)
+            bug!("Duplicate relation for field '{}'", lhs_field_name)
         }
     }
 
@@ -1123,7 +1123,7 @@ impl SQIRGen {
         if self.sqir.relations.insert(key, Relation { lhs, rhs }).is_none() {
             Ok(())
         } else {
-            unreachable!("Duplicate relation for field '{}'", field_name)
+            bug!("Duplicate relation for field '{}'", field_name)
         }
     }
 
@@ -1178,7 +1178,7 @@ impl SQIRGen {
     //
 
     fn forward_declare_free_function(&mut self, func: &ast::Function) -> Result<()> {
-        let name = func.name.expect("function name");
+        let name = func.name.ok_or_else(lazy_bug!("No function name"))?;
         let ty = self.compute_type_of_function(func)?;
         let value = Value::Placeholder;
         let id = ExprId::Global(name.to_owned()); // XXX: assumes that function is global
@@ -1218,7 +1218,7 @@ impl SQIRGen {
         let mut ns = BTreeMap::new();
 
         for (ty, func) in types.into_iter().zip(funcs) {
-            let name = func.name.expect("function name");
+            let name = func.name.ok_or_else(lazy_bug!("No function name"))?;
             let value = Value::Placeholder;
             let id = ExprId::Global(name.to_owned()); // XXX: assumes function is global
             let expr = RcCell::new(Expr { ty, value, id });
@@ -1233,7 +1233,7 @@ impl SQIRGen {
 
     fn compute_type_of_function(&mut self, func: &ast::Function) -> Result<RcType> {
         let ret_type = func.ret_type.as_ref().map_or(
-            Ok(self.get_unit_type()),
+            self.get_unit_type(),
             |rt| self.type_from_decl(rt),
         )?;
         let arg_types = self.arg_types_for_toplevel_func(&func.arguments)?;
@@ -1292,9 +1292,9 @@ impl SQIRGen {
         };
         let expr = self.generate_function(ctx, func)?;
         let expr_ref = expr.borrow()?;
-        let name = func.name.expect("function name");
-        let ns = self.sqir.globals.get_mut(ns).expect("namespace");
-        let mut slot = ns.get(name).expect("forward-declared function").borrow_mut()?;
+        let name = func.name.ok_or_else(lazy_bug!("No function name"))?;
+        let ns = self.sqir.globals.get_mut(ns).ok_or_else(lazy_bug!("No namespace"))?;
+        let mut slot = ns.get(name).ok_or_else(lazy_bug!("No forward-declared function"))?.borrow_mut()?;
 
         // Sanity-check generate_function(), then replace
         // placeholder expr with actual, generated function
@@ -1302,7 +1302,7 @@ impl SQIRGen {
 
         slot.value = match expr_ref.value {
             Value::Function(ref func) => Value::Function(func.clone()),
-            _ => unreachable!("Global function compiled to non-Function value?!"),
+            ref val => bug!("Global function compiled to non-Function value?! {:#?}", val),
         };
 
         Ok(())
@@ -1494,7 +1494,7 @@ impl SQIRGen {
 
     fn generate_semi(&mut self, node: &Exp) -> Result<RcExpr> {
         let subexpr = self.generate_expr(node, None)?;
-        let ty = self.get_unit_type();
+        let ty = self.get_unit_type()?;
         let value = Value::Ignore(subexpr);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
@@ -1559,7 +1559,7 @@ impl SQIRGen {
 
     fn generate_block(&mut self, ctx: TyCtx, nodes: &[Exp]) -> Result<RcExpr> {
         #[allow(unused_variables)]
-        let scope_guard = self.begin_local_scope();
+        let scope_guard = self.begin_local_scope()?;
 
         let (items, ty) = match nodes.split_last() {
             Some((last, firsts)) => {
@@ -1574,7 +1574,7 @@ impl SQIRGen {
 
                 (items, last_ty)
             },
-            None => (Vec::new(), self.get_unit_type()),
+            None => (Vec::new(), self.get_unit_type()?),
         };
 
         let value = Value::Seq(items);
@@ -1594,7 +1594,7 @@ impl SQIRGen {
     fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> Result<RcExpr> {
         use std::collections::hash_map::Entry::{ Vacant, Occupied };
 
-        let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
+        let mut locals = self.locals.borrow_mut()?;
 
         // insert into map of all transitively-visible locals
         let decl = match locals.var_map.entry(name.to_owned()) {
@@ -1607,7 +1607,7 @@ impl SQIRGen {
         };
 
         // Add name to innermost (topmost) scope on the stack
-        let scope = locals.scope_stack.last_mut().expect("no innermost scope found");
+        let scope = locals.scope_stack.last_mut().ok_or_else(lazy_bug!("no innermost scope"))?;
         scope.push(name.to_owned());
 
         Ok(decl)
@@ -1618,10 +1618,10 @@ impl SQIRGen {
     // The caller must hold on to the returned ScopeGuard as long as
     // s/he wishes to keep the scope open. ScopeGuard::drop() will
     // remove the topmost/innermost scope and all its declarations.
-    fn begin_local_scope(&mut self) -> ScopeGuard {
-        let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
+    fn begin_local_scope(&mut self) -> Result<ScopeGuard> {
+        let mut locals = self.locals.borrow_mut()?;
         locals.scope_stack.push(Vec::new());
-        ScopeGuard { locals: self.locals.clone() }
+        Ok(ScopeGuard { locals: self.locals.clone() })
     }
 
     //
@@ -1644,7 +1644,7 @@ impl SQIRGen {
 
         // Declare function arguments before generating body
         #[allow(unused_variables)]
-        let scope_guard = self.begin_local_scope();
+        let scope_guard = self.begin_local_scope()?;
         let arg_types = self.arg_types_for_function(func, &type_hint)?;
         let args = self.declare_function_arguments(func, &arg_types)?;
         let tmp_args = args.clone();
@@ -1673,7 +1673,7 @@ impl SQIRGen {
         // Fix arguments so that they actually point back to the function.
         // A copy of the original `args` vector is used, which should be
         // OK, since they both contain pointers to the same set of Exprs.
-        Self::fixup_function_arguments(tmp_args, &expr);
+        Self::fixup_function_arguments(tmp_args, &expr)?;
 
         Ok(expr)
     }
@@ -1698,14 +1698,15 @@ impl SQIRGen {
         ).collect()
     }
 
-    fn fixup_function_arguments(args: Vec<RcExpr>, fn_expr: &RcExpr) {
-        // TODO(H2CO3): do not unwrap()/expect() return value of borrow_mut()
+    fn fixup_function_arguments(args: Vec<RcExpr>, fn_expr: &RcExpr) -> Result<()> {
         for arg in args {
-            match arg.borrow_mut().expect("argument not borrowable").value {
+            match arg.borrow_mut()?.value {
                 Value::FuncArg { ref mut func, .. } => *func = fn_expr.as_weak(),
-                _ => unreachable!("Non-FuncArg argument?!"),
+                ref val => bug!("Non-FuncArg argument?! {:#?}", val),
             }
         }
+
+        Ok(())
     }
 
     fn arg_types_for_function(
@@ -1830,7 +1831,7 @@ impl SQIRGen {
 
         let ret_type = match func.ret_type {
             Some(ref rt_decl) => self.type_from_decl(rt_decl)?,
-            None              => self.get_unit_type(),
+            None              => self.get_unit_type()?,
         };
 
         Ok(Some(ret_type))

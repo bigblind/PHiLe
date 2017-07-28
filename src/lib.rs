@@ -23,6 +23,7 @@ extern crate unicode_segmentation;
 
 #[macro_use]
 pub mod util;
+#[macro_use]
 pub mod error;
 pub mod lexer;
 pub mod ast;
