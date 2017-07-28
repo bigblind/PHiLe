@@ -7,7 +7,7 @@
 //
 
 use std::io;
-use error::Result;
+use error::{ Error, Result };
 use codegen::*;
 use sqir::*;
 use declgen::go::*;
@@ -41,7 +41,7 @@ fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) 
             let prefixed_name = namespace_or("").to_owned() + "_" + raw_name;
             let name = transform_func_name(&prefixed_name, params);
             let wptr = wp(&file_name)?;
-            let mut wr = wptr.borrow_mut();
+            let mut wr = wptr.try_borrow_mut()?;
 
             write_global(&mut *wr, &name, &*expr.borrow()?, params)?;
         }
@@ -55,12 +55,12 @@ fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenPar
 
     let ty = match *ty_ptr {
         Type::Function(ref ty) => ty,
-        _ => unreachable!("Non-Function global?!"),
+        ref t => bug!("Non-Function global?! {}", t),
     };
 
     let func = match expr.value {
         Value::Function(ref func) => func,
-        _ => unreachable!("Non-Function global?!"),
+        ref val => bug!("Non-Function global?! {:#?}", val),
     };
 
     generate_function(wr, name, ty, func, params)
@@ -90,7 +90,7 @@ fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> R
     writeln!(wr)?;
 
     match ptr.value {
-        Value::Placeholder => unreachable!("Placeholder should have been replaced"),
+        Value::Placeholder        => bug!("Placeholder should have been replaced"),
         Value::Nil                => generate_nil_literal(wr, &ptr.id, params),
         Value::BoolConst(b)       => generate_bool_literal(wr, &ptr.id, b, params),
         Value::IntConst(n)        => generate_int_literal(wr, &ptr.id, n, params),
@@ -195,10 +195,10 @@ fn generate_function(
         match ptr.value {
             Value::FuncArg { index, .. } => match ptr.id {
                 ExprId::Local(_) => if index > 0 { write!(wr, ", ")? },
-                ExprId::Global(_) => unreachable!("FuncArg is global?!"),
-                ExprId::Temp(_) => unreachable!("FuncArg has no name?!"),
+                ExprId::Global(ref name) => bug!("FuncArg is global {}?!", name),
+                ExprId::Temp(index) => bug!("FuncArg is temporary {}?!", index),
             },
-            _ => unreachable!("Non-FuncArg argument?!"),
+            ref val => bug!("Non-FuncArg argument?! {:#?}", val),
         }
 
         write_expr_decl(wr, arg, params)?;

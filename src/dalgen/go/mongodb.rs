@@ -17,7 +17,7 @@ use util::*;
 pub fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     let file_name = NAMING_CONVENTION.top_basename.to_owned() + ".go";
     let wptr = wp(&file_name)?;
-    let mut wr = wptr.borrow_mut();
+    let mut wr = wptr.try_borrow_mut()?;
     let package_name = params.namespace.as_ref().map(
         |ns| transform_namespace(ns, params)
     ).ok_or_else(

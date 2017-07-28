@@ -71,7 +71,7 @@ impl<'a> Generator<'a> {
         for (name, ty) in &self.sqir.named_types {
             // primitive named types have no associated writer
             let mut wr = match wrs.get(name) {
-                Some(w) => w.borrow_mut(),
+                Some(w) => w.try_borrow_mut()?,
                 None    => continue,
             };
 
@@ -79,7 +79,7 @@ impl<'a> Generator<'a> {
                 Type::Struct(ref st) => self.write_fields(&mut *wr, name, &st.fields)?,
                 Type::Class(ref ct)  => self.write_fields(&mut *wr, name, &ct.fields)?,
                 Type::Enum(ref et)   => self.write_variants(&mut *wr, name, &et.variants)?,
-                _ => unreachable!("Attempt to declare primitive type?!"),
+                ref t => bug!("Attempt to declare primitive type {}?!", t),
             }
         }
 
@@ -107,7 +107,7 @@ impl<'a> Generator<'a> {
     fn writer_with_preamble(&mut self, name: &str) -> Result<Rc<RefCell<io::Write>>> {
         let file_name = name.to_owned() + ".go";
         let wptr = (self.wp)(&file_name)?;
-        write_header(&mut *wptr.borrow_mut(), &self.params)?;
+        write_header(&mut *wptr.try_borrow_mut()?, &self.params)?;
         Ok(wptr)
     }
 
@@ -220,7 +220,7 @@ pub fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> Re
         Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, params))?,
 
         Type::Function(ref ft) => write_function_type(wr, ft, params)?,
-        Type::Placeholder { ref name, kind } => unreachable!("Unresolved Placeholder({}, {})", name, kind),
+        Type::Placeholder { ref name, kind } => bug!("Unresolved Placeholder({}, {})", name, kind),
     }
 
     Ok(())

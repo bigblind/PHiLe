@@ -194,7 +194,7 @@ impl<'a> Parser<'a> {
             "class" => Item::ClassDecl(
                 ClassDecl { range, name, fields }
             ),
-            lexeme => unreachable!("Forgot to handle '{}'", lexeme),
+            lexeme => bug!("Forgot to handle '{}'", lexeme),
         };
 
         Ok(item)
@@ -518,7 +518,7 @@ impl<'a> Parser<'a> {
         let kind = match op {
             "."  => ExpKind::MemberAccess(MemberAccess { base, member }),
             "::" => ExpKind::QualAccess(QualAccess { base, member }),
-            _    => unreachable!("forgot to handle '{}'", op),
+            _    => bug!("forgot to handle '{}'", op),
         };
 
         Ok(Exp { kind, range })
@@ -572,7 +572,7 @@ impl<'a> Parser<'a> {
                 "nil"   => ExpKind::NilLiteral,
                 "true"  => ExpKind::BoolLiteral(true),
                 "false" => ExpKind::BoolLiteral(false),
-                lexeme  => unreachable!("forgot to handle '{}'", lexeme),
+                lexeme  => bug!("forgot to handle '{}'", lexeme),
             };
             return Ok(Exp { kind, range });
         }
