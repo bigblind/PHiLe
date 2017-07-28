@@ -6,15 +6,15 @@
 // on 02/06/2017
 //
 
-use std::io;
+use error::Result;
 use codegen::*;
 use sqir::*;
 
 
-pub fn generate_pod(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_pod(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
     unimplemented!()
 }
 
-pub fn generate_active_record(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_active_record(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
     unimplemented!()
 }

@@ -19,7 +19,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::{ self, stderr };
 use std::io::prelude::*;
-use phile::util::PACKAGE_INFO;
+use phile::util::{ COLOR, PACKAGE_INFO };
 use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
@@ -38,23 +38,6 @@ struct ProgramArgs {
     migration_script: Option<String>,
     sources:          Vec<String>,
 }
-
-#[derive(Debug)]
-struct Color {
-    reset:     &'static str,
-    info:      &'static str,
-    highlight: &'static str,
-    success:   &'static str,
-    error:     &'static str,
-}
-
-static COLOR: Color = Color {
-    reset:     "\x1b[0m",
-    info:      "\x1b[1;33m",
-    highlight: "\x1b[1;36m",
-    success:   "\x1b[1;32m",
-    error:     "\x1b[1;31m",
-};
 
 
 macro_rules! stopwatch {
@@ -234,62 +217,9 @@ fn handle_read_error(error: io::Error) -> ! {
     ::std::process::exit(1)
 }
 
-fn handle_lexer_error<P: AsRef<str>>(location: &Location, files: &[P]) -> ! {
-    eprint!(
-        "\n\n    Syntax error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{location}{clr_rst}:\n        {clr_err}Invalid token{clr_rst}\n\n",
-        file = files[location.src_idx].as_ref(),
-        location = location,
-        clr_hgl = COLOR.highlight,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
-    );
-    ::std::process::exit(1)
-}
-
-fn handle_syntax_error<P: AsRef<str>>(error: &SyntaxError, files: &[P]) -> ! {
-    eprint!(
-        "\n\n    Syntax error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{range}{clr_rst}:\n        {clr_err}{message}{clr_rst}\n\n",
-        file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref()),
-        range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r)),
-        message = error.message,
-        clr_hgl = COLOR.highlight,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
-    );
-    ::std::process::exit(1)
-}
-
-fn handle_sema_error<P: AsRef<str>>(error: &SemaError, files: &[P]) -> ! {
-    eprint!(
-        "\n\n    Semantic error in {clr_hgl}{file}{clr_rst} near {clr_hgl}{range}{clr_rst}:\n        {clr_err}{message}{clr_rst}\n\n",
-        file = error.range.map_or("source file", |r| files[r.begin.src_idx].as_ref()),
-        range = error.range.map_or("end of input".to_owned(), |r| format!("{}", r)),
-        message = error.message,
-        clr_hgl = COLOR.highlight,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
-    );
-    ::std::process::exit(1)
-}
-
-fn handle_declgen_error(error: io::Error) -> ! {
-    eprint!(
-        "\n\n    Could not generate declarations: {clr_err}{error}{clr_rst}\n\n",
-        error = error,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
-    );
-    ::std::process::exit(1)
-}
-
-fn handle_dalgen_error(error: io::Error) -> ! {
-    eprint!(
-        "\n\n    Could not generate DAL: {clr_err}{error}{clr_rst}\n\n",
-        error = error,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
-    );
-    ::std::process::exit(1)
+fn handle_compiler_error<P: AsRef<str>>(error: Error, files: &[P]) -> ! {
+    error.pretty_print(&mut io::stderr(), files).unwrap();
+    std::process::exit(1)
 }
 
 //
@@ -312,7 +242,7 @@ fn main() {
 
     let tokens = stopwatch!("Lexing", {
         let mut tmp_tokens = lex(&sources).unwrap_or_else(
-            |location| handle_lexer_error(&location, &args.sources)
+            |error| handle_compiler_error(error, &args.sources)
         );
 
         tmp_tokens.retain(|token| match token.kind {
@@ -326,13 +256,13 @@ fn main() {
 
     let program = stopwatch!("Parsing", {
         parse(&tokens).unwrap_or_else(
-            |error| handle_syntax_error(&error, &args.sources)
+            |error| handle_compiler_error(error, &args.sources)
         )
     });
 
     let raw_sqir = stopwatch!("Typechecking and generating SQIR", {
         generate_sqir(&program).unwrap_or_else(
-            |error| handle_sema_error(&error, &args.sources)
+            |error| handle_compiler_error(error, &args.sources)
         )
     });
 
@@ -342,13 +272,13 @@ fn main() {
 
     stopwatch!("Generating Declarations", {
         generate_declarations(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| handle_declgen_error(error)
+            |error| handle_compiler_error(error, &args.sources)
         )
     });
 
     stopwatch!("Generating Database Abstraction Layer", {
         generate_dal(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| handle_dalgen_error(error)
+            |error| handle_compiler_error(error, &args.sources)
         )
     });
 

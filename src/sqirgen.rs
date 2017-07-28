@@ -13,7 +13,7 @@ use sqir::*;
 use lexer::{ Range, Ranged };
 use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, FuncArg, Field };
 use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
-use error::{ SemaError, SemaResult };
+use error::{ Error, Result };
 
 
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ struct SQIRGen {
 // that simply wrap other types, e.g. &T, [T], T?, etc.
 macro_rules! implement_wrapping_type_getter {
     ($fn_name: ident, $variant: ident, $cache: ident) => {
-        fn $fn_name(&mut self, decl: &Ty) -> SemaResult<RcType> {
+        fn $fn_name(&mut self, decl: &Ty) -> Result<RcType> {
             // get the current wrapped type
             let wrapped = self.type_from_decl(decl)?;
 
@@ -73,12 +73,12 @@ macro_rules! sema_error {
     ($cause: expr, $msg: expr) => ({
         let message = $msg.to_owned();
         let range = Some($cause.range());
-        Err(SemaError { message, range })
+        Err(Error::Semantic { message, range })
     });
     ($cause: expr, $fmt: expr, $($arg: tt)+) => ({
         let message = format!($fmt, $($arg)+);
         let range = Some($cause.range());
-        Err(SemaError { message, range })
+        Err(Error::Semantic { message, range })
     });
 }
 
@@ -86,12 +86,12 @@ macro_rules! occurs_check_error {
     ($msg: expr) => ({
         let message = $msg.to_owned();
         let range = None;
-        Err(SemaError { message, range })
+        Err(Error::Semantic { message, range })
     });
     ($fmt: expr, $($arg: tt)+) => ({
         let message = format!($fmt, $($arg)+);
         let range = None;
-        Err(SemaError { message, range })
+        Err(Error::Semantic { message, range })
     });
 }
 
@@ -99,17 +99,17 @@ macro_rules! reciprocity_error {
     ($msg: expr) => ({
         let message = $msg.to_owned();
         let range = None;
-        Err(SemaError { message, range })
+        Err(Error::Semantic { message, range })
     });
     ($fmt: expr, $($arg: tt)+) => ({
         let message = format!($fmt, $($arg)+);
         let range = None;
-        Err(SemaError { message, range })
+        Err(Error::Semantic { message, range })
     });
 }
 
 
-pub fn generate_sqir(program: &[Item]) -> SemaResult<SQIR> {
+pub fn generate_sqir(program: &[Item]) -> Result<SQIR> {
     SQIRGen::new().generate_sqir(program)
 }
 
@@ -153,7 +153,7 @@ impl SQIRGen {
     // Top-level SQIR generation methods and helpers
     //
 
-    fn generate_sqir(mut self, program: &[Item]) -> SemaResult<SQIR> {
+    fn generate_sqir(mut self, program: &[Item]) -> Result<SQIR> {
         self.forward_declare_user_defined_types(program)?;
         self.define_user_defined_types(program)?;
         self.occurs_check_user_defined_types()?;
@@ -167,7 +167,7 @@ impl SQIRGen {
 
     // Forward declare every struct/class/enum definition
     // by inserting a placeholder type for each of them
-    fn forward_declare_user_defined_types(&mut self, items: &[Item]) -> SemaResult<()> {
+    fn forward_declare_user_defined_types(&mut self, items: &[Item]) -> Result<()> {
         for item in items {
             let (name, kind) = match *item {
                 Item::StructDecl(ref s) => (s.name, PlaceholderKind::Struct),
@@ -191,7 +191,7 @@ impl SQIRGen {
     }
 
     // Create semantic types out of AST and check their consistency
-    fn define_user_defined_types(&mut self, items: &[Item]) -> SemaResult<()> {
+    fn define_user_defined_types(&mut self, items: &[Item]) -> Result<()> {
         for item in items {
             match *item {
                 Item::StructDecl(ref s) => self.define_struct_type(s)?,
@@ -209,7 +209,7 @@ impl SQIRGen {
     // (It is only now that occurs checking is possible,
     // because at this point, we should have gotten rid of
     // all placeholders that could hide self-containing types.)
-    fn occurs_check_user_defined_types(&self) -> SemaResult<()> {
+    fn occurs_check_user_defined_types(&self) -> Result<()> {
         for (_, t) in &self.sqir.named_types {
             self.occurs_check(&t.as_weak())?
         }
@@ -217,7 +217,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn define_relations(&mut self, items: &[Item]) -> SemaResult<()> {
+    fn define_relations(&mut self, items: &[Item]) -> Result<()> {
         for item in items {
             match *item {
                 Item::ClassDecl(ref c) => self.define_relations_for_class(c)?,
@@ -237,7 +237,7 @@ impl SQIRGen {
     // The two latter conditions can be summed up as "the relations
     // specified by the LHS and the RHS are equivalent".
     // TODO(H2CO3): this does 2 times as many comparisons as necessary.
-    fn validate_relations(&self) -> SemaResult<()> {
+    fn validate_relations(&self) -> Result<()> {
         for (&(ref lhs_type, ref lhs_field), relation) in &self.sqir.relations {
             self.check_relation_reciprocity(lhs_type, lhs_field, relation)?
         }
@@ -245,7 +245,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn check_relation_reciprocity(&self, lhs_type: &RcType, lhs_field: &str, relation: &Relation) -> SemaResult<()> {
+    fn check_relation_reciprocity(&self, lhs_type: &RcType, lhs_field: &str, relation: &Relation) -> Result<()> {
         let rhs_type = relation.rhs.class.clone();
         let rhs_field = match relation.rhs.field {
             Some(ref name) => name.clone(),
@@ -281,7 +281,7 @@ impl SQIRGen {
     // For each function: typecheck, and insert placeholder Function
     // into self.sqir.functions that has no actual body/implementation,
     // no instructions/basic blocks, only a type and argument names
-    fn forward_declare_functions(&mut self, items: &[Item]) -> SemaResult<()> {
+    fn forward_declare_functions(&mut self, items: &[Item]) -> Result<()> {
         for item in items {
             match *item {
                 Item::FuncDef(ref func) => self.forward_declare_free_function(func)?,
@@ -294,7 +294,7 @@ impl SQIRGen {
     }
 
     // Generate SQIR for each function
-    fn generate_functions(&mut self, items: &[Item]) -> SemaResult<()> {
+    fn generate_functions(&mut self, items: &[Item]) -> Result<()> {
         for item in items {
             match *item {
                 Item::FuncDef(ref func) => self.generate_free_function(func)?,
@@ -310,7 +310,7 @@ impl SQIRGen {
     // Type-wise semantic analysis methods (DDL)
     //
 
-    fn define_struct_type(&mut self, decl: &StructDecl) -> SemaResult<RcType> {
+    fn define_struct_type(&mut self, decl: &StructDecl) -> Result<RcType> {
         let struct_type = Type::Struct(
             StructType {
                 name:   decl.name.to_owned(),
@@ -326,7 +326,7 @@ impl SQIRGen {
         Ok(struct_type_rc.clone())
     }
 
-    fn define_class_type(&mut self, decl: &ClassDecl) -> SemaResult<RcType> {
+    fn define_class_type(&mut self, decl: &ClassDecl) -> Result<RcType> {
         let class_type = Type::Class(
             ClassType {
                 name:   decl.name.to_owned(),
@@ -342,7 +342,7 @@ impl SQIRGen {
         Ok(class_type_rc.clone())
     }
 
-    fn define_enum_type(&mut self, decl: &EnumDecl) -> SemaResult<RcType> {
+    fn define_enum_type(&mut self, decl: &EnumDecl) -> Result<RcType> {
         let enum_type = Type::Enum(
             EnumType {
                 name:     decl.name.to_owned(),
@@ -362,7 +362,7 @@ impl SQIRGen {
     // Helpers for struct types
     //
 
-    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> SemaResult<BTreeMap<String, WkType>> {
+    fn typecheck_struct_fields(&mut self, decl: &StructDecl) -> Result<BTreeMap<String, WkType>> {
         let mut fields = BTreeMap::new();
 
         for field in &decl.fields {
@@ -388,7 +388,7 @@ impl SQIRGen {
     // Helpers for class types
     //
 
-    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> SemaResult<BTreeMap<String, WkType>> {
+    fn typecheck_class_fields(&mut self, decl: &ClassDecl) -> Result<BTreeMap<String, WkType>> {
         let mut fields = BTreeMap::new();
 
         for field in &decl.fields {
@@ -409,7 +409,7 @@ impl SQIRGen {
     // Helpers for enum types
     //
 
-    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> SemaResult<BTreeMap<String, WkType>> {
+    fn typecheck_enum_variants(&mut self, decl: &EnumDecl) -> Result<BTreeMap<String, WkType>> {
         let mut variants = BTreeMap::new();
 
         for variant in &decl.variants {
@@ -440,7 +440,7 @@ impl SQIRGen {
         item_type:   &WkType,
         range:       &R,
         parent_kind: ComplexTypeKind
-    ) -> SemaResult<()> {
+    ) -> Result<()> {
         let rc = item_type.as_rc()?;
         let ptr = rc.borrow()?;
 
@@ -521,7 +521,7 @@ impl SQIRGen {
         wrapped_type: &WkType,
         range:        &R,
         parent_kind:  ComplexTypeKind,
-    ) -> SemaResult<()> {
+    ) -> Result<()> {
         let res = self.validate_complex_type_item(wrapped_type, range, ComplexTypeKind::Value);
 
         // In a function, any wild combination of optionals, pointers, arrays,
@@ -547,7 +547,7 @@ impl SQIRGen {
         element_type: &WkType,
         range:        &R,
         parent_kind:  ComplexTypeKind,
-    ) -> SemaResult<()> {
+    ) -> Result<()> {
         let res = self.validate_complex_type_item(element_type, range, ComplexTypeKind::Value);
 
         // In a function, any wild combination of optionals, pointers, arrays,
@@ -571,10 +571,10 @@ impl SQIRGen {
     fn validate_wrapper_in_entity<R: Ranged>(
         &self,
         wrapped_type:      &WkType,
-        validation_result: SemaResult<()>,
+        validation_result: Result<()>,
         range:             &R,
         wrapper_type_name: &str,
-    ) -> SemaResult<()> {
+    ) -> Result<()> {
         validation_result.or_else(|err| {
             let rc = wrapped_type.as_rc()?;
             let ptr = rc.borrow()?;
@@ -588,7 +588,7 @@ impl SQIRGen {
                     range,
                     "Expected {} of pointer/value type ({})",
                     wrapper_type_name,
-                    err.message,
+                    err,
                 ),
             }
         })
@@ -598,14 +598,14 @@ impl SQIRGen {
     // Occurs Check
     //
 
-    fn occurs_check(&self, ud_type: &WkType) -> SemaResult<()> {
+    fn occurs_check(&self, ud_type: &WkType) -> Result<()> {
         self.occurs_check_type(ud_type, ud_type)
     }
 
     // Try to find the root_type in the transitive closure of its
     // contained/wrapped types that occur without indirection,
     // i.e. those that are _not_ behind a pointer or in an array.
-    fn occurs_check_type(&self, root: &WkType, child: &WkType) -> SemaResult<()> {
+    fn occurs_check_type(&self, root: &WkType, child: &WkType) -> Result<()> {
         let rc = child.as_rc()?;
         let ptr = rc.borrow()?;
 
@@ -640,7 +640,7 @@ impl SQIRGen {
         }
     }
 
-    fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> SemaResult<()> {
+    fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> Result<()> {
         if root.as_rc()? == child.as_rc()? {
             occurs_check_error!(
                 "Recursive type {} contains itself without indirection",
@@ -651,7 +651,7 @@ impl SQIRGen {
         }
     }
 
-    fn ensure_transitive_noncontainment_multi<'a, I>(&self, root: &WkType, types: I) -> SemaResult<()>
+    fn ensure_transitive_noncontainment_multi<'a, I>(&self, root: &WkType, types: I) -> Result<()>
         where I: IntoIterator<Item = &'a WkType> {
 
         for ty in types {
@@ -665,7 +665,7 @@ impl SQIRGen {
     // Caching getters for types
     //
 
-    fn type_from_decl(&mut self, decl: &Ty) -> SemaResult<RcType> {
+    fn type_from_decl(&mut self, decl: &Ty) -> Result<RcType> {
         match decl.kind {
             TyKind::Pointer(ref pointed)  => self.get_pointer_type(pointed),
             TyKind::Optional(ref wrapped) => self.get_optional_type(wrapped),
@@ -676,7 +676,7 @@ impl SQIRGen {
         }
     }
 
-    fn get_pointer_type(&mut self, decl: &Ty) -> SemaResult<RcType> {
+    fn get_pointer_type(&mut self, decl: &Ty) -> Result<RcType> {
         let pointer_type = self.get_pointer_type_raw(decl)?;
 
         match *pointer_type.borrow()? {
@@ -702,11 +702,11 @@ impl SQIRGen {
         Ok(pointer_type)
     }
 
-    fn get_optional_type(&mut self, decl: &Ty) -> SemaResult<RcType> {
+    fn get_optional_type(&mut self, decl: &Ty) -> Result<RcType> {
         self.get_optional_type_raw(decl)
     }
 
-    fn get_array_type(&mut self, decl: &Ty) -> SemaResult<RcType> {
+    fn get_array_type(&mut self, decl: &Ty) -> Result<RcType> {
         self.get_array_type_raw(decl)
     }
 
@@ -728,15 +728,15 @@ impl SQIRGen {
         array_types
     }
 
-    fn get_tuple_type(&mut self, nodes: &[Ty]) -> SemaResult<RcType> {
+    fn get_tuple_type(&mut self, nodes: &[Ty]) -> Result<RcType> {
         let types = nodes.iter()
             .map(|node| self.type_from_decl(node))
-            .collect::<SemaResult<_>>()?;
+            .collect::<Result<_>>()?;
 
         self.get_tuple_type_from_types(types, nodes)
     }
 
-    fn get_tuple_type_from_types<R: Ranged>(&mut self, types: Vec<RcType>, ranges: &[R]) -> SemaResult<RcType> {
+    fn get_tuple_type_from_types<R: Ranged>(&mut self, types: Vec<RcType>, ranges: &[R]) -> Result<RcType> {
         assert!(types.len() == ranges.len());
 
         // A one-element tuple is converted to its element type,
@@ -751,7 +751,7 @@ impl SQIRGen {
             let ty_wk = ty.as_weak();
             self.validate_complex_type_item(&ty_wk, range, ComplexTypeKind::Value)?;
             Ok(ty_wk)
-        }).collect::<SemaResult<_>>()?;
+        }).collect::<Result<_>>()?;
 
         let tuple = self.sqir.tuple_types.entry(types).or_insert_with(
             || RcCell::new(Type::Tuple(weak_types))
@@ -760,10 +760,10 @@ impl SQIRGen {
         Ok(tuple.clone())
     }
 
-    fn get_function_type(&mut self, fn_type: &ast::FunctionTy) -> SemaResult<RcType> {
+    fn get_function_type(&mut self, fn_type: &ast::FunctionTy) -> Result<RcType> {
         let arg_types = fn_type.arg_types.iter().map(
             |decl| self.type_from_decl(decl)
-        ).collect::<SemaResult<_>>()?;
+        ).collect::<Result<_>>()?;
 
         let ret_type = self.type_from_decl(&fn_type.ret_type)?;
 
@@ -781,7 +781,7 @@ impl SQIRGen {
         ret_type_rc:  RcType,
         arg_ranges:   I,
         ret_range:    &R1,
-    ) -> SemaResult<RcType>
+    ) -> Result<RcType>
         where I:  ExactSizeIterator<Item = &'a R2>,
               R1: Ranged,
               R2: Ranged + 'a {
@@ -812,7 +812,7 @@ impl SQIRGen {
         ret_type:   &WkType,
         arg_ranges: I,
         ret_range:  &R1,
-    ) -> SemaResult<()>
+    ) -> Result<()>
         where T:  ExactSizeIterator<Item = &'a WkType>,
               I:  ExactSizeIterator<Item = &'a R2>,
               R1: Ranged,
@@ -835,7 +835,7 @@ impl SQIRGen {
         )
     }
 
-    fn get_named_type<R: Ranged>(&mut self, name: &str, range: &R) -> SemaResult<RcType> {
+    fn get_named_type<R: Ranged>(&mut self, name: &str, range: &R) -> Result<RcType> {
         match self.sqir.named_types.get(name) {
             Some(rc) => Ok(rc.clone()),
             None => sema_error!(range, "Unknown type: '{}'", name),
@@ -878,7 +878,7 @@ impl SQIRGen {
     // Type checking relationships
     //
 
-    fn define_relations_for_class(&mut self, decl: &ClassDecl) -> SemaResult<()> {
+    fn define_relations_for_class(&mut self, decl: &ClassDecl) -> Result<()> {
         let class_type = self.sqir.named_types[decl.name].clone();
 
         for field in &decl.fields {
@@ -888,7 +888,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn define_relation_for_field(&mut self, class_type_rc: &RcType, field: &Field) -> SemaResult<()> {
+    fn define_relation_for_field(&mut self, class_type_rc: &RcType, field: &Field) -> Result<()> {
         let class_type = class_type_rc.borrow()?;
 
         let class = match *class_type {
@@ -941,7 +941,7 @@ impl SQIRGen {
         lhs_field_name: &str,
         relation:       &RelDecl,
         range:          &R,
-    ) -> SemaResult<()> {
+    ) -> Result<()> {
         // Ensure that declared RHS cardinality matches with the field type
         let (lhs_card, rhs_card) = self.cardinalities_from_operator(relation.cardinality);
         let rhs_class_type = self.validate_type_cardinality(lhs_field_type, rhs_card, range)?;
@@ -1016,7 +1016,7 @@ impl SQIRGen {
         lhs_field_name:  &str,
         lhs_cardinality: Cardinality,
         rhs_cardinality: Cardinality,
-    ) -> SemaResult<()> {
+    ) -> Result<()> {
         let lhs = RelationSide {
             class:       lhs_type.clone(),
             field:       Some(lhs_field_name.to_owned()),
@@ -1048,7 +1048,7 @@ impl SQIRGen {
         t:           &Type,
         cardinality: Cardinality,
         range:       &R,
-    ) -> SemaResult<RcType> {
+    ) -> Result<RcType> {
         let not_relational_error = || sema_error!(
             range,
             "Field type is not relational: {}",
@@ -1068,7 +1068,7 @@ impl SQIRGen {
 
                 match *ptr {
                     Type::Pointer(ref pointed) => match cardinality {
-                        $(Cardinality::$card => pointed.as_rc().map_err(SemaError::from),)*
+                        $(Cardinality::$card => pointed.as_rc(),)*
                         _ => cardinality_mismatch_error($name),
                     },
                     _ => not_relational_error(),
@@ -1084,7 +1084,7 @@ impl SQIRGen {
                 element, "Array",            ZeroOrMore, OneOrMore
             ),
             Type::Pointer(ref pointed) => match cardinality {
-                Cardinality::One => pointed.as_rc().map_err(SemaError::from),
+                Cardinality::One => pointed.as_rc(),
                 _ => cardinality_mismatch_error("Simple pointer"),
             },
             _ => not_relational_error(),
@@ -1100,7 +1100,7 @@ impl SQIRGen {
     //   * One        for &T
     //   * ZeroOrOne  for &T?
     //   * ZeroOrMore for [&T]
-    fn define_implicit_relation(&mut self, class_type: &RcType, field_type: &Type, field_name: &str) -> SemaResult<()> {
+    fn define_implicit_relation(&mut self, class_type: &RcType, field_type: &Type, field_name: &str) -> Result<()> {
         let (pointed_type, rhs_card) = match self.try_infer_type_cardinality(field_type)? {
             Some(type_and_cardinality) => type_and_cardinality,
             None => return Ok(()), // not a relational type
@@ -1130,7 +1130,7 @@ impl SQIRGen {
     // If 't' represents a relational type (&T, &T?, or [&T]),
     // return the corresponding cardinality and the pointed type T.
     // Otherwise, return None.
-    fn try_infer_type_cardinality(&self, t: &Type) -> SemaResult<Option<(RcType, Cardinality)>> {
+    fn try_infer_type_cardinality(&self, t: &Type) -> Result<Option<(RcType, Cardinality)>> {
         macro_rules! try_unwrap_pointer_type {
             ($ty: expr, $card: ident) => ({
                 let rc = $ty.as_rc()?;
@@ -1177,7 +1177,7 @@ impl SQIRGen {
     // Forward declaring functions and impls
     //
 
-    fn forward_declare_free_function(&mut self, func: &ast::Function) -> SemaResult<()> {
+    fn forward_declare_free_function(&mut self, func: &ast::Function) -> Result<()> {
         let name = func.name.expect("function name");
         let ty = self.compute_type_of_function(func)?;
         let value = Value::Placeholder;
@@ -1193,10 +1193,10 @@ impl SQIRGen {
         }
     }
 
-    fn forward_declare_impl(&mut self, decl: &Impl) -> SemaResult<()> {
+    fn forward_declare_impl(&mut self, decl: &Impl) -> Result<()> {
         let types: Vec<_> = decl.functions.iter().map(
             |func_node| self.compute_type_of_function(func_node)
-        ).collect::<SemaResult<_>>()?;
+        ).collect::<Result<_>>()?;
 
         let impl_name = Some(decl.name.to_owned());
 
@@ -1211,7 +1211,7 @@ impl SQIRGen {
     }
 
     fn impl_from_functions(types: Vec<RcType>, funcs: &[ast::Function])
-        -> SemaResult<BTreeMap<String, RcExpr>> {
+        -> Result<BTreeMap<String, RcExpr>> {
 
         assert!(types.len() == funcs.len());
 
@@ -1231,7 +1231,7 @@ impl SQIRGen {
         Ok(ns)
     }
 
-    fn compute_type_of_function(&mut self, func: &ast::Function) -> SemaResult<RcType> {
+    fn compute_type_of_function(&mut self, func: &ast::Function) -> Result<RcType> {
         let ret_type = func.ret_type.as_ref().map_or(
             Ok(self.get_unit_type()),
             |rt| self.type_from_decl(rt),
@@ -1246,7 +1246,7 @@ impl SQIRGen {
         )
     }
 
-    fn arg_types_for_toplevel_func(&mut self, args: &[FuncArg]) -> SemaResult<Vec<RcType>> {
+    fn arg_types_for_toplevel_func(&mut self, args: &[FuncArg]) -> Result<Vec<RcType>> {
         args.iter().map(|arg| match arg.ty {
             Some(ref ty) => self.type_from_decl(ty),
             None => sema_error!(arg, "Type required for argument"),
@@ -1257,11 +1257,11 @@ impl SQIRGen {
     // Value-level SQIR generation (DML)
     //
 
-    fn generate_free_function(&mut self, func: &ast::Function) -> SemaResult<()> {
+    fn generate_free_function(&mut self, func: &ast::Function) -> Result<()> {
         self.generate_global_function(func, &None)
     }
 
-    fn generate_impl(&mut self, ns: &Impl) -> SemaResult<()> {
+    fn generate_impl(&mut self, ns: &Impl) -> Result<()> {
         match self.sqir.named_types.get(ns.name) {
             Some(rc) => {
                 match *rc.borrow()? {
@@ -1285,7 +1285,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn generate_global_function(&mut self, func: &ast::Function, ns: &Option<String>) -> SemaResult<()> {
+    fn generate_global_function(&mut self, func: &ast::Function, ns: &Option<String>) -> Result<()> {
         let ctx = TyCtx {
             ty:    None,
             range: func.range,
@@ -1311,7 +1311,7 @@ impl SQIRGen {
     // Top-level expression emitter.
     // 'ty' is a type hint from the caller, used
     // for the top-down part of type inference.
-    fn generate_expr(&mut self, node: &Exp, ty: Option<RcType>) -> SemaResult<RcExpr> {
+    fn generate_expr(&mut self, node: &Exp, ty: Option<RcType>) -> Result<RcExpr> {
         let range = node.range;
         let ctx = TyCtx { ty, range };
 
@@ -1362,7 +1362,7 @@ impl SQIRGen {
     // * T <= T
     // * T <= T?          (results in an OptionalWrap)
     // * Int <= Float     (results in an IntToFloat conversion)
-    fn unify(&mut self, expr: RcExpr, ctx: TyCtx) -> SemaResult<RcExpr> {
+    fn unify(&mut self, expr: RcExpr, ctx: TyCtx) -> Result<RcExpr> {
         let ty = match ctx.ty {
             None => return Ok(expr),
             Some(ty) => if ty == expr.borrow()?.ty {
@@ -1391,7 +1391,7 @@ impl SQIRGen {
         )
     }
 
-    fn generate_nil_literal(&mut self, ctx: TyCtx) -> SemaResult<RcExpr> {
+    fn generate_nil_literal(&mut self, ctx: TyCtx) -> Result<RcExpr> {
         let value = Value::Nil;
         let id = self.next_temp_id();
 
@@ -1408,14 +1408,14 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_bool_literal(&mut self, b: bool) -> SemaResult<RcExpr> {
+    fn generate_bool_literal(&mut self, b: bool) -> Result<RcExpr> {
         let ty = self.get_bool_type();
         let value = Value::BoolConst(b);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_int_literal(&mut self, ctx: TyCtx, n: u64) -> SemaResult<RcExpr> {
+    fn generate_int_literal(&mut self, ctx: TyCtx, n: u64) -> Result<RcExpr> {
         if let Some(hint) = ctx.ty {
             if let Type::Float = *hint.borrow()? {
                 return self.generate_float_literal(n as f64)
@@ -1429,27 +1429,27 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_float_literal(&mut self, x: f64) -> SemaResult<RcExpr> {
+    fn generate_float_literal(&mut self, x: f64) -> Result<RcExpr> {
         let ty = self.get_float_type();
         let value = Value::FloatConst(x);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_string_literal(&mut self, s: &str) -> SemaResult<RcExpr> {
+    fn generate_string_literal(&mut self, s: &str) -> Result<RcExpr> {
         let ty = self.get_string_type();
         let value = Value::StringConst(s.to_owned());
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_name_ref<R: Ranged>(&mut self, name: &str, range: R) -> SemaResult<RcExpr> {
+    fn generate_name_ref<R: Ranged>(&mut self, name: &str, range: R) -> Result<RcExpr> {
         let expr = self.lookup_name(name, range)?;
         self.generate_load(expr)
     }
 
     // Helper for generate_name_ref()
-    fn lookup_name<R: Ranged>(&self, name: &str, range: R) -> SemaResult<RcExpr> {
+    fn lookup_name<R: Ranged>(&self, name: &str, range: R) -> Result<RcExpr> {
         if let Some(expr) = self.locals.borrow()?.var_map.get(name) {
             return Ok(expr.clone())
         }
@@ -1465,14 +1465,14 @@ impl SQIRGen {
     }
 
     // Helper for generate_name_ref()
-    fn generate_load(&mut self, expr: RcExpr) -> SemaResult<RcExpr> {
+    fn generate_load(&mut self, expr: RcExpr) -> Result<RcExpr> {
         let ty = expr.borrow()?.ty.clone();
         let value = Value::Load(expr.as_weak());
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> SemaResult<RcExpr> {
+    fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> Result<RcExpr> {
         let init_type_hint = match decl.ty {
             Some(ref node) => {
                 let ty = self.type_from_decl(node)?;
@@ -1488,11 +1488,11 @@ impl SQIRGen {
         self.declare_local(decl.name, init, &ctx)
     }
 
-    fn generate_empty_stmt(&mut self, ctx: TyCtx) -> SemaResult<RcExpr> {
+    fn generate_empty_stmt(&mut self, ctx: TyCtx) -> Result<RcExpr> {
         self.generate_tuple(ctx, &[])
     }
 
-    fn generate_semi(&mut self, node: &Exp) -> SemaResult<RcExpr> {
+    fn generate_semi(&mut self, node: &Exp) -> Result<RcExpr> {
         let subexpr = self.generate_expr(node, None)?;
         let ty = self.get_unit_type();
         let value = Value::Ignore(subexpr);
@@ -1500,17 +1500,17 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_binary_op(&mut self, _ctx: TyCtx, _op: &ast::BinaryOp) -> SemaResult<RcExpr> {
+    fn generate_binary_op(&mut self, _ctx: TyCtx, _op: &ast::BinaryOp) -> Result<RcExpr> {
         unimplemented!()
     }
 
-    fn generate_cast(&mut self, _ctx: TyCtx, _expr: &Exp, _ty: &Ty) -> SemaResult<RcExpr> {
+    fn generate_cast(&mut self, _ctx: TyCtx, _expr: &Exp, _ty: &Ty) -> Result<RcExpr> {
         // TODO(H2CO3): the type on the RHS must be checked using
         // validate_complex_type_item(ComplexTypeKind::Function)!
         unimplemented!()
     }
 
-    fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Exp]) -> SemaResult<RcExpr> {
+    fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Exp]) -> Result<RcExpr> {
         // A one-element tuple is equivalent with its element
         if nodes.len() == 1 {
             return self.generate_expr(&nodes[0], ctx.ty)
@@ -1519,7 +1519,7 @@ impl SQIRGen {
         let exprs = self.generate_tuple_items(ctx, nodes)?;
         let types = exprs.iter()
             .map(|expr| Ok(expr.borrow()?.ty.clone()))
-            .collect::<SemaResult<_>>()?;
+            .collect::<Result<_>>()?;
 
         let ty = self.get_tuple_type_from_types(types, nodes)?;
         let value = Value::Tuple(exprs);
@@ -1529,7 +1529,7 @@ impl SQIRGen {
     }
 
     // helper for generate_tuple()
-    fn generate_tuple_items(&mut self, ctx: TyCtx, nodes: &[Exp]) -> SemaResult<Vec<RcExpr>> {
+    fn generate_tuple_items(&mut self, ctx: TyCtx, nodes: &[Exp]) -> Result<Vec<RcExpr>> {
         if let Some(hint) = ctx.ty {
             if let Type::Tuple(ref types) = *hint.borrow()? {
                 let expected_len = types.len();
@@ -1553,11 +1553,11 @@ impl SQIRGen {
         nodes.iter().map(|node| self.generate_expr(node, None)).collect()
     }
 
-    fn generate_array(&mut self, _ctx: TyCtx, _nodes: &[Exp]) -> SemaResult<RcExpr> {
+    fn generate_array(&mut self, _ctx: TyCtx, _nodes: &[Exp]) -> Result<RcExpr> {
         unimplemented!()
     }
 
-    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Exp]) -> SemaResult<RcExpr> {
+    fn generate_block(&mut self, ctx: TyCtx, nodes: &[Exp]) -> Result<RcExpr> {
         #[allow(unused_variables)]
         let scope_guard = self.begin_local_scope();
 
@@ -1565,7 +1565,7 @@ impl SQIRGen {
             Some((last, firsts)) => {
                 let mut items: Vec<_> = firsts.iter().map(
                     |node| self.generate_expr(node, None)
-                ).collect::<SemaResult<_>>()?;
+                ).collect::<Result<_>>()?;
 
                 let last_expr = self.generate_expr(last, ctx.ty.clone())?;
                 let last_ty = last_expr.borrow()?.ty.clone();
@@ -1591,7 +1591,7 @@ impl SQIRGen {
     // Returns an error if a local with the specified name already exists.
     // Also changes the id of 'expr' to ExprId::Local(name.to_owned()).
     // Returns the already-changed 'expr' for convenience.
-    fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> SemaResult<RcExpr> {
+    fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> Result<RcExpr> {
         use std::collections::hash_map::Entry::{ Vacant, Occupied };
 
         let mut locals = self.locals.borrow_mut().expect("can't borrow locals");
@@ -1628,7 +1628,7 @@ impl SQIRGen {
     // Actually generating SQIR for funcions
     //
 
-    fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> SemaResult<RcExpr> {
+    fn generate_function(&mut self, ctx: TyCtx, func: &ast::Function) -> Result<RcExpr> {
         // Juggle types around, ensuring they are consistent
         let is_lambda = func.name.is_none();
         let range = ctx.range;
@@ -1682,7 +1682,7 @@ impl SQIRGen {
         &mut self,
         func:  &ast::Function,
         types: &[RcType],
-    ) -> SemaResult<Vec<RcExpr>> {
+    ) -> Result<Vec<RcExpr>> {
         assert!(func.arguments.len() == types.len());
 
         func.arguments.iter().zip(types).enumerate().map(
@@ -1712,7 +1712,7 @@ impl SQIRGen {
         &mut self,
         func:      &ast::Function,
         type_hint: &Option<FunctionType>,
-    ) -> SemaResult<Vec<RcType>> {
+    ) -> Result<Vec<RcType>> {
         match *type_hint {
             Some(ref t) => {
                 func.arguments.iter()
@@ -1728,7 +1728,7 @@ impl SQIRGen {
         }
     }
 
-    fn arg_type_with_hint(&mut self, arg: &FuncArg, ty: &WkType) -> SemaResult<RcType> {
+    fn arg_type_with_hint(&mut self, arg: &FuncArg, ty: &WkType) -> Result<RcType> {
         match arg.ty {
             None => Ok(ty.as_rc()?),
             Some(ref arg_ty) => {
@@ -1749,14 +1749,14 @@ impl SQIRGen {
         }
     }
 
-    fn arg_type_no_hint(&mut self, arg: &FuncArg) -> SemaResult<RcType> {
+    fn arg_type_no_hint(&mut self, arg: &FuncArg) -> Result<RcType> {
         match arg.ty {
             Some(ref ty) => self.type_from_decl(ty),
             None => sema_error!(arg, "Cannot infer argument type"),
         }
     }
 
-    fn type_hint_for_function(ctx: TyCtx) -> SemaResult<Option<FunctionType>> {
+    fn type_hint_for_function(ctx: TyCtx) -> Result<Option<FunctionType>> {
         match ctx.ty {
             Some(ty) => match *ty.borrow()? {
                 Type::Function(ref f) => Ok(Some(f.clone())),
@@ -1770,7 +1770,7 @@ impl SQIRGen {
         }
     }
 
-    fn check_function_arity(func: &ast::Function, type_hint: &Option<FunctionType>, range: Range) -> SemaResult<()> {
+    fn check_function_arity(func: &ast::Function, type_hint: &Option<FunctionType>, range: Range) -> Result<()> {
         let fn_type = if let Some(ref ty) = *type_hint {
             ty
         } else {
@@ -1796,7 +1796,7 @@ impl SQIRGen {
         &mut self,
         type_hint: &Option<FunctionType>,
         func:      &ast::Function,
-    ) -> SemaResult<Option<RcType>> {
+    ) -> Result<Option<RcType>> {
         let ret_type_hint = match (type_hint, &func.ret_type) {
             (&Some(ref t), &None) => Some(t.ret_type.as_rc()?),
             (&None, &Some(ref rt_decl)) => Some(self.type_from_decl(rt_decl)?),
@@ -1825,7 +1825,7 @@ impl SQIRGen {
         &mut self,
         type_hint: &Option<FunctionType>,
         func:      &ast::Function,
-    ) -> SemaResult<Option<RcType>> {
+    ) -> Result<Option<RcType>> {
         assert!(type_hint.is_none());
 
         let ret_type = match func.ret_type {

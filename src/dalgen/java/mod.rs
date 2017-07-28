@@ -6,11 +6,11 @@
 // on 18/07/2017
 //
 
-use std::io;
+use error::Result;
 use codegen::*;
 use sqir::*;
 
 
-pub fn generate(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
     unimplemented!()
 }

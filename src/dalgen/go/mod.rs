@@ -7,6 +7,7 @@
 //
 
 use std::io;
+use error::Result;
 use codegen::*;
 use sqir::*;
 use declgen::go::*;
@@ -16,7 +17,7 @@ pub mod mongodb;
 pub mod mariadb;
 
 
-pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     // First, generate the schema
     match params.database {
         DatabaseEngine::SQLite3 => sqlite3::generate_schema(sqir, params, wp)?,
@@ -32,7 +33,7 @@ pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) ->
 // Top-level (global func + impl) generators
 //
 
-fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     for (ns_name, namespace) in &sqir.globals {
         for (raw_name, expr) in namespace {
             let namespace_or = |default| ns_name.as_ref().map_or(default, String::as_ref);
@@ -49,7 +50,7 @@ fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) 
     Ok(())
 }
 
-fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenParams) -> io::Result<()> {
+fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenParams) -> Result<()> {
     let ty_ptr = expr.ty.borrow()?;
 
     let ty = match *ty_ptr {
@@ -69,7 +70,7 @@ fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenPar
 // Expression Generators
 //
 
-fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> io::Result<()> {
+fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> Result<()> {
     let ptr = expr.borrow()?;
 
     write!(wr, "    var ")?;
@@ -103,53 +104,60 @@ fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> i
     }
 }
 
-fn generate_nil_literal(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> io::Result<()> {
+fn generate_nil_literal(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, id, params)?;
-    writeln!(wr, " = nil")
+    writeln!(wr, " = nil")?;
+    Ok(())
 }
 
-fn generate_bool_literal(wr: &mut io::Write, id: &ExprId, b: bool, params: &CodegenParams) -> io::Result<()> {
+fn generate_bool_literal(wr: &mut io::Write, id: &ExprId, b: bool, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, id, params)?;
-    writeln!(wr, " = {}", b)
+    writeln!(wr, " = {}", b)?;
+    Ok(())
 }
 
-fn generate_int_literal(wr: &mut io::Write, id: &ExprId, n: u64, params: &CodegenParams) -> io::Result<()> {
+fn generate_int_literal(wr: &mut io::Write, id: &ExprId, n: u64, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, id, params)?;
-    writeln!(wr, " = {}", n)
+    writeln!(wr, " = {}", n)?;
+    Ok(())
 }
 
-fn generate_float_literal(wr: &mut io::Write, id: &ExprId, x: f64, params: &CodegenParams) -> io::Result<()> {
+fn generate_float_literal(wr: &mut io::Write, id: &ExprId, x: f64, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, id, params)?;
-    writeln!(wr, " = {}", x)
+    writeln!(wr, " = {}", x)?;
+    Ok(())
 }
 
-fn generate_string_literal(wr: &mut io::Write, id: &ExprId, s: &str, params: &CodegenParams) -> io::Result<()> {
+fn generate_string_literal(wr: &mut io::Write, id: &ExprId, s: &str, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, id, params)?;
-    writeln!(wr, " = {}", escape_string_literal(s))
+    writeln!(wr, " = {}", escape_string_literal(s))?;
+    Ok(())
 }
 
-fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr, params: &CodegenParams) -> io::Result<()> {
+fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, &id, params)?;
     write!(wr, " = ")?;
     let rc = expr.as_rc()?;
     write_expr_id(wr, &rc.borrow()?.id, params)?;
-    writeln!(wr)
+    writeln!(wr)?;
+    Ok(())
 }
 
-fn generate_ignore(wr: &mut io::Write, id: &ExprId, expr: &RcExpr, params: &CodegenParams) -> io::Result<()> {
+fn generate_ignore(wr: &mut io::Write, id: &ExprId, expr: &RcExpr, params: &CodegenParams) -> Result<()> {
     generate_expr(wr, expr, params)?;
     write!(wr, "    ")?;
     write_expr_id(wr, &id, params)?;
-    writeln!(wr, " = struct{{}}{{}}")
+    writeln!(wr, " = struct{{}}{{}}")?;
+    Ok(())
 }
 
-fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: &CodegenParams) -> io::Result<()> {
+fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: &CodegenParams) -> Result<()> {
     for expr in exprs {
         generate_expr(wr, expr, params)?
     }
@@ -161,9 +169,9 @@ fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: 
     match exprs.last() {
         Some(expr) => {
             write_expr_id(wr, &expr.borrow()?.id, params)?;
-            writeln!(wr)
+            writeln!(wr).map_err(From::from)
         },
-        None => writeln!(wr, "struct{{}}{{}}"),
+        None => writeln!(wr, "struct{{}}{{}}").map_err(From::from),
     }
 }
 
@@ -173,7 +181,7 @@ fn generate_function(
     ty:     &FunctionType,
     func:   &Function,
     params: &CodegenParams,
-) -> io::Result<()> {
+) -> Result<()> {
     write!(
         wr,
         "func ({} {}) {}(",
@@ -204,7 +212,7 @@ fn generate_function(
     write_expr_id(wr, &func.body.borrow()?.id, params)?;
     writeln!(wr)?;
     writeln!(wr, "}}")?;
-    writeln!(wr)
+    writeln!(wr).map_err(From::from)
 }
 
 // The following functions write references (i.e. reads/loads) and
@@ -221,7 +229,7 @@ fn write_expr_id(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> io:
     }
 }
 
-fn write_expr_decl(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> io::Result<()> {
+fn write_expr_decl(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> Result<()> {
     let ptr = expr.borrow()?;
     write_expr_id(wr, &ptr.id, params)?;
     write!(wr, " ")?;

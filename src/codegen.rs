@@ -10,6 +10,7 @@ use std::io;
 use std::rc::Rc;
 use std::cell::RefCell;
 use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase };
+use error::Result;
 
 
 #[derive(Debug, Clone, Copy)]
@@ -50,7 +51,7 @@ pub enum NameTransform {
 // TODO(H2CO3): rewrite this using RcCell once custom smart pointers
 //              can point to trait objects, i.e. when CoerceUnsized
 //              and Unsize are stabilized (see issue #27732)
-pub type WriterProvider = FnMut(&str) -> io::Result<Rc<RefCell<io::Write>>>;
+pub type WriterProvider = FnMut(&str) -> Result<Rc<RefCell<io::Write>>>;
 
 #[derive(Debug)]
 pub struct CodegenParams {

@@ -8,6 +8,7 @@
 
 use std::fmt::{ self, Display, Formatter };
 use regex::Regex;
+use error::{ Error, Result };
 use util::grapheme_count;
 
 
@@ -54,7 +55,7 @@ struct Lexer<'a> {
 }
 
 
-pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>, Location> {
+pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>> {
     Lexer::new().lex(sources)
 }
 
@@ -119,7 +120,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lex<S: AsRef<str>>(mut self, sources: &'a [S]) -> Result<Vec<Token<'a>>, Location> {
+    fn lex<S: AsRef<str>>(mut self, sources: &'a [S]) -> Result<Vec<Token<'a>>> {
         self.tokens.reserve(sources.iter().map(|s| s.as_ref().len()).sum());
 
         for source in sources {
@@ -133,17 +134,17 @@ impl<'a> Lexer<'a> {
         Ok(self.tokens)
     }
 
-    fn lex_single_source(&mut self) -> Result<(), Location> {
+    fn lex_single_source(&mut self) -> Result<()> {
         loop {
             match self.next() {
                 Ok(Some(token)) => self.tokens.push(token),
                 Ok(None)        => return Ok(()),
-                Err(location)   => return Err(location),
+                Err(error)      => return Err(error),
             }
         }
     }
 
-    fn next(&mut self) -> Result<Option<Token<'a>>, Location> {
+    fn next(&mut self) -> Result<Option<Token<'a>>> {
         if self.source.is_empty() {
             return Ok(None)
         }
@@ -163,6 +164,12 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Err(self.location)
+        Err(Error::Syntax {
+            message: "Invalid token".to_owned(),
+            range: Some(Range {
+                begin: self.location,
+                end:   self.location.advance_by(self.source),
+            }),
+        })
     }
 }

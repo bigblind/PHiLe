@@ -16,12 +16,12 @@ mod js;
 mod python;
 mod java;
 
-use std::io;
+use error::Result;
 use codegen::*;
 use sqir::*;
 
 
-pub fn generate_dal(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_dal(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     match params.language {
         Language::Rust       => rust  ::generate(sqir, params, wp),
         Language::C          => c     ::generate(sqir, params, wp),

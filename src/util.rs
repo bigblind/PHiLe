@@ -10,7 +10,7 @@ use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut };
 use std::hash::{ Hash, Hasher };
 use std::fmt::{ self, Display, Formatter };
-use error::{ DerefError, DerefResult, SyntaxResult };
+use error::{ Error, Result };
 use unicode_segmentation::UnicodeSegmentation;
 
 
@@ -63,6 +63,15 @@ pub struct PackageInfo {
     pub home_page:   &'static str,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct Color {
+    pub reset:     &'static str,
+    pub info:      &'static str,
+    pub highlight: &'static str,
+    pub success:   &'static str,
+    pub error:     &'static str,
+}
+
 #[derive(Debug)]
 pub struct RcCell<T: ?Sized> {
     ptr: Rc<RefCell<T>>,
@@ -76,19 +85,6 @@ pub struct WkCell<T: ?Sized> {
 #[derive(Debug)]
 pub struct WeakDisplay<'a, T: 'a>(pub &'a WkCell<T>);
 
-
-pub fn grapheme_count(string: &str) -> usize {
-    string.graphemes(true).count()
-}
-
-pub fn unescape_string_literal(string: &str) -> SyntaxResult<String> {
-    if string.contains('\\') {
-        unimplemented!() // TODO(H2CO3): unescape string literals
-    } else {
-        Ok(string.to_owned())
-    }
-}
-
 pub static PACKAGE_INFO: PackageInfo = PackageInfo {
     name:        env!["CARGO_PKG_NAME"],
     version:     env!["CARGO_PKG_VERSION"],
@@ -96,6 +92,27 @@ pub static PACKAGE_INFO: PackageInfo = PackageInfo {
     description: env!["CARGO_PKG_DESCRIPTION"],
     home_page:   env!["CARGO_PKG_HOMEPAGE"],
 };
+
+pub static COLOR: Color = Color {
+    reset:     "\x1b[0m",
+    info:      "\x1b[1;33m",
+    highlight: "\x1b[1;36m",
+    success:   "\x1b[1;32m",
+    error:     "\x1b[1;31m",
+};
+
+
+pub fn grapheme_count(string: &str) -> usize {
+    string.graphemes(true).count()
+}
+
+pub fn unescape_string_literal(string: &str) -> Result<String> {
+    if string.contains('\\') {
+        unimplemented!() // TODO(H2CO3): unescape string literals
+    } else {
+        Ok(string.to_owned())
+    }
+}
 
 
 impl<T> RcCell<T> {
@@ -105,12 +122,12 @@ impl<T> RcCell<T> {
         }
     }
 
-    pub fn borrow(&self) -> DerefResult<Ref<T>> {
-        self.ptr.try_borrow().map_err(DerefError::Borrow)
+    pub fn borrow(&self) -> Result<Ref<T>> {
+        self.ptr.try_borrow().map_err(Error::from)
     }
 
-    pub fn borrow_mut(&self) -> DerefResult<RefMut<T>> {
-        self.ptr.try_borrow_mut().map_err(DerefError::BorrowMut)
+    pub fn borrow_mut(&self) -> Result<RefMut<T>> {
+        self.ptr.try_borrow_mut().map_err(Error::from)
     }
 
     pub fn as_weak(&self) -> WkCell<T> {
@@ -154,8 +171,8 @@ impl<T> WkCell<T> {
         }
     }
 
-    pub fn as_rc(&self) -> DerefResult<RcCell<T>> {
-        self.ptr.upgrade().map(|rc| RcCell { ptr: rc }).ok_or(DerefError::Strongify)
+    pub fn as_rc(&self) -> Result<RcCell<T>> {
+        self.ptr.upgrade().map(|rc| RcCell { ptr: rc }).ok_or(Error::Strongify)
     }
 }
 

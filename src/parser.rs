@@ -8,8 +8,8 @@
 
 use std::slice;
 use lexer::{ Token, TokenKind, Range, Ranged };
+use error::{ Error, Result };
 use ast::*;
-use error::{ SyntaxError, SyntaxResult };
 use util::unescape_string_literal;
 
 
@@ -17,11 +17,11 @@ struct Parser<'a> {
     tokens: slice::Iter<'a, Token<'a>>,
 }
 
-pub type ProgResult<'a> = SyntaxResult<Prog<'a>>;
-pub type ItemResult<'a> = SyntaxResult<Item<'a>>;
-pub type ExpResult<'a>  = SyntaxResult<Exp<'a>>;
-pub type TyResult<'a>   = SyntaxResult<Ty<'a>>;
-pub type LexResult<'a>  = SyntaxResult<&'a Token<'a>>;
+pub type ProgResult<'a> = Result<Prog<'a>>;
+pub type ItemResult<'a> = Result<Item<'a>>;
+pub type ExpResult<'a>  = Result<Exp<'a>>;
+pub type TyResult<'a>   = Result<Ty<'a>>;
+pub type LexResult<'a>  = Result<&'a Token<'a>>;
 
 
 pub fn parse<'a>(tokens: &'a [Token]) -> ProgResult<'a> {
@@ -67,11 +67,11 @@ impl<'a> Parser<'a> {
         self.tokens.len() > 0
     }
 
-    fn expectation_error(&self, expected: &str) -> SyntaxError {
+    fn expectation_error(&self, expected: &str) -> Error {
         let token = self.next_token();
         let actual = token.map_or("end of input", |t| t.value);
 
-        SyntaxError {
+        Error::Syntax {
             message: format!("Expected {}; found {}", expected, actual),
             range:   token.map(Ranged::range),
         }
@@ -200,7 +200,7 @@ impl<'a> Parser<'a> {
         Ok(item)
     }
 
-    fn parse_field(&mut self) -> SyntaxResult<Field<'a>> {
+    fn parse_field(&mut self) -> Result<Field<'a>> {
         let name_tok = self.expect_identifier()?;
         let name = name_tok.value;
         let ty = self.expect(":").and_then(|_| self.parse_type())?;
@@ -211,7 +211,7 @@ impl<'a> Parser<'a> {
         Ok(Field { range, name, ty, relation })
     }
 
-    fn maybe_parse_relation(&mut self) -> SyntaxResult<Option<RelDecl<'a>>> {
+    fn maybe_parse_relation(&mut self) -> Result<Option<RelDecl<'a>>> {
         #[allow(non_upper_case_globals)]
         static relation_operators: &[&str] = &[
             // I just couldn't make up my mind as to how to denote
@@ -254,7 +254,7 @@ impl<'a> Parser<'a> {
         Ok(Item::EnumDecl(EnumDecl { range, name, variants }))
     }
 
-    fn parse_variant(&mut self) -> SyntaxResult<Variant<'a>> {
+    fn parse_variant(&mut self) -> Result<Variant<'a>> {
         let name_tok = self.expect_identifier()?;
         let name = name_tok.value;
 
@@ -281,7 +281,7 @@ impl<'a> Parser<'a> {
         self.parse_function().map(Item::FuncDef)
     }
 
-    fn parse_function(&mut self) -> SyntaxResult<Function<'a>> {
+    fn parse_function(&mut self) -> Result<Function<'a>> {
         let fn_keyword = self.expect("fn")?;
         let name_tok = self.expect_identifier()?;
         let name = Some(name_tok.value);
@@ -299,7 +299,7 @@ impl<'a> Parser<'a> {
         Ok(Function { range, name, arguments, ret_type, body })
     }
 
-    fn parse_decl_arg(&mut self) -> SyntaxResult<FuncArg<'a>> {
+    fn parse_decl_arg(&mut self) -> Result<FuncArg<'a>> {
         let name_tok = self.expect_identifier()?;
         let ty = match self.accept(":") {
             Some(_) => Some(self.parse_type()?),
@@ -742,7 +742,7 @@ impl<'a> Parser<'a> {
                 let message = format!("Binary operator {} is not associative", op);
                 let range = self.next_token().map(Ranged::range);
 
-                Err(SyntaxError { message, range })
+                Err(Error::Syntax { message, range })
             } else {
                 let range = make_range(&lhs, &rhs);
                 let expr = BinaryOp { op, lhs, rhs };
@@ -849,9 +849,9 @@ impl<'a> Parser<'a> {
     // Generic helpers for parsing either expressions or types
     //
 
-    fn parse_prefix<N, S, K>(&mut self, tokens: &[&str], nodes: &[N], subexpr: S) -> SyntaxResult<Node<K>>
+    fn parse_prefix<N, S, K>(&mut self, tokens: &[&str], nodes: &[N], subexpr: S) -> Result<Node<K>>
         where N: Fn(Box<Node<K>>) -> K,
-              S: FnOnce(&mut Self) -> SyntaxResult<Node<K>> {
+              S: FnOnce(&mut Self) -> Result<Node<K>> {
 
         assert!(tokens.len() == nodes.len());
 
@@ -874,8 +874,8 @@ impl<'a> Parser<'a> {
         subexpr: P,
         delim:   &str,
         close:   &str
-    ) -> SyntaxResult<(Vec<V>, Range)>
-        where P: Fn(&mut Self) -> SyntaxResult<V> {
+    ) -> Result<(Vec<V>, Range)>
+        where P: Fn(&mut Self) -> Result<V> {
 
         let mut items = Vec::new();
         let open_tok = self.expect(open)?;

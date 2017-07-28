@@ -7,13 +7,14 @@
 //
 
 use std::io;
+use error::Result;
 use declgen::go::*;
 use codegen::*;
 use sqir::*;
 use util::*;
 
 
-pub fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     let file_name = NAMING_CONVENTION.top_basename.to_owned() + ".go";
     let wptr = wp(&file_name)?;
     let mut wr = wptr.borrow_mut();
@@ -31,5 +32,7 @@ pub fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProv
         ctxname = NAMING_CONVENTION.context_name,
         ctxtype = NAMING_CONVENTION.context_type,
         namespace = package_name,
-    )
+    )?;
+
+    Ok(())
 }

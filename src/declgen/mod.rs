@@ -16,7 +16,7 @@ pub mod js;
 pub mod python;
 pub mod java;
 
-use std::io;
+use error::Result;
 use codegen::*;
 use sqir::*;
 
@@ -30,7 +30,7 @@ macro_rules! call_declgen {
     }
 }
 
-pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     match params.language {
         Language::Rust       => call_declgen!(rust,   sqir, params, wp),
         Language::C          => call_declgen!(c,      sqir, params, wp),
