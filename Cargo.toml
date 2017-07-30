@@ -27,8 +27,8 @@ panic = "abort"
 panic = "unwind"
 
 [dependencies]
-clap                 = "2.25.1"
-unicode-segmentation = "1.1.0"
+clap                 = "2.26.0"
+unicode-segmentation = "1.2.0"
 regex                = "0.2.2"
 heck                 = "0.2.1"
 
