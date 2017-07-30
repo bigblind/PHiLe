@@ -223,7 +223,7 @@ fn generate_function(
         )?
     }
 
-    write!(wr, " (")?;
+    write!(wr, "(")?;
 
     for arg in &func.args {
         let ptr = arg.borrow()?;
