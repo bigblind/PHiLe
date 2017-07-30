@@ -8,6 +8,8 @@ license       = "BSD"
 readme        = "README.md"
 documentation = "https://h2co3.github.io/phile/docs"
 description   = "The Painless High-Level Persistence Engine"
+keywords      = ["database", "orm", "storage", "codegen", "dsl"]
+categories    = ["command-line-interface", "command-line-utilities", "database", "database-implementations", "development-tools"]
 
 [profile.dev]
 panic = "abort"
@@ -21,8 +23,14 @@ panic = "abort"
 [profile.doc]
 panic = "abort"
 
+[profile.test]
+panic = "unwind"
+
 [dependencies]
 clap                 = "2.25.1"
 unicode-segmentation = "1.1.0"
 regex                = "0.2.2"
 heck                 = "0.2.1"
+
+[dev-dependencies]
+quickcheck = "0.4.1"

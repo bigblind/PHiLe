@@ -3,7 +3,7 @@
 
 ### What's PHiLe?
 
-PHiLe (pronounced fillet), the Painless High‑Level Persistence Engine, is a next‑generation database management tool and domain‑specific language. It allows application developers to write what is basically a textual form of a conceptual or entity relationship model, from which it automatically generates a Database Abstraction Layer.
+PHiLe (pronounced *fillet*), the Painless High‑Level Persistence Engine, is a next‑generation database management tool and domain‑specific language. It allows application developers to write what is basically a textual form of a conceptual or entity relationship model, from which it automatically generates a Database Abstraction Layer.
 
 Unlike traditional ORMs, it has a strong, expressive type system. It allows programmers to work with many kinds of values, not only objects, therefore trivially eliminating many of the bottlenecks commonly associated with ORM solutions, such as having to retrieve the transitive closure of an object, only to discard all but a few of its scalar attributes.
 
