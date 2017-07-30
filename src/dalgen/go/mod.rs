@@ -17,6 +17,28 @@ pub mod mongodb;
 pub mod mariadb;
 
 
+//
+// Naming Conventions for frequently-occurring types and variables
+//
+
+#[derive(Debug, Clone, Copy)]
+pub struct NamingConvention {
+    pub context_type: &'static str,
+    pub context_name: &'static str,
+    pub tmp_prefix:   &'static str,
+    pub var_prefix:   &'static str,
+    pub top_basename: &'static str,
+}
+
+static NAMING_CONVENTION: NamingConvention = NamingConvention {
+    context_type: "PhileCtx",
+    context_name: "ctx",
+    tmp_prefix:   "tmp_",
+    var_prefix:   "var_",
+    top_basename: "PHiLe-Context",
+};
+
+
 pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     // First, generate the schema
     match params.database {
@@ -35,35 +57,38 @@ pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) ->
 
 fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     for (ns_name, namespace) in &sqir.globals {
-        for (raw_name, expr) in namespace {
-            let namespace_or = |default| ns_name.as_ref().map_or(default, String::as_ref);
-            let file_name = namespace_or(NAMING_CONVENTION.top_basename).to_owned() + ".go";
-            let prefixed_name = namespace_or("").to_owned() + "_" + raw_name;
-            let name = transform_func_name(&prefixed_name, params);
-            let wptr = wp(&file_name)?;
-            let mut wr = wptr.try_borrow_mut()?;
+        for (global_name, expr) in namespace {
+            let ns_name = ns_name.as_ref().map(String::as_str);
+            let base_name = ns_name.unwrap_or(NAMING_CONVENTION.top_basename);
+            let file_name = base_name.to_owned() + ".go";
+            let wr = wp(&file_name)?;
 
-            write_global(&mut *wr, &name, &*expr.borrow()?, params)?;
+            generate_global(
+                &mut *wr.try_borrow_mut()?,
+                ns_name,
+                global_name,
+                &*expr.borrow()?,
+                params
+            )?;
         }
     }
 
     Ok(())
 }
 
-fn write_global(wr: &mut io::Write, name: &str, expr: &Expr, params: &CodegenParams) -> Result<()> {
-    let ty_ptr = expr.ty.borrow()?;
-
-    let ty = match *ty_ptr {
-        Type::Function(ref ty) => ty,
-        ref t => bug!("Non-Function global?! {}", t),
-    };
-
-    let func = match expr.value {
-        Value::Function(ref func) => func,
-        ref val => bug!("Non-Function global?! {:#?}", val),
-    };
-
-    generate_function(wr, name, ty, func, params)
+fn generate_global(
+    wr:     &mut io::Write,
+    ns:     Option<&str>,
+    name:   &str,
+    expr:   &Expr,
+    params: &CodegenParams,
+) -> Result<()> {
+    match (&expr.value, &*expr.ty.borrow()?) {
+        (&Value::Function(ref func), &Type::Function(ref ty)) => {
+            generate_function(wr, ns, Some(name), func, ty, params)
+        },
+        (val, ty) => bug!("Non-Function global?! {} ({:#?})", ty, val),
+    }
 }
 
 //
@@ -177,24 +202,34 @@ fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: 
 
 fn generate_function(
     wr:     &mut io::Write,
-    name:   &str,
-    ty:     &FunctionType,
+    ns:     Option<&str>,
+    name:   Option<&str>,
     func:   &Function,
+    ty:     &FunctionType,
     params: &CodegenParams,
 ) -> Result<()> {
-    write!(
-        wr,
-        "func ({} {}) {}(",
-        NAMING_CONVENTION.context_name,
-        NAMING_CONVENTION.context_type,
-        name
-    )?;
+    // lambdas can't be in a namespace, only global functions can
+    assert!(name.is_some() || ns.is_none());
+
+    write!(wr, "func")?;
+
+    if let Some(ref func_name) = name {
+        write!(
+            wr,
+            " ({} {}) {}",
+            NAMING_CONVENTION.context_name,
+            NAMING_CONVENTION.context_type,
+            name_for_global_func(ns, func_name, params),
+        )?
+    }
+
+    write!(wr, " (")?;
 
     for arg in &func.args {
         let ptr = arg.borrow()?;
         match ptr.value {
-            Value::FuncArg { index, .. } => match ptr.id {
-                ExprId::Local(_) => if index > 0 { write!(wr, ", ")? },
+            Value::FuncArg { .. } => match ptr.id {
+                ExprId::Local(_) => {},
                 ExprId::Global(ref name) => bug!("FuncArg is global {}?!", name),
                 ExprId::Temp(index) => bug!("FuncArg is temporary {}?!", index),
             },
@@ -202,6 +237,7 @@ fn generate_function(
         }
 
         write_expr_decl(wr, arg, params)?;
+        write!(wr, ", ")?;
     }
 
     write!(wr, ") ")?;
@@ -218,14 +254,18 @@ fn generate_function(
 // The following functions write references (i.e. reads/loads) and
 // variable/argument declarations for named-by-the-user variable
 // bindings and temporary expressions.
-// TODO(H2CO3): should these functions transform names according
-// to the name transforms specified by the provided CodegenParams?
-
+// TODO(H2CO3): Once global IDs gain a namespace name, respect that as well.
+// TODO(H2CO3): What to do with non-function globals (e.g. enum variants)?
 fn write_expr_id(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> io::Result<()> {
     match *id {
         ExprId::Temp(index)      => write!(wr, "{}{}", NAMING_CONVENTION.tmp_prefix, index),
         ExprId::Local(ref name)  => write!(wr, "{}{}", NAMING_CONVENTION.var_prefix, name),
-        ExprId::Global(ref name) => write!(wr, "{}.{}", NAMING_CONVENTION.context_type, transform_func_name(name, params)),
+        ExprId::Global(ref name) => write!(
+            wr,
+            "{}.{}", // TODO(H2CO3): only write 'ctx.' prefix for functions!!!
+            NAMING_CONVENTION.context_name,
+            name_for_global_func(None /* TODO(H2CO3): namespace */, name, params),
+        ),
     }
 }
 
@@ -234,4 +274,10 @@ fn write_expr_decl(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) ->
     write_expr_id(wr, &ptr.id, params)?;
     write!(wr, " ")?;
     write_type(wr, &ptr.ty.as_weak(), params)
+}
+
+// Helper for writing the prefixed name of a global function. `ns` is the namespace.
+fn name_for_global_func(ns: Option<&str>, raw_name: &str, params: &CodegenParams) -> String {
+    let name = ns.map_or(String::new(), str::to_owned) + "_" + raw_name;
+    transform_func_name(&name, params)
 }

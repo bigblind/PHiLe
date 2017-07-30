@@ -687,8 +687,8 @@ impl SQIRGen {
                 // Only pointer-to-class types are permitted.
                 // (Placeholders to classes are also allowed, obviously.)
                 match *ptr {
-                    Type::Class(_) => (),
-                    Type::Placeholder { kind: PlaceholderKind::Class, .. } => (),
+                    Type::Class(_) => {},
+                    Type::Placeholder { kind: PlaceholderKind::Class, .. } => {},
                     _ => return sema_error!(
                         decl,
                         "Pointer to non-class type {}",
@@ -1265,7 +1265,7 @@ impl SQIRGen {
         match self.sqir.named_types.get(ns.name) {
             Some(rc) => {
                 match *rc.borrow()? {
-                    Type::Enum(_) | Type::Struct(_) | Type::Class(_) => (),
+                    Type::Enum(_) | Type::Struct(_) | Type::Class(_) => {},
                     _ => return sema_error!(
                         ns,
                         "Cannot impl built-in type '{}'",
@@ -1285,7 +1285,7 @@ impl SQIRGen {
         Ok(())
     }
 
-    fn generate_global_function(&mut self, func: &ast::Function, ns: &Option<String>) -> Result<()> {
+    fn generate_global_function(&mut self, func: &ast::Function, ns_name: &Option<String>) -> Result<()> {
         let ctx = TyCtx {
             ty:    None,
             range: func.range,
@@ -1293,7 +1293,7 @@ impl SQIRGen {
         let expr = self.generate_function(ctx, func)?;
         let expr_ref = expr.borrow()?;
         let name = func.name.ok_or_else(lazy_bug!("No function name"))?;
-        let ns = self.sqir.globals.get_mut(ns).ok_or_else(lazy_bug!("No namespace"))?;
+        let ns = self.sqir.globals.get_mut(ns_name).ok_or_else(lazy_bug!("No namespace"))?;
         let mut slot = ns.get(name).ok_or_else(lazy_bug!("No forward-declared function"))?.borrow_mut()?;
 
         // Sanity-check generate_function(), then replace
@@ -1401,7 +1401,7 @@ impl SQIRGen {
         };
 
         match *ty.borrow()? {
-            Type::Optional(_) => (),
+            Type::Optional(_) => {},
             _ => return sema_error!(ctx.range, "Nil must have optional type"),
         }
 

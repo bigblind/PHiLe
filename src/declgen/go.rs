@@ -16,27 +16,6 @@ use sqir::*;
 use util::*;
 
 
-//
-// Naming Conventions for frequently-occurring types and variables
-//
-
-#[derive(Debug, Clone, Copy)]
-pub struct NamingConvention {
-    pub context_type: &'static str,
-    pub context_name: &'static str,
-    pub tmp_prefix:   &'static str,
-    pub var_prefix:   &'static str,
-    pub top_basename: &'static str,
-}
-
-pub static NAMING_CONVENTION: NamingConvention = NamingConvention {
-    context_type: "PhileCtx",
-    context_name: "ctx",
-    tmp_prefix:   "tmp_",
-    var_prefix:   "var_",
-    top_basename: "PHiLe-Context",
-};
-
 struct Generator<'a> {
     sqir:   &'a SQIR,
     params: &'a CodegenParams,
@@ -94,7 +73,7 @@ impl<'a> Generator<'a> {
         for (name, ty) in types {
             // primitive named types need no declaration
             match *ty.borrow()? {
-                Type::Struct(_) | Type::Class(_) | Type::Enum(_) => (),
+                Type::Struct(_) | Type::Class(_) | Type::Enum(_) => {},
                 _ => continue,
             }
 
@@ -251,11 +230,11 @@ fn write_tuple_type(wr: &mut io::Write, types: &[WkType], params: &CodegenParams
 }
 
 fn write_function_type(wr: &mut io::Write, ty: &FunctionType, params: &CodegenParams) -> Result<()> {
-    write!(wr, "func({}", NAMING_CONVENTION.context_type)?;
+    write!(wr, "func(")?;
 
     for arg in &ty.arg_types {
-        write!(wr, ", ")?;
         write_type(wr, arg, params)?;
+        write!(wr, ", ")?;
     }
 
     write!(wr, ") ")?;

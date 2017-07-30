@@ -8,7 +8,7 @@
 
 use std::io;
 use error::Result;
-use declgen::go::*;
+use dalgen::go::NAMING_CONVENTION;
 use codegen::*;
 use sqir::*;
 use util::*;
