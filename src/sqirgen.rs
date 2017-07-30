@@ -1338,7 +1338,7 @@ impl SQIRGen {
             ExpKind::Subscript(_)         => unimplemented!(),
             ExpKind::MemberAccess(_)      => unimplemented!(),
             ExpKind::QualAccess(_)        => unimplemented!(),
-            ExpKind::FuncCall(_)          => unimplemented!(),
+            ExpKind::FuncCall(ref call)   => self.generate_call(ctx.clone(), call),
             ExpKind::StructLiteral(_)     => unimplemented!(),
             ExpKind::If(_)                => unimplemented!(),
             ExpKind::Match(_)             => unimplemented!(),
@@ -1583,6 +1583,10 @@ impl SQIRGen {
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
+    fn generate_call(&mut self, _ctx: TyCtx, _call: &ast::FuncCall) -> Result<RcExpr> {
+        unimplemented!()
+    }
+
     //
     // Declaring locals, RAII, etc.
     //
@@ -1650,9 +1654,6 @@ impl SQIRGen {
         let tmp_args = args.clone();
 
         // Generate body
-        // TODO(H2CO3): isn't it a problem that at this point, while the
-        // body is being generated, the arguments' parent function
-        // pointer points nowhere because it's an empty weak pointer?
         let body = self.generate_expr(&func.body, ret_type_hint)?;
         let ret_type = body.borrow()?.ty.clone();
 
