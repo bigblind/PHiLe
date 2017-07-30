@@ -186,8 +186,15 @@ impl<T> Clone for WkCell<T> {
 
 impl<'a, T> Display for WeakDisplay<'a, T> where T: Display {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let rc = self.0.as_rc().expect("cannot strongify WkCell");
-        let ptr = rc.borrow().expect("cannot borrow RcCell");
-        ptr.fmt(f)
+        let rc = match self.0.as_rc() {
+            Ok(rc) => rc,
+            Err(_) => return f.write_str("<cannot strongify>"),
+        };
+        let ptr = match rc.borrow() {
+            Ok(ptr) => ptr,
+            Err(_)  => return f.write_str("<cannot borrow>"),
+        };
+
+        Display::fmt(&*ptr, f)
     }
 }
