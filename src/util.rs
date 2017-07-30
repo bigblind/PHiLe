@@ -43,17 +43,6 @@ macro_rules! btree_map {
     ($($k: expr => $v: expr),+,) => { btree_map!($($k => $v),+) };
 }
 
-macro_rules! impl_display_as_debug {
-    ($($name: ty),*) => ($(
-        impl Display for $name {
-            fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-                Debug::fmt(self, f)
-            }
-        }
-    )*);
-    ($($name: ty),+,) => { impl_display_as_debug!($($name),+); };
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct PackageInfo {
     pub name:        &'static str,

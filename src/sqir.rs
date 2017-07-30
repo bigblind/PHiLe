@@ -6,7 +6,7 @@
 // on 07/04/2017
 //
 
-use std::fmt::{ self, Debug, Display, Formatter };
+use std::fmt::{ self, Display, Formatter };
 use std::collections::{ HashMap, BTreeMap, BTreeSet };
 use std::cmp::*;
 use util::*;
@@ -405,9 +405,29 @@ impl Display for Type {
     }
 }
 
-impl_display_as_debug! {
-    PlaceholderKind,
-    Cardinality,
+impl Display for PlaceholderKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let s = match *self {
+            PlaceholderKind::Struct => "struct",
+            PlaceholderKind::Class  => "class",
+            PlaceholderKind::Enum   => "enum",
+        };
+
+        f.write_str(s)
+    }
+}
+
+impl Display for Cardinality {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let s = match *self {
+            Cardinality::ZeroOrOne  => "zero or one",
+            Cardinality::One        => "one",
+            Cardinality::ZeroOrMore => "zero or more",
+            Cardinality::OneOrMore  => "one or more",
+        };
+
+        f.write_str(s)
+    }
 }
 
 impl PartialOrd for RelationSide {
