@@ -25,7 +25,7 @@ PHiLe also supports a wide spectrum of different languages and databases, theref
 
 ### Is it documented?
 
-Sure, please visit the [official documentation](https://h2co3.github.io/phile/docs/phile/index.html).
+Sure, please visit the [official documentation](https://h2co3.github.io/phile/docs/phile/).
 
 If you learn easier by example, check out the [examples](https://github.com/H2CO3/PHiLe/tree/master/doc/examples).
 
