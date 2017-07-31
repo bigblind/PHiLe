@@ -42,7 +42,7 @@ mod tests {
         #[allow(trivial_casts)]
         fn random_sources(sources: Vec<String>) -> bool {
             match lex(&sources) {
-                Err(Error::Syntax { ref message, range, .. }) => {
+                Err(Error::Syntax { ref message, range }) => {
                     assert_eq!(message, "Invalid token");
                     assert!(!sources[range.unwrap().begin.src_idx].is_empty());
                     true
