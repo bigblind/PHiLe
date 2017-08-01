@@ -29,13 +29,6 @@ macro_rules! assoc_map {
     })
 }
 
-macro_rules! hash_map {
-    ($($k: expr => $v: expr),*) => {
-        assoc_map!(HashMap, $($k => $v),*)
-    };
-    ($($k: expr => $v: expr),+,) => { hash_map!($($k => $v),+) };
-}
-
 macro_rules! btree_map {
     ($($k: expr => $v: expr),*) => {
         assoc_map!(BTreeMap, $($k => $v),*)
@@ -61,12 +54,12 @@ pub struct Color {
     pub error:     &'static str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RcCell<T: ?Sized> {
     ptr: Rc<RefCell<T>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
@@ -140,7 +133,7 @@ impl<T> Clone for RcCell<T> {
 // Tests equality based on pointer identity
 impl<T> PartialEq for RcCell<T> {
     fn eq(&self, other: &Self) -> bool {
-        self.ptr.as_ptr() == other.ptr.as_ptr()
+        Rc::ptr_eq(&self.ptr, &other.ptr)
     }
 }
 

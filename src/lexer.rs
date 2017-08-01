@@ -107,7 +107,7 @@ impl<'a> Lexer<'a> {
     fn new() -> Lexer<'a> {
         Lexer {
             source:   "",
-            location: Location::default(),
+            location: Default::default(),
             tokens:   Vec::new(),
             regexes:  [
                 (TokenKind::Whitespace,     Regex::new(r"^\s+").unwrap()),

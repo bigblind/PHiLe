@@ -144,7 +144,7 @@ impl SQIRGen {
     fn new() -> SQIRGen {
         SQIRGen {
             sqir:    SQIR::new(),
-            locals:  RcCell::new(Locals::default()),
+            locals:  Default::default(),
             tmp_idx: 0,
         }
     }
@@ -864,14 +864,6 @@ impl SQIRGen {
 
     fn get_string_type(&self) -> RcType {
         self.get_builtin_type(BUILTIN_NAME.string_name)
-    }
-
-    fn get_blob_type(&self) -> RcType {
-        self.get_builtin_type(BUILTIN_NAME.blob_name)
-    }
-
-    fn get_date_type(&self) -> RcType {
-        self.get_builtin_type(BUILTIN_NAME.date_name)
     }
 
     //

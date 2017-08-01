@@ -617,10 +617,6 @@ impl<'a> Parser<'a> {
         Ok(Exp { kind, range })
     }
 
-    fn parse_struct_expr(&mut self) -> ExpResult<'a> {
-        unimplemented!()
-    }
-
     fn parse_func_expr(&mut self) -> ExpResult<'a> {
         let (arguments, arg_range) = self.parse_paren_delim(
             "|", Self::parse_decl_arg, ",", "|"
@@ -709,24 +705,6 @@ impl<'a> Parser<'a> {
         }
 
         Ok(lhs)
-    }
-
-    fn parse_binop_rightassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ExpResult<'a>
-        where F: Fn(&mut Self) -> ExpResult<'a> {
-
-        let lhs = subexpr(self)?;
-
-        if let Some(token) = self.accept_one_of(tokens) {
-            let rhs = self.parse_binop_rightassoc(tokens, subexpr)?;
-            let range = make_range(&lhs, &rhs);
-            let op = token.value;
-            let expr = BinaryOp { op, lhs, rhs };
-            let kind = ExpKind::BinaryOp(Box::new(expr));
-
-            Ok(Exp { kind, range })
-        } else {
-            Ok(lhs)
-        }
     }
 
     fn parse_binop_noassoc<F>(&mut self, tokens: &[&str], subexpr: F) -> ExpResult<'a>
