@@ -15,3 +15,42 @@ struct Lol {}
 fn qux() -> float -> Lol? {
     double
 }
+
+fn arg(arg: String) -> String {
+    arg
+}
+
+fn local(arg: int) -> float {
+    let my_var = 42.0;
+    my_var
+}
+
+fn many_args(a: int, b: float?) -> int {
+    let x = a;
+    let y = b;
+    let z = a;
+    let w = b;
+    let q = x;
+    let r = w;
+    x;
+    z;
+    r;
+    q;
+    w;
+    y;
+    x
+}
+
+fn many_locals() -> String {
+    let s = "hello world";
+    let p = s;
+    let r = "bonjour le monde";
+    let t = p;
+    let u = r;
+    let v = u;
+    let w = p;
+    let x = s;
+    let y = x;
+    let z = u;
+    p
+}
