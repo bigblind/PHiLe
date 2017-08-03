@@ -581,7 +581,8 @@ impl<'a> Parser<'a> {
         // then it's floating-point, otherwise it's an integer.
         if let Some(token) = self.accept_of_kind(TokenKind::NumericLiteral) {
             let range = token.range;
-            let kind = if token.value.contains(|c| "eE.".contains(c)) {
+            let float_chars: &[char] = &['e', 'E', '.'];
+            let kind = if token.value.contains(float_chars) {
                 ExpKind::FloatLiteral(token.value.parse()?)
             } else {
                 ExpKind::IntLiteral(token.value.parse()?)

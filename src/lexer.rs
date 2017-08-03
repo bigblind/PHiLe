@@ -12,14 +12,14 @@ use error::{ Error, Result };
 use util::grapheme_count;
 
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Location {
     pub line:    usize,
     pub column:  usize,
     pub src_idx: usize, // index of the source `self` points into
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Range {
     pub begin: Location,
     pub end:   Location,
@@ -60,13 +60,14 @@ pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>> {
 }
 
 impl Location {
-    // TODO(H2CO3): handle all other Unicode line separators
     fn advance_by(&self, lexeme: &str) -> Location {
-        match lexeme.rfind('\n') {
+        // TODO(H2CO3): Keep this list in sync with the regexes in Lexer::new()
+        let line_breaks: &[char] = &['\n', '\x0b', '\x0c', '\r', '\u{0085}', '\u{2028}', '\u{2029}'];
+        match lexeme.rfind(line_breaks) {
             // -1 because the \n itself doesn't count,
             // +1 because humans start counting at 1.
             Some(index) => Location {
-                line:    self.line + lexeme.matches('\n').count(),
+                line:    self.line + lexeme.matches(line_breaks).count(),
                 column:  grapheme_count(&lexeme[index..]) - 1 + 1,
                 src_idx: self.src_idx,
             },
@@ -111,9 +112,9 @@ impl<'a> Lexer<'a> {
             tokens:   Vec::new(),
             regexes:  [
                 (TokenKind::Whitespace,     Regex::new(r#"^\s+"#).unwrap()),
-                (TokenKind::Comment,        Regex::new(r#"^#[^\n]*\n?"#).unwrap()),
-                (TokenKind::Word,           Regex::new(r#"^[\p{Alphabetic}\p{M}\p{Pc}\p{Join_Control}_][\w_]*"#).unwrap()),
-                (TokenKind::NumericLiteral, Regex::new(r#"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|(\d+(\.\d+([eE][\+\-]?\d+)?)?))"#).unwrap()),
+                (TokenKind::Comment,        Regex::new(r#"^#[^\n\v\f\r\x{0085}\x{2028}\x{2029}]*[\n\v\f\r\x{0085}\x{2028}\x{2029}]?"#).unwrap()),
+                (TokenKind::Word,           Regex::new(r#"^[^\W0-9][\w]*"#).unwrap()),
+                (TokenKind::NumericLiteral, Regex::new(r#"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|([0-9]+(\.[0-9]+([eE][\+\-]?[0-9]+)?)?))"#).unwrap()),
                 (TokenKind::Punctuation,    Regex::new(r#"^([!\?\*\+]?<\->[!\?\*\+]?|\.{1,3}|[<>]=?|[=!]=|\->|=>?|::?|[\(\)\[\]\{\}\+\-\*/%&\|~\?,;])"#).unwrap()),
                 (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\"]|\\[\\"nrtb]|\\x[[:xdigit:]]{2}|\\u[[:xdigit:]]{4}|\\U[[:xdigit:]]{8})*""#).unwrap()),
             ],
