@@ -577,17 +577,8 @@ impl<'a> Parser<'a> {
             return Ok(Exp { kind, range });
         }
 
-        // If the lexeme contains a decimal point or an exponent,
-        // then it's floating-point, otherwise it's an integer.
         if let Some(token) = self.accept_of_kind(TokenKind::NumericLiteral) {
-            let range = token.range;
-            let float_chars: &[char] = &['e', 'E', '.'];
-            let kind = if token.value.contains(float_chars) {
-                ExpKind::FloatLiteral(token.value.parse()?)
-            } else {
-                ExpKind::IntLiteral(token.value.parse()?)
-            };
-            return Ok(Exp { kind, range });
+            return Self::parse_numeric_literal(token);
         }
 
         if let Some(token) = self.accept_of_kind(TokenKind::StringLiteral) {
@@ -604,6 +595,72 @@ impl<'a> Parser<'a> {
         }
 
         Err(self.expectation_error("literal or identifier"))
+    }
+
+    // Helper for parse_atomic_expr
+    fn parse_numeric_literal(token: &Token) -> ExpResult<'a> {
+        assert!(token.kind == TokenKind::NumericLiteral);
+
+        // If the lexeme contains a decimal point or an exponent,
+        // then it's floating-point, otherwise it's an integer.
+        let float_chars: &[char] = &['.', 'e', 'E'];
+
+        let kind = if token.value.contains(float_chars) {
+            Self::parse_float_literal(token)?
+        } else {
+            Self::parse_int_literal(token)?
+        };
+
+        let range = token.range;
+
+        Ok(Exp { kind, range })
+    }
+
+    // Helper for parse_numeric_literal
+    fn parse_float_literal(token: &Token) -> Result<ExpKind<'a>> {
+        assert!(token.kind == TokenKind::NumericLiteral);
+
+        let lexeme = token.value;
+
+        lexeme.parse()
+            .map(ExpKind::FloatLiteral)
+            .map_err(|err| Error::Syntax {
+                message: format!("Cannot parse float literal '{}': {}", lexeme, err),
+                range: Some(token.range),
+            })
+    }
+
+    // Helper for parse_numeric_literal
+    fn parse_int_literal(token: &Token) -> Result<ExpKind<'a>> {
+        assert!(token.kind == TokenKind::NumericLiteral);
+
+        let radix_map = [
+            ("0b",  2),
+            ("0B",  2),
+            ("0o",  8),
+            ("0O",  8),
+            ("0x", 16),
+            ("0X", 16),
+        ];
+
+        for &(prefix, radix) in &radix_map {
+            if token.value.starts_with(prefix) {
+                let lexeme = &token.value[prefix.len()..];
+                return Self::parse_int_with_radix(lexeme, radix, token.range);
+            }
+        }
+
+        Self::parse_int_with_radix(token.value, 10, token.range)
+    }
+
+    // helper for parse_int_literal
+    fn parse_int_with_radix(lexeme: &str, radix: u32, range: Range) -> Result<ExpKind<'a>> {
+        u64::from_str_radix(lexeme, radix)
+            .map(ExpKind::IntLiteral)
+            .map_err(|err| Error::Syntax {
+                message: format!("Cannot parse integer literal '{}': {}", lexeme, err),
+                range: Some(range),
+            })
     }
 
     fn parse_tuple_expr(&mut self) -> ExpResult<'a> {

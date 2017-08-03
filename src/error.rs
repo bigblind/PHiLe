@@ -9,7 +9,6 @@
 use std; // for error
 use std::io;
 use std::result;
-use std::num::{ ParseIntError, ParseFloatError };
 use std::fmt::{ self, Display, Formatter };
 use std::cell::{ BorrowError, BorrowMutError };
 use lexer::Range;
@@ -180,29 +179,5 @@ impl From<BorrowError> for Error {
 impl From<BorrowMutError> for Error {
     fn from(error: BorrowMutError) -> Self {
         Error::BorrowMut(error)
-    }
-}
-
-// TODO(H2CO3): parser should be aware of the range of the ParseIntError
-impl From<ParseIntError> for Error {
-    fn from(error: ParseIntError) -> Self {
-        use std::error::Error;
-
-        self::Error::Syntax {
-            message: error.description().to_owned(),
-            range:   None,
-        }
-    }
-}
-
-// TODO(H2CO3): parser should be aware of the range of the ParseFloatError
-impl From<ParseFloatError> for Error {
-    fn from(error: ParseFloatError) -> Self {
-        use std::error::Error;
-
-        self::Error::Syntax {
-            message: error.description().to_owned(),
-            range:   None,
-        }
     }
 }
