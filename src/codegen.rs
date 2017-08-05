@@ -13,14 +13,14 @@ use heck::{ SnakeCase, ShoutySnakeCase, MixedCase, CamelCase };
 use error::Result;
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DatabaseEngine {
     SQLite3,
     MongoDB,
     MariaDB,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Language {
     Rust,
     C,
@@ -33,13 +33,13 @@ pub enum Language {
     Java,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DatabaseAccessMode {
     Pod,
     ActiveRecord,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NameTransform {
     Identity,
     LowerSnakeCase, // isn't SnakeCase spelled with camel case ironic?
@@ -53,7 +53,7 @@ pub enum NameTransform {
 //              and Unsize are stabilized (see issue #27732)
 pub type WriterProvider = FnMut(&str) -> Result<Rc<RefCell<io::Write>>>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CodegenParams {
     pub database:               DatabaseEngine,
     pub language:               Language,

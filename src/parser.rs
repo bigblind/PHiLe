@@ -18,11 +18,11 @@ struct Parser<'a> {
     tokens: slice::Iter<'a, Token<'a>>,
 }
 
-pub type ProgResult<'a> = Result<Prog<'a>>;
-pub type ItemResult<'a> = Result<Item<'a>>;
-pub type ExpResult<'a>  = Result<Exp<'a>>;
-pub type TyResult<'a>   = Result<Ty<'a>>;
-pub type LexResult<'a>  = Result<&'a Token<'a>>;
+type ProgResult<'a> = Result<Prog<'a>>;
+type ItemResult<'a> = Result<Item<'a>>;
+type ExpResult<'a>  = Result<Exp<'a>>;
+type TyResult<'a>   = Result<Ty<'a>>;
+type LexResult<'a>  = Result<&'a Token<'a>>;
 
 
 pub fn parse<'a>(tokens: &'a [Token]) -> ProgResult<'a> {
