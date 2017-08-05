@@ -32,5 +32,4 @@ pub mod sqir;
 pub mod sqirgen;
 pub mod sqiropt;
 pub mod codegen;
-pub mod declgen;
 pub mod dalgen;

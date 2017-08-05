@@ -25,7 +25,6 @@ use phile::parser::*;
 use phile::sqirgen::*;
 use phile::sqiropt::*;
 use phile::codegen::*;
-use phile::declgen::*;
 use phile::dalgen::*;
 use phile::error::*;
 
@@ -233,6 +232,7 @@ fn main() {
     eprintln!();
 
     let args = get_args();
+    let mut wp = writer_provider_with_args(&args);
 
     let sources = stopwatch!("Reading Sources", {
         read_files(&args.sources).unwrap_or_else(
@@ -267,14 +267,6 @@ fn main() {
     });
 
     let sqir = stopwatch!("Optimizing SQIR", optimize_sqir(raw_sqir));
-
-    let mut wp = writer_provider_with_args(&args);
-
-    stopwatch!("Generating Declarations", {
-        generate_declarations(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| handle_compiler_error(error, &args.sources)
-        )
-    });
 
     stopwatch!("Generating Database Abstraction Layer", {
         generate_dal(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
