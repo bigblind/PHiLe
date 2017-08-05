@@ -25,12 +25,12 @@ mod mariadb;
 //
 
 #[derive(Debug, Clone, Copy)]
-pub struct NamingConvention {
-    pub context_type: &'static str,
-    pub context_name: &'static str,
-    pub tmp_prefix:   &'static str,
-    pub var_prefix:   &'static str,
-    pub top_basename: &'static str,
+struct NamingConvention {
+    context_type: &'static str,
+    context_name: &'static str,
+    tmp_prefix:   &'static str,
+    var_prefix:   &'static str,
+    top_basename: &'static str,
 }
 
 static NAMING_CONVENTION: NamingConvention = NamingConvention {
@@ -205,7 +205,7 @@ impl<'a> PodUdTypeGen<'a> {
 // Type annotations for declarations, etc.
 //
 
-pub fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> Result<()> {
+fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> Result<()> {
     let rc = ty.as_rc()?;
     let ptr = rc.borrow()?;
 
@@ -338,7 +338,7 @@ fn write_dummy_uses(wr: &mut io::Write, params: &CodegenParams) -> io::Result<()
 // Escaping string literals
 //
 
-pub fn escape_string_literal(s: &str) -> String {
+fn escape_string_literal(s: &str) -> String {
     // printable characters need not be escaped
     if s.chars().all(|c| 0x20 as char <= c && c <= 0x7e as char) {
         s.to_owned()
