@@ -12,20 +12,19 @@ use std::iter;
 use quickcheck::{ Arbitrary, Gen };
 use phile::error::Error;
 use phile::lexer;
+use phile::util::grapheme_count;
 
 
 //
 // Types for generating correct and incorrect source code
 //
 
-// Appends the lexeme onto source's buffer
+// Append a lexeme onto `source`'s buffer
 trait Lexeme: Arbitrary {
     fn render(&self, source: &mut SourceItem);
 }
 
-//
 // Metadata about a token, without the actual underlying lexeme
-//
 #[derive(Debug, Clone)]
 struct TokenHeader {
     slice: ops::Range<usize>,
@@ -33,45 +32,26 @@ struct TokenHeader {
     kind:  lexer::TokenKind,
 }
 
-//
-// Represents a multi-file input to the lexer
-//
-#[derive(Debug, Clone)]
-struct GoodSource {
-    items: Vec<SourceItem>,
-}
-
-impl Arbitrary for GoodSource {
-    fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        // Generate a random number of source items, but at least 1
-        let max_num_sources = 8;
-        let num_sources = g.gen_range(1, max_num_sources);
-        let mut items: Vec<_> = (0..num_sources).map(SourceItem::new).collect();
-
-        // Fill each item with a random number of correct lexemes, but at least 1
-        for item in &mut items {
-            let gen_size = 2; // g.size(); // TODO(H2CO3): g.size() once other kinds are implemented
-            for _ in 0..g.gen_range(1, gen_size) {
-                // TODO(H2CO3): whitespace is not the only kind of correct lexeme
-                GoodWhitespace::arbitrary(g).render(&mut *item);
-            }
-        }
-
-        GoodSource { items }
-    }
-
-    // TODO(H2CO3): implement shrink()
-}
-
-//
-// Represents a single "file" in a multi-source input to the lexer
-//
+// Represents a single "file" in multi-source input to the lexer
 #[derive(Debug, Clone)]
 struct SourceItem {
     buf:    String,
     tokens: Vec<TokenHeader>,
     index:  usize,
 }
+
+// Represents some well-formed multi-file input to the lexer
+#[derive(Debug, Clone)]
+struct ValidSource {
+    items: Vec<SourceItem>,
+}
+
+// Represents some ill-formed multi-file input to the lexer
+#[derive(Debug, Clone)]
+struct InvalidSource {
+    items: Vec<SourceItem>,
+}
+
 
 impl SourceItem {
     fn new(index: usize) -> SourceItem {
@@ -104,16 +84,40 @@ impl AsRef<str> for SourceItem {
     }
 }
 
+impl Arbitrary for ValidSource {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        // Generate a random number of source items, but at least 1
+        let max_num_sources = 8;
+        let num_sources = g.gen_range(1, max_num_sources);
+        let mut items: Vec<_> = (0..num_sources).map(SourceItem::new).collect();
+
+        // Fill each item with a random number of correct lexemes, but at least 1
+        for item in &mut items {
+            let gen_size = 2; // g.size(); // TODO(H2CO3): g.size() once other kinds are implemented
+            for _ in 0..g.gen_range(1, gen_size) {
+                // TODO(H2CO3): whitespace is not the only kind of correct lexeme
+                ValidWhitespace::arbitrary(g).render(&mut *item);
+            }
+        }
+
+        ValidSource { items }
+    }
+
+    // TODO(H2CO3): implement shrink()
+    // XXX: it's not as trivial as removing lexemes one-by-one,
+    // because there are many rules concerning consecutive lexemes!
+}
+
 //
 // A lexeme containing well-formed whitespace characters,
 // horizontal as well as vertical.
 //
 #[derive(Debug, Clone)]
-struct GoodWhitespace {
+struct ValidWhitespace {
     buf: String,
 }
 
-impl Arbitrary for GoodWhitespace {
+impl Arbitrary for ValidWhitespace {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         // generate at least one valid whitespace character
         let buf = (0..g.gen_range(1, 16)).map(|_| {
@@ -121,7 +125,7 @@ impl Arbitrary for GoodWhitespace {
             *g.choose(chars).unwrap()
         }).collect();
 
-        GoodWhitespace { buf }
+        ValidWhitespace { buf }
     }
 
     fn shrink(&self) -> Box<Iterator<Item=Self>> {
@@ -134,17 +138,19 @@ impl Arbitrary for GoodWhitespace {
                 .map(|(_, c)| c)
                 .collect();
 
-            GoodWhitespace { buf }
+            ValidWhitespace { buf }
         });
 
         Box::new(iter.collect::<Vec<_>>().into_iter())
     }
 }
 
-impl Lexeme for GoodWhitespace {
+impl Lexeme for ValidWhitespace {
     fn render(&self, source: &mut SourceItem) {
         let mut end = source.end_location();
 
+        // A WS char is a single grapheme cluster on its own,
+        // so bumping end.column for each char is OK.
         for ch in self.buf.chars() {
             if VER_WS.contains(&ch) {
                 end.column = 1;
@@ -190,6 +196,62 @@ static VER_WS: &[char] = &[
     '\u{2028}',
     '\u{2029}',
 ];
+
+//
+// A lexeme representing a line comment ending with a newline.
+//
+#[derive(Debug, Clone)]
+struct ValidLineComment {
+    buf: String,
+}
+
+impl Arbitrary for ValidLineComment {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        // Generate 0 or more valid non-newline extended grapheme clusters.
+        // TODO(H2CO3): generate more interesting, but still valid strings
+        let it = (0..g.gen_range(0, 16)).map(|_| {
+            'a'
+        });
+        let newline = *g.choose(VER_WS).unwrap();
+        let buf = iter::once('#').chain(it).chain(iter::once(newline)).collect();
+
+        ValidLineComment { buf }
+    }
+
+    fn shrink(&self) -> Box<Iterator<Item=Self>> {
+        // leave out each character, one-by-one,
+        // except the leading '#' and the trailing newline
+        let it = (1..self.buf.chars().count() - 1).map(|i| {
+            let buf: String = self.buf
+                .chars()
+                .enumerate()
+                .filter(|&(j, _)| j != i)
+                .map(|(_, c)| c)
+                .collect();
+
+            assert!(buf.chars().next().unwrap() == '#');
+            assert!(VER_WS.contains(&buf.chars().last().unwrap()));
+
+            ValidLineComment { buf }
+        });
+
+        Box::new(it.collect::<Vec<_>>().into_iter())
+    }
+}
+
+impl Lexeme for ValidLineComment {
+    fn render(&self, source: &mut SourceItem) {
+        // A line comment represented by this type always ends in a newline.
+        assert!(self.buf.chars().next().unwrap() == '#');
+        assert!(VER_WS.contains(&self.buf.chars().last().unwrap()));
+
+        let mut end = source.end_location();
+        end.line += 1;
+        end.column = 1;
+
+        source.push(&self.buf, lexer::TokenKind::Comment, end);
+    }
+}
 
 //
 // Actual Unit Tests
@@ -254,26 +316,58 @@ fn unicode_digit_is_not_numeric() {
     let non_numeric_digits: &[&str] = &[
         "\u{0660}",
         "\u{0967}",
-        "\u{0e52}",
+        "\u{0E52}",
         "\u{0967}",
         "\u{1814}",
-        "\u{ff15}",
+        "\u{FF15}",
     ];
 
     // They all express a single grapheme cluster.
-    let range = lexer::Range {
+    let err_range = lexer::Range {
         begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
         end:   lexer::Location { line: 1, column: 2, src_idx: 0 },
     };
 
     for lexeme in non_numeric_digits {
         let sources = &[lexeme];
+        let result = lexer::lex(sources);
+
+        match result {
+            Err(Error::Syntax { ref message, range }) => {
+                assert_eq!(message, "Invalid token");
+                assert_eq!(range, Some(err_range));
+            },
+            Err(other) => panic!("Lexer returned a non-syntax error: {}", other),
+            Ok(tokens) => panic!("Lexer unexpectedly accepted {}: {:#?}", lexeme, tokens),
+        }
+    }
+}
+
+#[test]
+fn identifier_with_inner_unicode_digit() {
+    let identifiers: &[&str] = &[
+        "x\u{0660}",                // Latin Letter followed by Digit
+        "_\u{0967}",                // Underscore followed by Digit
+        "E\u{0300}\u{0e52}",        // Latin letter + Combining Grave Accent + Digit
+        "\u{0687}\u{08EA}\u{0967}", // Arabic + Nonspacing Mark followed by Digit
+        "\u{4FA1}\u{1814}",         // Chinese followed by Digit
+        "\u{0938}\u{A8F1}\u{FF15}", // Devanagari + Combining Avagraha + Digit
+    ];
+
+    for ident in identifiers {
+        // every extended grapheme cluster in this test is ASCII, so it takes
+        // up 1 byte => therefore lexeme.len() is OK to use in the Range.
+        let range = lexer::Range {
+            begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
+            end:   lexer::Location { line: 1, column: grapheme_count(ident) + 1, src_idx: 0 },
+        };
+        let sources = &[ident];
         let tokens = lexer::lex(sources).unwrap();
         let token = tokens[0];
 
         assert_eq!(tokens.len(), 1);
         assert_eq!(token.kind, lexer::TokenKind::Word);
-        assert_eq!(token.value, *lexeme);
+        assert_eq!(token.value, *ident);
         assert_eq!(token.range, range);
     }
 }
@@ -288,12 +382,16 @@ quickcheck! {
                 true
             },
             Err(_) => false, // lexer must always produce a syntax error on failure
-            Ok(tokens) => sources.iter().all(String::is_empty) || !tokens.is_empty(),
+            Ok(tokens) => {
+                sources.iter().all(String::is_empty) && tokens.is_empty()
+                ||
+                sources.iter().any(|s| !s.is_empty()) && !tokens.is_empty()
+            },
         }
     }
 
     #[allow(trivial_casts)]
-    fn good_source(source: GoodSource) -> bool {
+    fn good_source(source: ValidSource) -> bool {
         let actual = lexer::lex(&source.items).unwrap();
         let expected = source.items.iter()
             .flat_map(|item| iter::repeat(item.index).zip(&item.tokens));
