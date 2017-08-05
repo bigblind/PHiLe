@@ -24,13 +24,13 @@ use sqir::*;
 macro_rules! call_declgen {
     ($module: ident, $sqir: expr, $params: expr, $wp: expr) => {
         match $params.database_access_mode {
-            DatabaseAccessMode::POD          => $module::generate_pod($sqir, $params, $wp),
+            DatabaseAccessMode::Pod          => $module::generate_pod($sqir, $params, $wp),
             DatabaseAccessMode::ActiveRecord => $module::generate_active_record($sqir, $params, $wp),
         }
     }
 }
 
-pub fn generate_declarations(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_declarations(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     match params.language {
         Language::Rust       => call_declgen!(rust,   sqir, params, wp),
         Language::C          => call_declgen!(c,      sqir, params, wp),

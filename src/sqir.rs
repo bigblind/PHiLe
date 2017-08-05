@@ -42,6 +42,9 @@ pub static BUILTIN_NAME: BuiltinName = BuiltinName {
     date_name:    "Date",
 };
 
+/// `Type` is deliberately not Clone, PartialEq and Eq:
+/// it is meant to be used only with RcCell/WkCell,
+/// and its instances should be compared by address.
 #[derive(Debug)]
 pub enum Type {
     // Numeric and Complex Built-in Types
@@ -78,7 +81,7 @@ pub enum Type {
     },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum PlaceholderKind {
     Struct,
     Class,
@@ -99,7 +102,7 @@ pub enum PlaceholderKind {
 // * Value types are enums, structs, and tuples.
 // * Entity types are only classes (for now).
 // * Function types are... function types, obviously.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ComplexTypeKind {
     Value,
     Entity,
@@ -141,7 +144,7 @@ pub struct RelationSide {
     pub cardinality: Cardinality,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Cardinality {
     ZeroOrOne,
     One,
@@ -272,7 +275,9 @@ pub enum Value {
     Max(RcType, String),
 }
 
-#[derive(Debug)]
+/// `ExprId` is deliberately not Clone:
+/// there should never be any two identical ExprIds.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ExprId {
     Temp(usize),
     Local(String),
@@ -333,7 +338,7 @@ pub struct Group {
 //
 
 #[derive(Debug)]
-pub struct SQIR {
+pub struct Sqir {
     pub named_types:    BTreeMap<String, RcType>,
     pub decimal_types:  HashMap<(usize, usize), RcType>,
     pub optional_types: HashMap<RcType, RcType>,
@@ -351,7 +356,7 @@ fn write_many_types(f: &mut Formatter, types: &[WkType]) -> fmt::Result {
 
     for (index, ty) in types.iter().enumerate() {
         let sep = if index > 0 { ", " } else { "" };
-        write!(f, "{}{}", sep, WeakDisplay(ty))?
+        write!(f, "{}{}", sep, ty)?
     }
 
     f.write_str(")")
@@ -381,17 +386,17 @@ impl Display for Type {
                 write_decimal_type(f, integral, fractional)
             },
             Type::Optional(ref wrapped) => {
-                write!(f, "({})?", WeakDisplay(wrapped))
+                write!(f, "({})?", wrapped)
             },
             Type::Pointer(ref pointed) => {
-                write!(f, "&({})", WeakDisplay(pointed))
+                write!(f, "&({})", pointed)
             },
             Type::Array(ref element) => {
-                write!(f, "[{}]", WeakDisplay(element))
+                write!(f, "[{}]", element)
             },
             Type::Function(ref ty) => {
                 write_many_types(f, &ty.arg_types)?;
-                write!(f, " -> {}", WeakDisplay(&ty.ret_type))
+                write!(f, " -> {}", ty.ret_type)
             },
             Type::Placeholder { ref name, kind } => {
                 write!(f, "Placeholder({}, kind: {})", name, kind)
@@ -481,8 +486,8 @@ impl Ord for Relation {
     }
 }
 
-impl SQIR {
-    pub fn new() -> SQIR {
+impl Sqir {
+    pub fn new() -> Sqir {
         let named_types = btree_map![
             BUILTIN_NAME.bool_name   => RcCell::new(Type::Bool),
             BUILTIN_NAME.int_name    => RcCell::new(Type::Int),
@@ -492,7 +497,7 @@ impl SQIR {
             BUILTIN_NAME.date_name   => RcCell::new(Type::Date),
         ];
 
-        SQIR {
+        Sqir {
             named_types:    named_types,
             decimal_types:  HashMap::new(),
             optional_types: HashMap::new(),

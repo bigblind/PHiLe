@@ -35,7 +35,7 @@ pub enum Language {
 
 #[derive(Debug, Clone, Copy)]
 pub enum DatabaseAccessMode {
-    POD,
+    Pod,
     ActiveRecord,
 }
 

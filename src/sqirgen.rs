@@ -38,9 +38,9 @@ struct Locals {
     scope_stack: Vec<Vec<String>>,
 }
 
-#[allow(missing_debug_implementations)]
-struct SQIRGen {
-    sqir:    SQIR,
+#[derive(Debug)]
+struct SqirGen {
+    sqir:    Sqir,
     locals:  RcCell<Locals>,
     tmp_idx: usize,
 }
@@ -109,8 +109,8 @@ macro_rules! reciprocity_error {
 }
 
 
-pub fn generate_sqir(program: &[Item]) -> Result<SQIR> {
-    SQIRGen::new().generate_sqir(program)
+pub fn generate_sqir(program: &[Item]) -> Result<Sqir> {
+    SqirGen::new().generate_sqir(program)
 }
 
 // This is to be used ONLY when you know you have a Class type
@@ -140,10 +140,10 @@ impl Drop for ScopeGuard {
     }
 }
 
-impl SQIRGen {
-    fn new() -> SQIRGen {
-        SQIRGen {
-            sqir:    SQIR::new(),
+impl SqirGen {
+    fn new() -> SqirGen {
+        SqirGen {
+            sqir:    Sqir::new(),
             locals:  Default::default(),
             tmp_idx: 0,
         }
@@ -153,7 +153,7 @@ impl SQIRGen {
     // Top-level SQIR generation methods and helpers
     //
 
-    fn generate_sqir(mut self, program: &[Item]) -> Result<SQIR> {
+    fn generate_sqir(mut self, program: &[Item]) -> Result<Sqir> {
         self.forward_declare_user_defined_types(program)?;
         self.define_user_defined_types(program)?;
         self.occurs_check_user_defined_types()?;
@@ -629,7 +629,7 @@ impl SQIRGen {
             // Function types are not allowed within user-defined types
             Type::Function(_) => occurs_check_error!(
                 "Function type should not occur within user-defined type {}",
-                WeakDisplay(root),
+                root,
             ),
 
             // Occurs check is supposed to happen after type resolution
@@ -644,7 +644,7 @@ impl SQIRGen {
         if root.as_rc()? == child.as_rc()? {
             occurs_check_error!(
                 "Recursive type {} contains itself without indirection",
-                WeakDisplay(root),
+                root,
             )
         } else {
             self.occurs_check_type(root, child)

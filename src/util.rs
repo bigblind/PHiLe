@@ -64,9 +64,6 @@ pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
 
-#[derive(Debug)]
-pub struct WeakDisplay<'a, T: 'a>(pub &'a WkCell<T>);
-
 pub static PACKAGE_INFO: PackageInfo = PackageInfo {
     name:        env!["CARGO_PKG_NAME"],
     version:     env!["CARGO_PKG_VERSION"],
@@ -130,19 +127,29 @@ impl<T> Clone for RcCell<T> {
 // TODO(H2CO3): implement this once { Unsize, CoerceUnsized } are stable
 // impl<T: ?Sized + Unsize<U>, U: ?Sized> CoerceUnsized<RcCell<U>> for RcCell<T> {}
 
-// Tests equality based on pointer identity
+/// Tests equality based on pointer identity
 impl<T> PartialEq for RcCell<T> {
     fn eq(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.ptr, &other.ptr)
     }
 }
 
+/// Tests equality based on pointer identity
 impl<T> Eq for RcCell<T> {}
 
-// Hashes the pointer address itself
+/// Hashes the pointer address itself
 impl<T> Hash for RcCell<T> {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
         self.ptr.as_ptr().hash(hasher)
+    }
+}
+
+impl<T> Display for RcCell<T> where T: Display {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.borrow() {
+            Ok(ptr) => ptr.fmt(f),
+            Err(_)  => f.write_str("<cannot borrow RcCell>"),
+        }
     }
 }
 
@@ -166,17 +173,11 @@ impl<T> Clone for WkCell<T> {
     }
 }
 
-impl<'a, T> Display for WeakDisplay<'a, T> where T: Display {
+impl<T> Display for WkCell<T> where RcCell<T>: Display {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let rc = match self.0.as_rc() {
-            Ok(rc) => rc,
-            Err(_) => return f.write_str("<cannot strongify>"),
-        };
-        let ptr = match rc.borrow() {
-            Ok(ptr) => ptr,
-            Err(_)  => return f.write_str("<cannot borrow>"),
-        };
-
-        Display::fmt(&*ptr, f)
+        match self.as_rc() {
+            Ok(rc) => rc.fmt(f),
+            Err(_) => f.write_str("<cannot strongify WkCell>"),
+        }
     }
 }

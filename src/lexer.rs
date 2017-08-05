@@ -12,14 +12,14 @@ use error::{ Error, Result };
 use util::grapheme_count;
 
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Location {
+    pub src_idx: usize, // index of the source `self` points into
     pub line:    usize,
     pub column:  usize,
-    pub src_idx: usize, // index of the source `self` points into
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Range {
     pub begin: Location,
     pub end:   Location,
@@ -29,7 +29,7 @@ pub trait Ranged {
     fn range(&self) -> Range;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenKind {
     Whitespace,
     Comment,
@@ -39,14 +39,14 @@ pub enum TokenKind {
     NumericLiteral,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Token<'a> {
     pub kind:  TokenKind,
     pub value: &'a str,
     pub range: Range,
 }
 
-#[allow(missing_debug_implementations)]
+#[derive(Debug)]
 struct Lexer<'a> {
     source:   &'a str,
     location: Location,

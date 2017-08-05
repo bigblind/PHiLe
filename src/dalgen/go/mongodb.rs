@@ -14,7 +14,7 @@ use sqir::*;
 use util::*;
 
 
-pub fn generate_schema(_sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_schema(_sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     let file_name = NAMING_CONVENTION.top_basename.to_owned() + ".go";
     let wptr = wp(&file_name)?;
     let mut wr = wptr.try_borrow_mut()?;

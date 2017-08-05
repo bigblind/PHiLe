@@ -39,7 +39,7 @@ static NAMING_CONVENTION: NamingConvention = NamingConvention {
 };
 
 
-pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     // First, generate the schema
     match params.database {
         DatabaseEngine::SQLite3 => sqlite3::generate_schema(sqir, params, wp)?,
@@ -55,7 +55,7 @@ pub fn generate(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) ->
 // Top-level (global func + impl) generators
 //
 
-fn generate_query(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+fn generate_query(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     for (ns_name, namespace) in &sqir.globals {
         for (global_name, expr) in namespace {
             let ns_name = ns_name.as_ref().map(String::as_str);

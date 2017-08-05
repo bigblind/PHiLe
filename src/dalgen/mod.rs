@@ -21,7 +21,7 @@ use codegen::*;
 use sqir::*;
 
 
-pub fn generate_dal(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_dal(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     match params.language {
         Language::Rust       => rust  ::generate(sqir, params, wp),
         Language::C          => c     ::generate(sqir, params, wp),

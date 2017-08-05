@@ -17,7 +17,7 @@ use util::*;
 
 
 struct Generator<'a> {
-    sqir:   &'a SQIR,
+    sqir:   &'a Sqir,
     params: &'a CodegenParams,
     wp:     &'a mut WriterProvider,
 }
@@ -27,7 +27,7 @@ struct Generator<'a> {
 // Plain Old Data access mode
 //
 
-pub fn generate_pod(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_pod(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     Generator { sqir, params, wp }.generate_pod()
 }
 
@@ -35,7 +35,7 @@ pub fn generate_pod(sqir: &SQIR, params: &CodegenParams, wp: &mut WriterProvider
 // Active Record database access mode (not yet supported)
 //
 
-pub fn generate_active_record(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_active_record(_sqir: &Sqir, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
     unimplemented!()
 }
 

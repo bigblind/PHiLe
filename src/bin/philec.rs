@@ -127,9 +127,9 @@ fn validate_language(langname: &str) -> Language {
 
 fn validate_access(mode: Option<&str>) -> DatabaseAccessMode {
     mode.map_or(
-        DatabaseAccessMode::POD,
+        DatabaseAccessMode::Pod,
         |name| match name {
-            "pod" => DatabaseAccessMode::POD,
+            "pod" => DatabaseAccessMode::Pod,
             "acr" => DatabaseAccessMode::ActiveRecord,
             _     => handle_argument_error("DB access mode", name),
         }

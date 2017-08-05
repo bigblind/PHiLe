@@ -13,6 +13,7 @@ use ast::*;
 use util::unescape_string_literal;
 
 
+#[derive(Debug)]
 struct Parser<'a> {
     tokens: slice::Iter<'a, Token<'a>>,
 }

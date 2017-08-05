@@ -11,6 +11,6 @@ use codegen::*;
 use sqir::*;
 
 
-pub fn generate_schema(_sqir: &SQIR, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
+pub fn generate_schema(_sqir: &Sqir, _params: &CodegenParams, _wp: &mut WriterProvider) -> io::Result<()> {
     unimplemented!()
 }
