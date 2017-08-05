@@ -21,16 +21,25 @@ use codegen::*;
 use sqir::*;
 
 
+macro_rules! call_dalgen {
+    ($module: ident, $sqir: expr, $params: expr, $wp: expr) => {
+        match $params.database_access_mode {
+            DatabaseAccessMode::Pod          => $module::generate_pod($sqir, $params, $wp),
+            DatabaseAccessMode::ActiveRecord => $module::generate_active_record($sqir, $params, $wp),
+        }
+    }
+}
+
 pub fn generate_dal(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     match params.language {
-        Language::Rust       => rust  ::generate(sqir, params, wp),
-        Language::C          => c     ::generate(sqir, params, wp),
-        Language::CXX        => cxx   ::generate(sqir, params, wp),
-        Language::ObjectiveC => objc  ::generate(sqir, params, wp),
-        Language::Swift      => swift ::generate(sqir, params, wp),
-        Language::Go         => go    ::generate(sqir, params, wp),
-        Language::JavaScript => js    ::generate(sqir, params, wp),
-        Language::Python     => python::generate(sqir, params, wp),
-        Language::Java       => java  ::generate(sqir, params, wp),
+        Language::Rust       => call_dalgen!(rust,   sqir, params, wp),
+        Language::C          => call_dalgen!(c,      sqir, params, wp),
+        Language::CXX        => call_dalgen!(cxx,    sqir, params, wp),
+        Language::ObjectiveC => call_dalgen!(objc,   sqir, params, wp),
+        Language::Swift      => call_dalgen!(swift,  sqir, params, wp),
+        Language::Go         => call_dalgen!(go,     sqir, params, wp),
+        Language::JavaScript => call_dalgen!(js,     sqir, params, wp),
+        Language::Python     => call_dalgen!(python, sqir, params, wp),
+        Language::Java       => call_dalgen!(java,   sqir, params, wp),
     }
 }

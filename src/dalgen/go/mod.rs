@@ -39,7 +39,7 @@ static NAMING_CONVENTION: NamingConvention = NamingConvention {
 };
 
 
-pub fn generate(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_pod(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     // First, generate the schema
     match params.database {
         DatabaseEngine::SQLite3 => sqlite3::generate_schema(sqir, params, wp)?,
@@ -49,6 +49,10 @@ pub fn generate(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) ->
 
     // Then, generate queries
     generate_query(sqir, params, wp)
+}
+
+pub fn generate_active_record(_sqir: &Sqir, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
+    unimplemented!()
 }
 
 //
