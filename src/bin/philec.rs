@@ -206,11 +206,6 @@ fn handle_argument_error(arg_name: &str, value: &str) -> ! {
     ::std::process::exit(1)
 }
 
-fn handle_compiler_error<P: AsRef<str>>(error: Error, files: &[P]) -> ! {
-    error.pretty_print(&mut io::stderr(), files).unwrap();
-    std::process::exit(1)
-}
-
 //
 // Entry point
 //
@@ -262,7 +257,10 @@ fn main() {
     let args = get_args();
     let result = philec_main(&args);
 
-    result.unwrap_or_else(|error| handle_compiler_error(error, &args.sources));
+    result.unwrap_or_else(|error| {
+        error.pretty_print(&mut io::stderr(), &args.sources).unwrap();
+        std::process::exit(1)
+    });
 
     eprintln!();
     eprintln!("    {}Compilation Successful{}", COLOR.success, COLOR.reset);
