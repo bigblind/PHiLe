@@ -15,6 +15,10 @@
 
 #[macro_use]
 extern crate quickcheck;
+#[macro_use]
+extern crate lazy_static;
+extern crate unicode_xid;
 extern crate phile;
+extern crate regex;
 
 pub mod lexer;

@@ -33,4 +33,6 @@ regex                = "0.2.2"
 heck                 = "0.2.1"
 
 [dev-dependencies]
-quickcheck = "0.4.1"
+quickcheck  = "0.4.1"
+unicode-xid = "0.1.0"
+lazy_static = "0.2.8"

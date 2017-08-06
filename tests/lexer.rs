@@ -11,6 +11,8 @@ use std::ops;
 use std::iter;
 use std::char;
 use quickcheck::{ Arbitrary, Gen };
+use unicode_xid::UnicodeXID;
+use regex::Regex;
 use phile::error::Error;
 use phile::lexer;
 use phile::util::grapheme_count;
@@ -98,16 +100,17 @@ impl Arbitrary for ValidSource {
             for _ in 0..g.gen_range(1, gen_size) {
                 // TODO(H2CO3): whitespace is not the only kind of correct lexeme
                 // ValidWhitespace::arbitrary(g).render(&mut *item);
-                ValidLineComment::arbitrary(g).render(&mut *item);
+                // ValidLineComment::arbitrary(g).render(&mut *item);
+                ValidWord::arbitrary(g).render(&mut *item);
             }
         }
 
         ValidSource { items }
     }
 
-    // TODO(H2CO3): implement shrink()
-    // XXX: it's not as trivial as removing lexemes one-by-one,
-    // because there are many rules concerning consecutive lexemes!
+    // Shrinking a multi-itme source is not as trivial as removing lexemes
+    // one-by-one, because there are many rules concerning consecutive lexemes.
+    // TODO(H2CO3): implement shrinking
 }
 
 //
@@ -154,7 +157,7 @@ impl Lexeme for ValidWhitespace {
         // A WS char is a single grapheme cluster on its own,
         // so bumping end.column for each char is OK.
         for ch in self.buf.chars() {
-            if VER_WS.contains(&ch) {
+            if is_ver_ws(ch) {
                 end.column = 1;
                 end.line += 1;
             } else {
@@ -183,7 +186,7 @@ impl Arbitrary for ValidLineComment {
         let it = (0..g.gen_range(0, 16)).map(|_| {
             loop {
                 match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
-                    Some(ch) => if !VER_WS.contains(&ch) { return ch },
+                    Some(ch) => if !is_ver_ws(ch) { return ch },
                     None => {},
                 }
             }
@@ -205,7 +208,7 @@ impl Arbitrary for ValidLineComment {
                 .collect();
 
             assert!(buf.chars().next().unwrap() == '#');
-            assert!(VER_WS.contains(&buf.chars().last().unwrap()));
+            assert!(is_ver_ws(buf.chars().last().unwrap()));
 
             ValidLineComment { buf }
         });
@@ -218,13 +221,79 @@ impl Lexeme for ValidLineComment {
     fn render(&self, source: &mut SourceItem) {
         // A line comment represented by this type always ends in a newline.
         assert!(self.buf.chars().next().unwrap() == '#');
-        assert!(VER_WS.contains(&self.buf.chars().last().unwrap()));
+        assert!(is_ver_ws(self.buf.chars().last().unwrap()));
 
         let mut end = source.end_location();
         end.line += 1;
         end.column = 1;
 
         source.push(&self.buf, lexer::TokenKind::Comment, end);
+    }
+}
+
+// TODO(H2CO3): type for valid line comments that DO NOT end with a newline
+
+//
+// A lexeme representing words, that is, identifiers and keywords
+//
+#[derive(Debug, Clone)]
+struct ValidWord {
+    buf: String,
+}
+
+impl Arbitrary for ValidWord {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        // Generate exactly one valid XID_Start char,
+        // followed by any number of valid XID_Continue ones.
+        let first = loop {
+            match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
+                Some(ch) => if is_ident_start(ch) { break iter::once(ch) },
+                None => {},
+            }
+        };
+        let rest = (0..g.gen_range(0, 16)).map(|_| {
+            loop {
+                match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
+                    Some(ch) => if is_ident_cont(ch) { break ch },
+                    None => {},
+                }
+            }
+        });
+
+        ValidWord { buf: first.chain(rest).collect() }
+    }
+
+    fn shrink(&self) -> Box<Iterator<Item=Self>> {
+        // The first char always has to be a XID_Start, so don't touch it.
+        // Leave out the rest of the chars, one by one.
+        let it = (1..self.buf.chars().count()).map(|i| {
+            let buf: String = self.buf
+                .chars()
+                .enumerate()
+                .filter(|&(j, _)| j != i)
+                .map(|(_, c)| c)
+                .collect();
+
+            assert!(is_ident_start(buf.chars().next().unwrap()));
+
+            ValidWord { buf }
+        });
+
+        Box::new(it.collect::<Vec<_>>().into_iter())
+    }
+}
+
+impl Lexeme for ValidWord {
+    fn render(&self, source: &mut SourceItem) {
+        // Identifiers must not contain vertical whitespace
+        assert!(!self.buf.contains(VER_WS));
+        // ...or any other whitespace, for that matter.
+        assert!(!self.buf.contains(HOR_WS));
+
+        let mut end = source.end_location();
+        end.column += grapheme_count(&self.buf); // because we contain no newlines
+
+        source.push(&self.buf, lexer::TokenKind::Word, end);
     }
 }
 
@@ -264,6 +333,47 @@ static VER_WS: &[char] = &[
     '\u{2028}',
     '\u{2029}',
 ];
+
+const CHAR_MAX_BYTES: usize = 4;
+
+fn is_hor_ws(ch: char) -> bool {
+    HOR_WS.contains(&ch)
+}
+
+fn is_ver_ws(ch: char) -> bool {
+    VER_WS.contains(&ch)
+}
+
+// Regex uses an outdated (Unicode 7.0) definition of XID_{Start,Continue},
+// whereas the UnicodeXID crate conforms to Unicode 9.0. This makes
+// unit tests fail for some code points, e.g. U+17828.
+// See https://github.com/rust-lang/regex/issues/391.
+// TODO(H2CO3): this is both horribly slow, absolutely disgusting,
+// and doesn't actually test _anything_, because the same regex that
+// is used for lexing is also utilized in generating test cases.
+// Consequently, we must rewrite these two functions using UnicodeXID
+// once the regex crate is updated to a more recent version of Unicode...
+#[allow(non_upper_case_globals)]
+fn is_ident_start(ch: char) -> bool {
+    // UnicodeXID::is_xid_start(ch) || ch == '_'
+
+    lazy_static! {
+        static ref re: Regex = Regex::new(r"^\p{XID_Start}$").unwrap();
+    }
+
+    re.is_match(ch.encode_utf8(&mut [0; CHAR_MAX_BYTES])) || ch == '_'
+}
+
+#[allow(non_upper_case_globals)]
+fn is_ident_cont(ch: char) -> bool {
+    // UnicodeXID::is_xid_continue(ch)
+
+    lazy_static! {
+        static ref re: Regex = Regex::new(r"^\p{XID_Continue}$").unwrap();
+    }
+
+    re.is_match(ch.encode_utf8(&mut [0; CHAR_MAX_BYTES]))
+}
 
 //
 // Actual Unit Tests
