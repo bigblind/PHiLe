@@ -1,6 +1,11 @@
 # PHiLe
 ## The Painless High-Level Persistence Engine
 
+[![PHiLe on crates.io](https://img.shields.io/crates/v/phile.svg)](https://crates.io/crates/phile)
+[![PHiLe on docs.rs](https://docs.rs/phile/badge.svg)](https://docs.rs/phile)
+[![PHiLe Download](https://img.shields.io/crates/d/phile.svg)](https://crates.io/crates/phile)
+[![PHiLe License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/H2CO3/PHiLe/blob/master/LICENSE.txt)
+
 ### What's PHiLe?
 
 PHiLe (pronounced *fillet*), the Painless High‑Level Persistence Engine, is a next‑generation database management tool and domain‑specific language. It allows application developers to write what is basically a textual form of a conceptual or entity relationship model, from which it automatically generates a Database Abstraction Layer.
@@ -25,7 +30,7 @@ PHiLe also supports a wide spectrum of different languages and databases, theref
 
 ### Is it documented?
 
-Sure, please visit the [official documentation](https://h2co3.github.io/phile/docs/phile/).
+Sure, please visit the [official documentation](https://docs.rs/phile/).
 
 If you learn easier by example, check out the [examples](https://github.com/H2CO3/PHiLe/tree/master/doc/examples).
 

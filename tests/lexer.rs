@@ -353,6 +353,8 @@ fn is_ver_ws(ch: char) -> bool {
 // is used for lexing is also utilized in generating test cases.
 // Consequently, we must rewrite these two functions using UnicodeXID
 // once the regex crate is updated to a more recent version of Unicode...
+// When that is done, we can do away with the regex and lazy_static
+// imports in the test crate, and with the lazy_static dev dependency.
 #[allow(non_upper_case_globals)]
 fn is_ident_start(ch: char) -> bool {
     // UnicodeXID::is_xid_start(ch) || ch == '_'
