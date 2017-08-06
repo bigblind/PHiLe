@@ -206,16 +206,6 @@ fn handle_argument_error(arg_name: &str, value: &str) -> ! {
     ::std::process::exit(1)
 }
 
-fn handle_read_error(error: io::Error) -> ! {
-    eprint!(
-        "\n\n    Error reading file: {clr_err}{error}{clr_rst}\n\n",
-        error = error,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
-    );
-    ::std::process::exit(1)
-}
-
 fn handle_compiler_error<P: AsRef<str>>(error: Error, files: &[P]) -> ! {
     error.pretty_print(&mut io::stderr(), files).unwrap();
     std::process::exit(1)
@@ -225,6 +215,44 @@ fn handle_compiler_error<P: AsRef<str>>(error: Error, files: &[P]) -> ! {
 // Entry point
 //
 
+fn philec_main(args: &ProgramArgs) -> Result<()> {
+    let mut wp = writer_provider_with_args(args);
+
+    let sources = stopwatch!("Reading Sources", {
+        read_files(&args.sources)?
+    });
+
+    let tokens = stopwatch!("Lexing", {
+        let mut tokens = lex(&sources)?;
+
+        tokens.retain(|token| match token.kind {
+            TokenKind::Whitespace => false,
+            TokenKind::Comment    => false,
+            _                     => true,
+        });
+
+        tokens
+    });
+
+    let program = stopwatch!("Parsing", {
+        parse(&tokens)?
+    });
+
+    let sqir = stopwatch!("Typechecking and generating SQIR", {
+        generate_sqir(&program)?
+    });
+
+    let sqir = stopwatch!("Optimizing SQIR", {
+        optimize_sqir(sqir)
+    });
+
+    let result = stopwatch!("Generating Database Abstraction Layer", {
+        generate_dal(&sqir, &args.codegen_params, &mut *wp)?
+    });
+
+    Ok(result)
+}
+
 fn main() {
     eprintln!();
     eprintln!("    The PHiLe Compiler, version {}", PACKAGE_INFO.version);
@@ -232,47 +260,9 @@ fn main() {
     eprintln!();
 
     let args = get_args();
-    let mut wp = writer_provider_with_args(&args);
+    let result = philec_main(&args);
 
-    let sources = stopwatch!("Reading Sources", {
-        read_files(&args.sources).unwrap_or_else(
-            |error| handle_read_error(error)
-        )
-    });
-
-    let tokens = stopwatch!("Lexing", {
-        let mut tmp_tokens = lex(&sources).unwrap_or_else(
-            |error| handle_compiler_error(error, &args.sources)
-        );
-
-        tmp_tokens.retain(|token| match token.kind {
-            TokenKind::Whitespace => false,
-            TokenKind::Comment    => false,
-            _                     => true,
-        });
-
-        tmp_tokens
-    });
-
-    let program = stopwatch!("Parsing", {
-        parse(&tokens).unwrap_or_else(
-            |error| handle_compiler_error(error, &args.sources)
-        )
-    });
-
-    let raw_sqir = stopwatch!("Typechecking and generating SQIR", {
-        generate_sqir(&program).unwrap_or_else(
-            |error| handle_compiler_error(error, &args.sources)
-        )
-    });
-
-    let sqir = stopwatch!("Optimizing SQIR", optimize_sqir(raw_sqir));
-
-    stopwatch!("Generating Database Abstraction Layer", {
-        generate_dal(&sqir, &args.codegen_params, &mut *wp).unwrap_or_else(
-            |error| handle_compiler_error(error, &args.sources)
-        )
-    });
+    result.unwrap_or_else(|error| handle_compiler_error(error, &args.sources));
 
     eprintln!();
     eprintln!("    {}Compilation Successful{}", COLOR.success, COLOR.reset);
