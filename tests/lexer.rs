@@ -108,7 +108,7 @@ impl Arbitrary for ValidSource {
         ValidSource { items }
     }
 
-    // Shrinking a multi-itme source is not as trivial as removing lexemes
+    // Shrinking a multi-item source is not as trivial as removing lexemes
     // one-by-one, because there are many rules concerning consecutive lexemes.
     // TODO(H2CO3): implement shrinking
 }

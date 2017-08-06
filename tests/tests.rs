@@ -18,7 +18,7 @@ extern crate quickcheck;
 #[macro_use]
 extern crate lazy_static;
 extern crate unicode_xid;
-extern crate phile;
 extern crate regex;
+extern crate phile;
 
 pub mod lexer;
