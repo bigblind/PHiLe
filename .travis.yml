@@ -1,4 +1,31 @@
 language: rust
+
 os:
   - linux
   - osx
+
+env:
+  global:
+    - RUSTFLAGS="-C link-dead-code"
+
+after_success: |
+  if [ "$TRAVIS_OS_NAME" = "osx" ]; then exit 0; fi
+  sudo apt-get -y install wget pkg-config libcurl4-openssl-dev libelf-dev libdw-dev binutils-dev libiberty-dev cmake gcc g++ &&
+  rm -rf kcov kcov-master kcov.tar.gz &&
+  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz -O kcov.tar.gz &&
+  tar -xzf kcov.tar.gz &&
+  mv kcov-master kcov &&
+  mkdir -p kcov/install &&
+  mkdir -p kcov/build &&
+  cd kcov/build &&
+  cmake .. &&
+  make &&
+  make install DESTDIR=../install &&
+  cd ../.. &&
+  for file in target/debug/*-*[^\.d]; do
+  mkdir -p "target/cov/$(basename $file)"
+    ./kcov/install/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"
+  done &&
+  curl -s https://codecov.io/bash -o codecov.sh &&
+  bash codecov.sh &&
+  echo "Coverage data has been sent successfully."
