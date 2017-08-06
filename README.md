@@ -1,6 +1,7 @@
 # PHiLe
 ## The Painless High-Level Persistence Engine
 
+[![PHiLe on Travis CI](https://api.travis-ci.org/H2CO3/PHiLe.svg)](https://travis-ci.org/H2CO3/PHiLe)
 [![PHiLe on crates.io](https://img.shields.io/crates/v/phile.svg)](https://crates.io/crates/phile)
 [![PHiLe on docs.rs](https://docs.rs/phile/badge.svg)](https://docs.rs/phile)
 [![PHiLe Download](https://img.shields.io/crates/d/phile.svg)](https://crates.io/crates/phile)
