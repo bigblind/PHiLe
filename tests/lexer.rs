@@ -6,6 +6,21 @@
 // on 31/07/2017
 //
 
+#![cfg(test)]
+#![deny(missing_debug_implementations, missing_copy_implementations,
+        trivial_casts, trivial_numeric_casts,
+        unsafe_code,
+        unstable_features,
+        unused_import_braces, unused_qualifications)]
+
+#[macro_use]
+extern crate quickcheck;
+#[macro_use]
+extern crate lazy_static;
+extern crate unicode_xid;
+extern crate regex;
+extern crate phile;
+
 use std::str;
 use std::ops;
 use std::iter;
