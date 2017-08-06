@@ -9,6 +9,7 @@
 use std::str;
 use std::ops;
 use std::iter;
+use std::char;
 use quickcheck::{ Arbitrary, Gen };
 use phile::error::Error;
 use phile::lexer;
@@ -96,7 +97,8 @@ impl Arbitrary for ValidSource {
             let gen_size = 2; // g.size(); // TODO(H2CO3): g.size() once other kinds are implemented
             for _ in 0..g.gen_range(1, gen_size) {
                 // TODO(H2CO3): whitespace is not the only kind of correct lexeme
-                ValidWhitespace::arbitrary(g).render(&mut *item);
+                // ValidWhitespace::arbitrary(g).render(&mut *item);
+                ValidLineComment::arbitrary(g).render(&mut *item);
             }
         }
 
@@ -164,39 +166,6 @@ impl Lexeme for ValidWhitespace {
     }
 }
 
-// Horizontal whitespace
-static HOR_WS: &[char] = &[
-    '\u{0009}',
-    '\u{0020}',
-    '\u{00A0}',
-    '\u{1680}',
-    '\u{2000}',
-    '\u{2001}',
-    '\u{2002}',
-    '\u{2003}',
-    '\u{2004}',
-    '\u{2005}',
-    '\u{2006}',
-    '\u{2007}',
-    '\u{2008}',
-    '\u{2009}',
-    '\u{200A}',
-    '\u{202F}',
-    '\u{205F}',
-    '\u{3000}',
-];
-
-// Vertical whitespace, a.k.a. newline characters
-static VER_WS: &[char] = &[
-    '\u{000A}',
-    '\u{000B}',
-    '\u{000C}',
-    '\u{000D}',
-    '\u{0085}',
-    '\u{2028}',
-    '\u{2029}',
-];
-
 //
 // A lexeme representing a line comment ending with a newline.
 //
@@ -208,11 +177,17 @@ struct ValidLineComment {
 impl Arbitrary for ValidLineComment {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         // Generate 0 or more valid non-newline extended grapheme clusters.
-        // TODO(H2CO3): generate more interesting, but still valid strings
-        let it = (0..g.gen_range(0, 16)).map(|_| {
-            'a'
-        });
+        // Generating the newline character has to be done first because the
+        // map iterator mutably borrows the PRNG for the rest of the fn body.
         let newline = *g.choose(VER_WS).unwrap();
+        let it = (0..g.gen_range(0, 16)).map(|_| {
+            loop {
+                match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
+                    Some(ch) => if !VER_WS.contains(&ch) { return ch },
+                    None => {},
+                }
+            }
+        });
         let buf = iter::once('#').chain(it).chain(iter::once(newline)).collect();
 
         ValidLineComment { buf }
@@ -252,6 +227,43 @@ impl Lexeme for ValidLineComment {
         source.push(&self.buf, lexer::TokenKind::Comment, end);
     }
 }
+
+//
+// Constants and functions for generating pseudorandom strings
+//
+
+// Horizontal whitespace
+static HOR_WS: &[char] = &[
+    '\u{0009}',
+    '\u{0020}',
+    '\u{00A0}',
+    '\u{1680}',
+    '\u{2000}',
+    '\u{2001}',
+    '\u{2002}',
+    '\u{2003}',
+    '\u{2004}',
+    '\u{2005}',
+    '\u{2006}',
+    '\u{2007}',
+    '\u{2008}',
+    '\u{2009}',
+    '\u{200A}',
+    '\u{202F}',
+    '\u{205F}',
+    '\u{3000}',
+];
+
+// Vertical whitespace, a.k.a. newline characters
+static VER_WS: &[char] = &[
+    '\u{000A}',
+    '\u{000B}',
+    '\u{000C}',
+    '\u{000D}',
+    '\u{0085}',
+    '\u{2028}',
+    '\u{2029}',
+];
 
 //
 // Actual Unit Tests
@@ -355,8 +367,6 @@ fn identifier_with_inner_unicode_digit() {
     ];
 
     for ident in identifiers {
-        // every extended grapheme cluster in this test is ASCII, so it takes
-        // up 1 byte => therefore lexeme.len() is OK to use in the Range.
         let range = lexer::Range {
             begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
             end:   lexer::Location { line: 1, column: grapheme_count(ident) + 1, src_idx: 0 },
