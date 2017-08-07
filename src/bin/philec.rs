@@ -10,16 +10,16 @@
 extern crate clap;
 extern crate phile;
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::str;
-use std::fs::File;
+use std::fs::{ self, File };
 use std::path::PathBuf;
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::{ self, stderr };
 use std::io::prelude::*;
-use phile::util::{ COLOR, PACKAGE_INFO };
+use phile::util::{ RcCell, COLOR, PACKAGE_INFO };
 use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
@@ -38,6 +38,47 @@ struct ProgramArgs {
     sources:          Vec<String>,
 }
 
+// TODO(H2CO3): Rewrite this using RcCell once custom smart pointers
+//              can point to trait objects, i.e. when CoerceUnsized
+//              and Unsize are stabilized (see issue #27732)
+struct FileWriterProvider {
+    files: BTreeMap<PathBuf, Rc<RefCell<io::Write>>>,
+    base_path: PathBuf,
+    outfile_prefix: String,
+}
+
+impl FileWriterProvider {
+    fn new(args: &ProgramArgs) -> Self {
+        FileWriterProvider {
+            files: Default::default(),
+            base_path: PathBuf::from(&args.output_directory),
+            outfile_prefix: args.outfile_prefix.clone(),
+        }
+    }
+
+    fn writer_with_name(&mut self, name: &str) -> Result<Rc<RefCell<io::Write>>> {
+        let path = self.base_path.join(self.outfile_prefix.clone() + name);
+
+        if let Some(rc) = self.files.get(&path) {
+            return Ok(rc.clone())
+        }
+
+        let file = File::create(&path)?;
+        let rc = Rc::new(RefCell::new(file)) as Rc<RefCell<io::Write>>;
+
+        self.files.insert(path, rc.clone());
+
+        Ok(rc)
+    }
+
+    fn remove_files(&self) {
+        for path in self.files.keys() {
+            fs::remove_file(path).unwrap_or_else(
+                |e| eprintln!("    Could not remove {}: {}", path.to_string_lossy(), e)
+            )
+        }
+    }
+}
 
 macro_rules! stopwatch {
     ($msg: expr, $code: expr) => ({
@@ -52,7 +93,6 @@ macro_rules! stopwatch {
         val
     })
 }
-
 
 //
 // Parsing Command-Line Arguments
@@ -162,35 +202,6 @@ fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
     paths.iter().map(|p| read_file(p.as_ref())).collect()
 }
 
-// TODO(H2CO3): Rewrite this using RcCell once custom smart pointers
-//              can point to trait objects, i.e. when CoerceUnsized
-//              and Unsize are stabilized (see issue #27732)
-// TODO(H2CO3): Rewrite this using impl WriterProvider (issue #34511)
-fn writer_provider_with_args(args: &ProgramArgs) -> Box<WriterProvider> {
-    let mut files = HashMap::<_, Rc<RefCell<_>>>::new();
-    let base_path = PathBuf::from(&args.output_directory);
-    let outfile_prefix = args.outfile_prefix.clone();
-
-    // If the file exists, truncate it, otherwise create it.
-    // We then cache the file handle so that later
-    // passes don't overwrite the output of earlier ones.
-    let wp = move |name: &str| {
-        if let Some(rc) = files.get(name) {
-            return Ok(rc.clone())
-        }
-
-        let path = base_path.join(outfile_prefix.clone() + name);
-        let file = File::create(path)?;
-        let rc = Rc::new(RefCell::new(file)) as Rc<RefCell<io::Write>>;
-
-        files.insert(name.to_owned(), rc.clone());
-
-        Ok(rc)
-    };
-
-    Box::new(wp)
-}
-
 //
 // Error Reporting
 //
@@ -210,8 +221,8 @@ fn handle_argument_error(arg_name: &str, value: &str) -> ! {
 // Entry point
 //
 
-fn philec_main(args: &ProgramArgs) -> Result<()> {
-    let mut wp = writer_provider_with_args(args);
+fn philec_main<Wp>(args: &ProgramArgs, mut wp: Wp) -> Result<()>
+    where Wp: FnMut(&str) -> Result<Rc<RefCell<io::Write>>> + 'static {
 
     let sources = stopwatch!("Reading Sources", {
         read_files(&args.sources)?
@@ -242,7 +253,7 @@ fn philec_main(args: &ProgramArgs) -> Result<()> {
     });
 
     let result = stopwatch!("Generating Database Abstraction Layer", {
-        generate_dal(&sqir, &args.codegen_params, &mut *wp)?
+        generate_dal(&sqir, &args.codegen_params, &mut wp)?
     });
 
     Ok(result)
@@ -255,11 +266,15 @@ fn main() {
     eprintln!();
 
     let args = get_args();
-    let result = philec_main(&args);
+    let wp0 = RcCell::new(FileWriterProvider::new(&args));
+    let wp1 = wp0.clone();
+    let result = philec_main(&args, move |name| wp0.borrow_mut()?.writer_with_name(name));
 
+    // Handle errors by printing them, removing partially-written files, then bailing out
     result.unwrap_or_else(|error| {
         error.pretty_print(&mut io::stderr(), &args.sources).unwrap();
-        std::process::exit(1)
+        wp1.borrow_mut().unwrap().remove_files();
+        std::process::exit(1);
     });
 
     eprintln!();
