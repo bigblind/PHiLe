@@ -415,8 +415,14 @@ impl<'a> Parser<'a> {
             return Ok(condition)
         }
 
-        let true_val = self.parse_expr()?;
+        let true_val = if self.is_at(":") {
+            None
+        } else {
+            self.parse_expr().map(Some)?
+        };
+
         self.expect(":")?;
+
         let false_val = self.parse_cond_expr()?;
 
         let range = make_range(&condition, &false_val);

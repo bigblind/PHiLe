@@ -150,7 +150,7 @@ pub struct Impl<'a> {
 #[derive(Debug)]
 pub struct CondExp<'a> {
     pub condition: Exp<'a>,
-    pub true_val:  Exp<'a>,
+    pub true_val:  Option<Exp<'a>>,
     pub false_val: Exp<'a>,
 }
 
