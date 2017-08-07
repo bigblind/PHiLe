@@ -221,9 +221,7 @@ fn handle_argument_error(arg_name: &str, value: &str) -> ! {
 // Entry point
 //
 
-fn philec_main<Wp>(args: &ProgramArgs, mut wp: Wp) -> Result<()>
-    where Wp: FnMut(&str) -> Result<Rc<RefCell<io::Write>>> + 'static {
-
+fn philec_main(args: &ProgramArgs, wp: &mut WriterProvider) -> Result<()> {
     let sources = stopwatch!("Reading Sources", {
         read_files(&args.sources)?
     });
@@ -253,7 +251,7 @@ fn philec_main<Wp>(args: &ProgramArgs, mut wp: Wp) -> Result<()>
     });
 
     let result = stopwatch!("Generating Database Abstraction Layer", {
-        generate_dal(&sqir, &args.codegen_params, &mut wp)?
+        generate_dal(&sqir, &args.codegen_params, wp)?
     });
 
     Ok(result)
@@ -268,7 +266,7 @@ fn main() {
     let args = get_args();
     let wp0 = RcCell::new(FileWriterProvider::new(&args));
     let wp1 = wp0.clone();
-    let result = philec_main(&args, move |name| wp0.borrow_mut()?.writer_with_name(name));
+    let result = philec_main(&args, &mut move |name| wp0.borrow_mut()?.writer_with_name(name));
 
     // Handle errors by printing them, removing partially-written files, then bailing out
     result.unwrap_or_else(|error| {
