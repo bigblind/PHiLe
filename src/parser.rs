@@ -290,7 +290,7 @@ impl<'a> Parser<'a> {
             "(", Self::parse_decl_arg, ",", ")"
         )?;
         let ret_type = if self.accept("->").is_some() {
-            Some(self.parse_type()?)
+            self.parse_type().map(Some)?
         } else {
             None
         };
@@ -303,7 +303,7 @@ impl<'a> Parser<'a> {
     fn parse_decl_arg(&mut self) -> Result<FuncArg<'a>> {
         let name_tok = self.expect_identifier()?;
         let ty = match self.accept(":") {
-            Some(_) => Some(self.parse_type()?),
+            Some(_) => self.parse_type().map(Some)?,
             None    => None,
         };
         let name = name_tok.value;
@@ -359,7 +359,7 @@ impl<'a> Parser<'a> {
         let name_tok = self.expect_identifier()?;
 
         let ty = match self.accept(":") {
-            Some(_) => Some(self.parse_type()?),
+            Some(_) => self.parse_type().map(Some)?,
             None    => None,
         };
 
@@ -688,7 +688,7 @@ impl<'a> Parser<'a> {
         )?;
         let has_ret_type = self.accept("->").is_some();
         let ret_type = if has_ret_type {
-            Some(self.parse_type()?)
+            self.parse_type().map(Some)?
         } else {
             None
         };
