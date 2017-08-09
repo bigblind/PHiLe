@@ -428,7 +428,7 @@ impl ValidNumber {
 
     fn shrink_int(&self) -> Box<Iterator<Item=Self>> {
         assert!(self.kind != ValidNumberKind::FloatingPoint);
-        assert!(self.buf.len() > self.prefix_len);
+        assert!(self.prefix_len < self.buf.len());
 
         let prefix = &self.buf[..self.prefix_len];
         let payload = &self.buf[self.prefix_len..];
@@ -443,7 +443,7 @@ impl ValidNumber {
             let digits = payload
                 .chars()
                 .enumerate()
-                .filter(|&(j, _)| i != j)
+                .filter(|&(j, _)| j != i)
                 .map(|(_, c)| c);
 
             ValidNumber {
