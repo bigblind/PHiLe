@@ -311,10 +311,8 @@ impl Arbitrary for ValidWord {
 
 impl Lexeme for ValidWord {
     fn render(&self, source: &mut SourceItem) {
-        // Identifiers must not contain vertical whitespace
-        assert!(!self.buf.contains(VER_WS));
-        // ...or any other whitespace, for that matter.
-        assert!(!self.buf.contains(HOR_WS));
+        // Identifiers must not contain whitespace, including newlines
+        assert!(!self.buf.contains(char::is_whitespace));
 
         let mut end = source.end_location();
         end.column += grapheme_count(&self.buf); // because we contain no newlines
@@ -486,10 +484,8 @@ impl Arbitrary for ValidNumber {
 // TODO(H2CO3): this is almost the same as ValidWord::render(); refactor
 impl Lexeme for ValidNumber {
     fn render(&self, source: &mut SourceItem) {
-        // Identifiers must not contain vertical whitespace
-        assert!(!self.buf.contains(VER_WS));
-        // ...or any other whitespace, for that matter.
-        assert!(!self.buf.contains(HOR_WS));
+        // Identifiers must not contain whitespace, including newlines
+        assert!(!self.buf.contains(char::is_whitespace));
 
         let mut end = source.end_location();
         end.column += grapheme_count(&self.buf); // because we contain no newlines
@@ -515,7 +511,7 @@ impl Arbitrary for ValidPunct {
 
 impl Lexeme for ValidPunct {
     fn render(&self, item: &mut SourceItem) {
-        assert!(!self.value.contains(VER_WS) && !self.value.contains(HOR_WS));
+        assert!(!self.value.contains(char::is_whitespace));
         assert!(self.value.is_ascii());
 
         let mut end = item.end_location();
