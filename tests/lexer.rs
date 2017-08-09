@@ -22,6 +22,7 @@ extern crate regex;
 extern crate phile;
 
 use std::str;
+use std::vec;
 use std::ops;
 use std::iter;
 use std::char;
@@ -116,7 +117,8 @@ impl Arbitrary for ValidSource {
                 // TODO(H2CO3): whitespace is not the only kind of correct lexeme
                 // ValidWhitespace::arbitrary(g).render(&mut *item);
                 // ValidLineComment::arbitrary(g).render(&mut *item);
-                ValidWord::arbitrary(g).render(&mut *item);
+                // ValidWord::arbitrary(g).render(&mut *item);
+                ValidNumber::arbitrary(g).render(&mut *item);
             }
         }
 
@@ -149,8 +151,15 @@ impl Arbitrary for ValidWhitespace {
     }
 
     fn shrink(&self) -> Box<Iterator<Item=Self>> {
+        let num_chars = self.buf.chars().count();
+
+        // do not return empty string as valid whitespace
+        if num_chars <= 1 {
+            return quickcheck::empty_shrinker()
+        }
+
         // leave out each character, one-by-one
-        let iter = (0..self.buf.chars().count()).map(|i| {
+        let iter = (0..num_chars).map(|i| {
             let buf = self.buf
                 .chars()
                 .enumerate()
@@ -309,6 +318,181 @@ impl Lexeme for ValidWord {
         end.column += grapheme_count(&self.buf); // because we contain no newlines
 
         source.push(&self.buf, lexer::TokenKind::Word, end);
+    }
+}
+
+//
+// A type representing valid numeric (integer and floating-point) literals
+//
+#[derive(Debug, Clone)]
+struct ValidNumber {
+    buf: String,
+    kind: ValidNumberKind,
+    prefix_len: usize, // this many leading bytes to be preserved by shrink()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ValidNumberKind {
+    DecimalInt,
+    BinaryInt,
+    OctalInt,
+    HexInt,
+    FloatingPoint,
+}
+
+impl ValidNumber {
+    fn arbitrary_int<G: Gen>(g: &mut G, prefix: &str, digits: &[char], kind: ValidNumberKind) -> Self {
+        let range = 0..g.gen_range(1, 16);
+        let digits_iter = range.map(|_| *g.choose(digits).unwrap());
+        let buf = prefix.chars().chain(digits_iter).collect();
+        let prefix_len = prefix.len();
+
+        ValidNumber { buf, kind, prefix_len }
+    }
+
+    fn arbitrary_decimal_int<G: Gen>(g: &mut G) -> Self {
+        Self::arbitrary_int(
+            g,
+            "",
+            &['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+            ValidNumberKind::DecimalInt,
+        )
+    }
+
+    fn arbitrary_binary_int<G: Gen>(g: &mut G) -> Self {
+        let prefix = if g.gen() { "0b" } else { "0B" };
+        Self::arbitrary_int(
+            g,
+            prefix,
+            &['0', '1'],
+            ValidNumberKind::BinaryInt,
+        )
+    }
+
+    fn arbitrary_octal_int<G: Gen>(g: &mut G) -> Self {
+        let prefix = if g.gen() { "0o" } else { "0O" };
+        Self::arbitrary_int(
+            g,
+            prefix,
+            &['0', '1', '2', '3', '4', '5', '6', '7'],
+            ValidNumberKind::OctalInt,
+        )
+    }
+
+    fn arbitrary_hex_int<G: Gen>(g: &mut G) -> Self {
+        let prefix = if g.gen() { "0x" } else { "0X" };
+        Self::arbitrary_int(
+            g,
+            prefix,
+            &[
+                '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+                'a', 'b', 'c', 'd', 'e', 'f',
+                'A', 'B', 'C', 'D', 'E', 'F',
+            ],
+            ValidNumberKind::HexInt,
+        )
+    }
+
+    fn decimal_digits<G: Gen>(g: &mut G) -> vec::IntoIter<char> {
+        let digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+        (0..g.gen_range(1, 16))
+            .map(|_| *g.choose(&digits).unwrap())
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+
+    fn arbitrary_float<G: Gen>(g: &mut G) -> Self {
+        let integral = Self::decimal_digits(g);
+        let fraction = Self::decimal_digits(g);
+        let dot = iter::once('.');
+        let exponent: Box<Iterator<Item=char>> = if g.gen() {
+            let e = iter::once(if g.gen() { 'e' } else { 'E' });
+            let ds = Self::decimal_digits(g);
+            let sign: Box<Iterator<Item=char>> = if g.gen() {
+                Box::new(iter::once(if g.gen() { '+' } else { '-' }))
+            } else {
+                Box::new(iter::empty())
+            };
+
+            Box::new(e.chain(sign).chain(ds))
+        } else {
+            Box::new(iter::empty())
+        };
+        let buf = integral.chain(dot).chain(fraction).chain(exponent).collect();
+        let kind = ValidNumberKind::FloatingPoint;
+        let prefix_len = 0;
+
+        ValidNumber { buf, kind, prefix_len }
+    }
+
+    fn shrink_int(&self) -> Box<Iterator<Item=Self>> {
+        assert!(self.kind != ValidNumberKind::FloatingPoint);
+        assert!(self.buf.len() > self.prefix_len);
+
+        let prefix = &self.buf[..self.prefix_len];
+        let payload = &self.buf[self.prefix_len..];
+
+        // do not return empty string as a valid integer literal
+        if payload.chars().count() <= 1 {
+            return quickcheck::empty_shrinker()
+        }
+
+        // Remove digits one-by-one
+        let it = (0..payload.chars().count()).map(|i| {
+            let digits = payload
+                .chars()
+                .enumerate()
+                .filter(|&(j, _)| i != j)
+                .map(|(_, c)| c);
+
+            ValidNumber {
+                buf: prefix.chars().chain(digits).collect(),
+                kind: self.kind,
+                prefix_len: self.prefix_len,
+            }
+        });
+
+        Box::new(it.collect::<Vec<_>>().into_iter())
+    }
+}
+
+// TODO(H2CO3): this is almost the same as ValidWord::render(); refactor
+impl Lexeme for ValidNumber {
+    fn render(&self, source: &mut SourceItem) {
+        // Identifiers must not contain vertical whitespace
+        assert!(!self.buf.contains(VER_WS));
+        // ...or any other whitespace, for that matter.
+        assert!(!self.buf.contains(HOR_WS));
+
+        let mut end = source.end_location();
+        end.column += grapheme_count(&self.buf); // because we contain no newlines
+
+        source.push(&self.buf, lexer::TokenKind::NumericLiteral, end);
+    }
+}
+
+impl Arbitrary for ValidNumber {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        let funcs: &[fn(&mut G) -> ValidNumber] = &[
+            Self::arbitrary_decimal_int,
+            Self::arbitrary_binary_int,
+            Self::arbitrary_octal_int,
+            Self::arbitrary_hex_int,
+            Self::arbitrary_float,
+        ];
+        let func = g.choose(funcs).unwrap();
+
+        func(g)
+    }
+
+    fn shrink(&self) -> Box<Iterator<Item=Self>> {
+        use ValidNumberKind::*;
+
+        match self.kind {
+            DecimalInt | BinaryInt | OctalInt | HexInt => self.shrink_int(),
+            FloatingPoint => quickcheck::empty_shrinker(), // too hard
+        }
     }
 }
 
@@ -528,7 +712,7 @@ quickcheck! {
     }
 
     #[allow(trivial_casts)]
-    fn good_source(source: ValidSource) -> bool {
+    fn valid_source(source: ValidSource) -> bool {
         let actual = lexer::lex(&source.items).unwrap();
         let expected = source.items.iter()
             .flat_map(|item| iter::repeat(item.index).zip(&item.tokens));

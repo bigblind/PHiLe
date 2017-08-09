@@ -10,7 +10,7 @@
 extern crate clap;
 extern crate phile;
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::str;
 use std::fs::{ self, File };
 use std::path::PathBuf;
@@ -42,7 +42,7 @@ struct ProgramArgs {
 //              can point to trait objects, i.e. when CoerceUnsized
 //              and Unsize are stabilized (see issue #27732)
 struct FileWriterProvider {
-    files: BTreeMap<PathBuf, Rc<RefCell<io::Write>>>,
+    files: HashMap<PathBuf, Rc<RefCell<io::Write>>>,
     base_path: PathBuf,
     outfile_prefix: String,
 }
