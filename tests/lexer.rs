@@ -26,6 +26,7 @@ use std::vec;
 use std::ops;
 use std::iter;
 use std::char;
+use std::ascii::AsciiExt;
 use quickcheck::{ Arbitrary, Gen };
 use unicode_xid::UnicodeXID;
 use regex::Regex;
@@ -118,7 +119,8 @@ impl Arbitrary for ValidSource {
                 // ValidWhitespace::arbitrary(g).render(&mut *item);
                 // ValidLineComment::arbitrary(g).render(&mut *item);
                 // ValidWord::arbitrary(g).render(&mut *item);
-                ValidNumber::arbitrary(g).render(&mut *item);
+                // ValidNumber::arbitrary(g).render(&mut *item);
+                ValidPunct::arbitrary(g).render(&mut *item);
             }
         }
 
@@ -457,21 +459,6 @@ impl ValidNumber {
     }
 }
 
-// TODO(H2CO3): this is almost the same as ValidWord::render(); refactor
-impl Lexeme for ValidNumber {
-    fn render(&self, source: &mut SourceItem) {
-        // Identifiers must not contain vertical whitespace
-        assert!(!self.buf.contains(VER_WS));
-        // ...or any other whitespace, for that matter.
-        assert!(!self.buf.contains(HOR_WS));
-
-        let mut end = source.end_location();
-        end.column += grapheme_count(&self.buf); // because we contain no newlines
-
-        source.push(&self.buf, lexer::TokenKind::NumericLiteral, end);
-    }
-}
-
 impl Arbitrary for ValidNumber {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
         let funcs: &[fn(&mut G) -> ValidNumber] = &[
@@ -493,6 +480,48 @@ impl Arbitrary for ValidNumber {
             DecimalInt | BinaryInt | OctalInt | HexInt => self.shrink_int(),
             FloatingPoint => quickcheck::empty_shrinker(), // too hard
         }
+    }
+}
+
+// TODO(H2CO3): this is almost the same as ValidWord::render(); refactor
+impl Lexeme for ValidNumber {
+    fn render(&self, source: &mut SourceItem) {
+        // Identifiers must not contain vertical whitespace
+        assert!(!self.buf.contains(VER_WS));
+        // ...or any other whitespace, for that matter.
+        assert!(!self.buf.contains(HOR_WS));
+
+        let mut end = source.end_location();
+        end.column += grapheme_count(&self.buf); // because we contain no newlines
+
+        source.push(&self.buf, lexer::TokenKind::NumericLiteral, end);
+    }
+}
+
+//
+// Type for generating an operator or other punctuation character
+//
+#[derive(Debug, Clone)]
+struct ValidPunct {
+    value: &'static str,
+}
+
+// No shrink(); operators are atomic
+impl Arbitrary for ValidPunct {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        ValidPunct { value: *g.choose(PUNCTUATION).unwrap() }
+    }
+}
+
+impl Lexeme for ValidPunct {
+    fn render(&self, item: &mut SourceItem) {
+        assert!(!self.value.contains(VER_WS) && !self.value.contains(HOR_WS));
+        assert!(self.value.is_ascii());
+
+        let mut end = item.end_location();
+        end.column += self.value.len(); // operators are ASCII -> bytes == graphemes
+
+        item.push(self.value, lexer::TokenKind::Punctuation, end);
     }
 }
 
@@ -531,6 +560,19 @@ static VER_WS: &[char] = &[
     '\u{0085}',
     '\u{2028}',
     '\u{2029}',
+];
+
+// Valid operators
+static PUNCTUATION: &[&str] = &[
+     "<->",  "<->!",  "<->?",  "<->*",  "<->+",
+    "!<->", "!<->!", "!<->?", "!<->*", "!<->+",
+    "?<->", "?<->!", "?<->?", "?<->*", "?<->+",
+    "*<->", "*<->!", "*<->?", "*<->*", "*<->+",
+    "+<->", "+<->!", "+<->?", "+<->*", "+<->+",
+
+    "...", "..", ".", "<=", ">=", "<", ">", "==", "!=",
+    "->", "=>", "=", "::", ":", "(", ")", "[", "]", "{", "}",
+    "+", "-", "*", "/", "%", "&", "|", "~", "?", ",", ";",
 ];
 
 const CHAR_MAX_BYTES: usize = 4;
@@ -689,6 +731,24 @@ fn identifier_with_inner_unicode_digit() {
         assert_eq!(tokens.len(), 1);
         assert_eq!(token.kind, lexer::TokenKind::Word);
         assert_eq!(token.value, *ident);
+        assert_eq!(token.range, range);
+    }
+}
+
+#[test]
+fn all_valid_punctuation() {
+    for punct in PUNCTUATION {
+        let range = lexer::Range {
+            begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
+            end:   lexer::Location { line: 1, column: punct.len() + 1, src_idx: 0 },
+        };
+        let sources = &[punct];
+        let tokens = lexer::lex(sources).unwrap();
+        let token = tokens[0];
+
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(token.kind, lexer::TokenKind::Punctuation);
+        assert_eq!(token.value, *punct);
         assert_eq!(token.range, range);
     }
 }
