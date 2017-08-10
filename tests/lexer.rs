@@ -18,6 +18,7 @@ extern crate quickcheck;
 #[macro_use]
 extern crate lazy_static;
 extern crate unicode_xid;
+extern crate unicode_segmentation;
 extern crate regex;
 extern crate phile;
 
@@ -27,8 +28,10 @@ use std::ops;
 use std::iter;
 use std::char;
 use std::ascii::AsciiExt;
+use std::fmt::Write;
 use quickcheck::{ Arbitrary, Gen };
 use unicode_xid::UnicodeXID;
+use unicode_segmentation::UnicodeSegmentation;
 use regex::Regex;
 use phile::error::Error;
 use phile::lexer;
@@ -120,7 +123,8 @@ impl Arbitrary for ValidSource {
                 // ValidLineComment::arbitrary(g).render(&mut *item);
                 // ValidWord::arbitrary(g).render(&mut *item);
                 // ValidNumber::arbitrary(g).render(&mut *item);
-                ValidPunct::arbitrary(g).render(&mut *item);
+                // ValidPunct::arbitrary(g).render(&mut *item);
+                ValidString::arbitrary(g).render(&mut *item);
             }
         }
 
@@ -211,9 +215,10 @@ impl Arbitrary for ValidLineComment {
         let newline = *g.choose(VER_WS).unwrap();
         let it = (0..g.gen_range(0, 16)).map(|_| {
             loop {
-                match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
-                    Some(ch) => if !is_ver_ws(ch) { return ch },
-                    None => {},
+                let ch: char = g.gen();
+
+                if !is_ver_ws(ch) {
+                    break ch
                 }
             }
         });
@@ -272,16 +277,18 @@ impl Arbitrary for ValidWord {
         // Generate exactly one valid XID_Start char,
         // followed by any number of valid XID_Continue ones.
         let first = loop {
-            match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
-                Some(ch) => if is_ident_start(ch) { break iter::once(ch) },
-                None => {},
+            let ch: char = g.gen();
+
+            if is_ident_start(ch) {
+                break iter::once(ch)
             }
         };
         let rest = (0..g.gen_range(0, 16)).map(|_| {
             loop {
-                match char::from_u32(g.gen_range(0, char::MAX as u32 + 1)) {
-                    Some(ch) => if is_ident_cont(ch) { break ch },
-                    None => {},
+                let ch: char = g.gen();
+
+                if is_ident_cont(ch) {
+                    break ch
                 }
             }
         });
@@ -515,9 +522,115 @@ impl Lexeme for ValidPunct {
         assert!(self.value.is_ascii());
 
         let mut end = item.end_location();
-        end.column += self.value.len(); // operators are ASCII -> bytes == graphemes
+        end.column += grapheme_count(self.value);
 
         item.push(self.value, lexer::TokenKind::Punctuation, end);
+    }
+}
+
+//
+// Type for generating valid string literals
+//
+#[derive(Debug, Clone)]
+struct ValidString {
+    chars: Vec<CharacterLiteral>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum CharacterLiteral {
+    Unescaped(char),
+    Quote,
+    Backslash,
+    Cr,
+    Lf,
+    Tab,
+    Hex(u8),
+    Unicode(char),
+}
+
+impl Arbitrary for ValidString {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
+        use CharacterLiteral::*;
+
+        // generate a possibly empty string, 25% of which are escape sequences
+        let it = (0..g.gen_range(0, 16)).map(|_| {
+            if g.gen::<u8>() < 0x40 {
+                return match g.gen::<u8>() {
+                    0x00...0x1f => Quote,            // 2/16
+                    0x20...0x3f => Backslash,        // 2/16
+                    0x40...0x5f => Cr,               // 2/16
+                    0x60...0x7f => Lf,               // 2/16
+                    0x80...0x9f => Tab,              // 2/16
+                    0xa0...0xcf => Hex(g.gen()),     // 3/16
+                    0xd0...0xff => Unicode(g.gen()), // 3/16
+                    _ => unreachable!(),
+                }
+            }
+
+            // Otherwise, generate any valid Unicode scalar except " and \
+            loop {
+                match g.gen::<char>() {
+                    '"' | '\\' => {},
+                    ch => break Unescaped(ch),
+                }
+            }
+        });
+
+        ValidString { chars: it.collect() }
+    }
+
+    fn shrink(&self) -> Box<Iterator<Item=Self>> {
+        let it = (0..self.chars.len()).map(|i| {
+            let chars = self.chars
+                .iter()
+                .enumerate()
+                .filter(|&(j, _)| j != i)
+                .map(|(_, c)| *c)
+                .collect();
+
+            ValidString { chars }
+        });
+
+        Box::new(it.collect::<Vec<_>>().into_iter())
+    }
+}
+
+impl Lexeme for ValidString {
+    fn render(&self, item: &mut SourceItem) {
+        use CharacterLiteral::*;
+
+        let mut end = item.end_location();
+        let mut buf = String::with_capacity(self.chars.len() * 2);
+
+        buf.push('"');
+
+        for ch in &self.chars {
+            match *ch {
+                Unescaped(uch) => buf.push(uch),
+                Backslash      => buf.push_str(r#"\\"#),
+                Quote          => buf.push_str(r#"\""#),
+                Cr             => buf.push_str(r#"\r"#),
+                Lf             => buf.push_str(r#"\n"#),
+                Tab            => buf.push_str(r#"\t"#),
+                Hex(byte)      => write!(buf, "\\x{:02x}", byte).unwrap(),
+                Unicode(uch)   => write!(buf, "\\u{{{:x}}}", uch as u32).unwrap(),
+            }
+        }
+
+        buf.push('"');
+
+        for g in buf.graphemes(true) {
+            // if one char is vertical whitespace, then all of them must be so
+            if g.contains(VER_WS) {
+                assert!(g.chars().all(|ch| VER_WS.contains(&ch)));
+                end.line += 1;
+                end.column = 1;
+            } else {
+                end.column += 1;
+            }
+        }
+
+        item.push(&buf, lexer::TokenKind::StringLiteral, end);
     }
 }
 
