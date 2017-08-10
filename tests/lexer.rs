@@ -186,8 +186,8 @@ impl Lexeme for ValidWhitespace {
 
         // A WS char is a single grapheme cluster on its own,
         // so bumping end.column for each char is OK.
-        for ch in self.buf.chars() {
-            if is_ver_ws(ch) {
+        for g in self.buf.graphemes(true) {
+            if g.contains(VER_WS) {
                 end.column = 1;
                 end.line += 1;
             } else {
