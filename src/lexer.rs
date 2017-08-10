@@ -116,7 +116,7 @@ impl<'a> Lexer<'a> {
                 (TokenKind::Word,           Regex::new(r#"^[_\p{XID_Start}]\p{XID_Continue}*"#).unwrap()),
                 (TokenKind::NumericLiteral, Regex::new(r#"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|([0-9]+(\.[0-9]+([eE][\+\-]?[0-9]+)?)?))"#).unwrap()),
                 (TokenKind::Punctuation,    Regex::new(r#"^([!\?\*\+]?<\->[!\?\*\+]?|\.{1,3}|[<>]=?|[=!]=|\->|=>?|::?|[\(\)\[\]\{\}\+\-\*/%&\|~\?,;])"#).unwrap()),
-                (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\"]|\\[\\"nrtb]|\\x[[:xdigit:]]{2}|\\u[[:xdigit:]]{4}|\\U[[:xdigit:]]{8})*""#).unwrap()),
+                (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\"]|\\[\\"nrt]|\\x[[:xdigit:]]{2}|\\u\{[[:xdigit:]]+\})*""#).unwrap()),
             ],
         }
     }
