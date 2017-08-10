@@ -85,6 +85,10 @@ pub fn grapheme_count(string: &str) -> usize {
     string.graphemes(true).count()
 }
 
+pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
+    string.graphemes(true).filter(|g| pred(*g)).count()
+}
+
 pub fn unescape_string_literal(string: &str) -> Result<String> {
     if string.contains('\\') {
         unimplemented!() // TODO(H2CO3): unescape string literals
