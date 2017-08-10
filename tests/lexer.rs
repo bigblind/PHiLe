@@ -116,15 +116,20 @@ impl Arbitrary for ValidSource {
 
         // Fill each item with a random number of correct lexemes, but at least 1
         for item in &mut items {
-            let gen_size = 2; // g.size(); // TODO(H2CO3): g.size() once other kinds are implemented
+            let gen_size = g.size();
             for _ in 0..g.gen_range(1, gen_size) {
-                // TODO(H2CO3): whitespace is not the only kind of correct lexeme
-                // ValidWhitespace::arbitrary(g).render(&mut *item);
-                // ValidLineComment::arbitrary(g).render(&mut *item);
-                // ValidWord::arbitrary(g).render(&mut *item);
-                // ValidNumber::arbitrary(g).render(&mut *item);
-                // ValidPunct::arbitrary(g).render(&mut *item);
-                ValidString::arbitrary(g).render(&mut *item);
+                // always append exactly one whitespace token
+                ValidWhitespace::arbitrary(g).render(&mut *item);
+
+                // append a non-whitespace token
+                match g.gen_range(0, 5) {
+                    0 => ValidWord::arbitrary(g).render(&mut *item),
+                    1 => ValidNumber::arbitrary(g).render(&mut *item),
+                    2 => ValidPunct::arbitrary(g).render(&mut *item),
+                    3 => ValidString::arbitrary(g).render(&mut *item),
+                    4 => ValidLineComment::arbitrary(g).render(&mut *item),
+                    _ => unreachable!(),
+                }
             }
         }
 
