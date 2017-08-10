@@ -597,10 +597,10 @@ fn is_ident_start(ch: char) -> bool {
     // UnicodeXID::is_xid_start(ch) || ch == '_'
 
     lazy_static! {
-        static ref re: Regex = Regex::new(r"^\p{XID_Start}$").unwrap();
+        static ref re: Regex = Regex::new(r"^[_\p{XID_Start}]$").unwrap();
     }
 
-    re.is_match(ch.encode_utf8(&mut [0; CHAR_MAX_BYTES])) || ch == '_'
+    re.is_match(ch.encode_utf8(&mut [0; CHAR_MAX_BYTES]))
 }
 
 #[allow(non_upper_case_globals)]
