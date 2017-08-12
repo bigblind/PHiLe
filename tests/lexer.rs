@@ -779,7 +779,8 @@ fn shrink_valid_whitespace_items() {
 fn shrink_valid_whitespace_size() {
     fn num_shrunk(len: usize) -> usize {
         match len {
-            0 => 0,
+            0 => panic!("Valid whitespace must be at least one char long"),
+            1 => 1,
             _ => 1 + len * num_shrunk(len - 1),
         }
     }
@@ -824,24 +825,25 @@ fn shrink_valid_line_comment_items() {
 fn shrink_valid_line_comment_size() {
     fn num_shrunk(len: usize) -> usize {
         match len {
-            0 => 1,
-            _ => 1 + len * num_shrunk(len - 1),
+            0 | 1 => panic!("Valid line comment must be at least 2 chars long (#\n)"),
+            2     => 1,
+            _     => 1 + (len - 2) * num_shrunk(len - 1),
         }
     }
 
     let mut g = quickcheck::StdGen::new(rand::OsRng::new().unwrap(), 100);
 
     for _ in 0..100 {
-        let ws = ValidLineComment::arbitrary(&mut g);
-        let num_chars = ws.buf.chars().count() - 2; // -2 for # and newline
+        let comment = ValidLineComment::arbitrary(&mut g);
+        let num_chars = comment.buf.chars().count();
 
-        // this blows up exponentially, so only check for length < 10
-        if num_chars >= 10 { continue }
+        // this blows up exponentially, so only check for length < 12
+        if num_chars >= 12 { continue }
 
-        let num_actual = shrunk_transitive_closure(iter::once(ws.clone())).count();
+        let num_actual = shrunk_transitive_closure(iter::once(comment.clone())).count();
         let num_expected = num_shrunk(num_chars);
 
-        assert_eq!(num_actual, num_expected, "{:?}", ws);
+        assert_eq!(num_actual, num_expected, "{:?}", comment);
     }
 }
 
