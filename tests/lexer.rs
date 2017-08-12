@@ -44,7 +44,7 @@ use phile::util::grapheme_count;
 
 // Append a lexeme onto `source`'s buffer
 trait Lexeme: Arbitrary {
-    fn render(&self, source: &mut SourceItem);
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind;
 }
 
 // Metadata about a token, without the actual underlying lexeme
@@ -55,90 +55,97 @@ struct TokenHeader {
     kind:  lexer::TokenKind,
 }
 
-// Represents a single "file" in multi-source input to the lexer
-#[derive(Debug, Clone)]
-struct SourceItem {
-    buf:    String,
-    tokens: Vec<TokenHeader>,
-    index:  usize,
-}
-
 // Represents some well-formed multi-file input to the lexer
 #[derive(Debug, Clone)]
 struct ValidSource {
-    items: Vec<SourceItem>,
+    files: Vec<ValidSourceFile>,
 }
 
-// Represents some ill-formed multi-file input to the lexer
+type ValidSourceFile = Vec<ValidToken>;
+
+// Poor man's dynamic dispatch for non-object-safe traits: enums!
 #[derive(Debug, Clone)]
-struct InvalidSource {
-    items: Vec<SourceItem>,
+enum ValidToken {
+    Whitespace(ValidWhitespace),
+    LineComment(ValidLineComment),
+    Word(ValidWord),
+    Number(ValidNumber),
+    Punct(ValidPunct),
+    String(ValidString),
 }
 
 
-impl SourceItem {
-    fn new(index: usize) -> SourceItem {
-        SourceItem {
-            buf:    String::new(),
-            tokens: Vec::new(),
-            index:  index,
+impl ValidSource {
+    fn render(&self) -> (Vec<String>, Vec<TokenHeader>) {
+        let mut strings = Vec::with_capacity(self.files.len());
+        let mut tokens = Vec::with_capacity(self.files.len() * 100);
+
+        for (i, file) in self.files.iter().enumerate() {
+            let mut buf = String::with_capacity(file.len() * 16);
+            let mut begin = lexer::Location { src_idx: i, line: 1, column: 1 };
+
+            for token in file {
+                let mut end = begin;
+                let old_len = buf.len();
+                let kind = token.render(&mut buf, &mut end);
+                let new_len = buf.len();
+                let slice = old_len..new_len;
+                let range = lexer::Range { begin, end };
+                tokens.push(TokenHeader { slice, range, kind });
+                begin = end;
+            }
+
+            strings.push(buf);
         }
-    }
 
-    fn end_location(&self) -> lexer::Location {
-        self.tokens.last().map_or(
-            lexer::Location { line: 1, column: 1, src_idx: self.index },
-            |token| token.range.end,
-        )
-    }
-
-    fn push(&mut self, lexeme: &str, kind: lexer::TokenKind, end: lexer::Location) {
-        let slice = self.buf.len()..self.buf.len() + lexeme.len();
-        let begin = self.end_location();
-        let range = lexer::Range { begin, end };
-        self.tokens.push(TokenHeader { slice, range, kind });
-        self.buf.push_str(lexeme);
-    }
-}
-
-impl AsRef<str> for SourceItem {
-    fn as_ref(&self) -> &str {
-        &self.buf
+        (strings, tokens)
     }
 }
 
 impl Arbitrary for ValidSource {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        // Generate a random number of source items, but at least 1
-        let max_num_sources = 8;
-        let num_sources = g.gen_range(1, max_num_sources);
-        let mut items: Vec<_> = (0..num_sources).map(SourceItem::new).collect();
-
-        // Fill each item with a random number of correct lexemes, but at least 1
-        for item in &mut items {
+        // Generate a random number of source "files", but at least 1
+        // Fill each file with a random number of correct lexemes, but at least 1
+        let files = (0..g.gen_range(1, 8)).map(|_| {
             let gen_size = g.size();
-            for _ in 0..g.gen_range(1, gen_size) {
-                // always append exactly one whitespace token
-                ValidWhitespace::arbitrary(g).render(&mut *item);
 
-                // append a non-whitespace token
-                match g.gen_range(0, 5) {
-                    0 => ValidWord::arbitrary(g).render(&mut *item),
-                    1 => ValidNumber::arbitrary(g).render(&mut *item),
-                    2 => ValidPunct::arbitrary(g).render(&mut *item),
-                    3 => ValidString::arbitrary(g).render(&mut *item),
-                    4 => ValidLineComment::arbitrary(g).render(&mut *item),
+            (0..g.gen_range(1, gen_size)).flat_map(|_| {
+                let ws = ValidToken::Whitespace(ValidWhitespace::arbitrary(g));
+
+                let non_ws = match g.gen_range(0, 5) {
+                    0 => ValidToken::Word(ValidWord::arbitrary(g)),
+                    1 => ValidToken::Number(ValidNumber::arbitrary(g)),
+                    2 => ValidToken::Punct(ValidPunct::arbitrary(g)),
+                    3 => ValidToken::String(ValidString::arbitrary(g)),
+                    4 => ValidToken::LineComment(ValidLineComment::arbitrary(g)),
                     _ => unreachable!(),
-                }
-            }
-        }
+                };
 
-        ValidSource { items }
+                iter::once(ws).chain(iter::once(non_ws))
+            }).collect()
+        }).collect();
+
+        ValidSource { files }
     }
 
     // Shrinking a multi-item source is not as trivial as removing lexemes
     // one-by-one, because there are many rules concerning consecutive lexemes.
     // TODO(H2CO3): implement shrinking
+}
+
+impl ValidToken {
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+        use ValidToken::*;
+
+        match *self {
+            Whitespace(ref ws)  => ws.render(buf, end),
+            LineComment(ref lc) => lc.render(buf, end),
+            Word(ref word)      => word.render(buf, end),
+            Number(ref num)     => num.render(buf, end),
+            Punct(ref punct)    => punct.render(buf, end),
+            String(ref s)       => s.render(buf, end),
+        }
+    }
 }
 
 //
@@ -186,11 +193,7 @@ impl Arbitrary for ValidWhitespace {
 }
 
 impl Lexeme for ValidWhitespace {
-    fn render(&self, source: &mut SourceItem) {
-        let mut end = source.end_location();
-
-        // A WS char is a single grapheme cluster on its own,
-        // so bumping end.column for each char is OK.
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         for g in self.buf.graphemes(true) {
             if g.contains(VER_WS) {
                 end.column = 1;
@@ -200,7 +203,9 @@ impl Lexeme for ValidWhitespace {
             }
         }
 
-        source.push(&self.buf, lexer::TokenKind::Whitespace, end);
+        buf.push_str(&self.buf);
+
+        lexer::TokenKind::Whitespace
     }
 }
 
@@ -254,16 +259,17 @@ impl Arbitrary for ValidLineComment {
 }
 
 impl Lexeme for ValidLineComment {
-    fn render(&self, source: &mut SourceItem) {
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         // A line comment represented by this type always ends in a newline.
         assert!(self.buf.chars().next().unwrap() == '#');
         assert!(is_ver_ws(self.buf.chars().last().unwrap()));
 
-        let mut end = source.end_location();
         end.line += 1;
         end.column = 1;
 
-        source.push(&self.buf, lexer::TokenKind::Comment, end);
+        buf.push_str(&self.buf);
+
+        lexer::TokenKind::Comment
     }
 }
 
@@ -322,14 +328,14 @@ impl Arbitrary for ValidWord {
 }
 
 impl Lexeme for ValidWord {
-    fn render(&self, source: &mut SourceItem) {
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         // Identifiers must not contain whitespace, including newlines
         assert!(!self.buf.contains(char::is_whitespace));
 
-        let mut end = source.end_location();
         end.column += grapheme_count(&self.buf); // because we contain no newlines
+        buf.push_str(&self.buf);
 
-        source.push(&self.buf, lexer::TokenKind::Word, end);
+        lexer::TokenKind::Word
     }
 }
 
@@ -495,14 +501,14 @@ impl Arbitrary for ValidNumber {
 
 // TODO(H2CO3): this is almost the same as ValidWord::render(); refactor
 impl Lexeme for ValidNumber {
-    fn render(&self, source: &mut SourceItem) {
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         // Identifiers must not contain whitespace, including newlines
         assert!(!self.buf.contains(char::is_whitespace));
 
-        let mut end = source.end_location();
         end.column += grapheme_count(&self.buf); // because we contain no newlines
+        buf.push_str(&self.buf);
 
-        source.push(&self.buf, lexer::TokenKind::NumericLiteral, end);
+        lexer::TokenKind::NumericLiteral
     }
 }
 
@@ -522,14 +528,14 @@ impl Arbitrary for ValidPunct {
 }
 
 impl Lexeme for ValidPunct {
-    fn render(&self, item: &mut SourceItem) {
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         assert!(!self.value.contains(char::is_whitespace));
         assert!(self.value.is_ascii());
 
-        let mut end = item.end_location();
         end.column += grapheme_count(self.value);
+        buf.push_str(self.value);
 
-        item.push(self.value, lexer::TokenKind::Punctuation, end);
+        lexer::TokenKind::Punctuation
     }
 }
 
@@ -601,12 +607,12 @@ impl Arbitrary for ValidString {
 }
 
 impl Lexeme for ValidString {
-    fn render(&self, item: &mut SourceItem) {
+    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         use CharacterLiteral::*;
 
-        let mut end = item.end_location();
-        let mut buf = String::with_capacity(self.chars.len() * 2);
+        let old_len = buf.len();
 
+        buf.reserve(self.chars.len() * 2);
         buf.push('"');
 
         for ch in &self.chars {
@@ -624,7 +630,7 @@ impl Lexeme for ValidString {
 
         buf.push('"');
 
-        for g in buf.graphemes(true) {
+        for g in buf[old_len..].graphemes(true) {
             // if one char is vertical whitespace, then all of them must be so
             if g.contains(VER_WS) {
                 assert!(g.chars().all(|ch| VER_WS.contains(&ch)));
@@ -635,7 +641,7 @@ impl Lexeme for ValidString {
             }
         }
 
-        item.push(&buf, lexer::TokenKind::StringLiteral, end);
+        lexer::TokenKind::StringLiteral
     }
 }
 
@@ -887,20 +893,17 @@ quickcheck! {
 
     #[allow(trivial_casts)]
     fn valid_source(source: ValidSource) -> bool {
-        let actual = lexer::lex(&source.items).unwrap();
-        let expected = source.items.iter()
-            .flat_map(|item| iter::repeat(item.index).zip(&item.tokens));
+        let (sources, expected) = source.render();
+        let actual = lexer::lex(&sources).unwrap();
 
-        let actual_count = actual.len();
-        let expected_count = source.items.iter()
-            .flat_map(|item| item.tokens.iter())
-            .count();
+        assert_eq!(actual.len(), expected.len());
 
-        assert_eq!(actual_count, expected_count);
+        for (act_tok, exp_tok) in actual.iter().zip(expected) {
+            let src_idx = exp_tok.range.begin.src_idx;
+            let slice = exp_tok.slice.clone();
 
-        for ((src_idx, exp_tok), act_tok) in expected.zip(actual) {
             assert_eq!(act_tok.kind, exp_tok.kind);
-            assert_eq!(act_tok.value, &source.items[src_idx].buf[exp_tok.slice.clone()]);
+            assert_eq!(act_tok.value, &sources[src_idx][slice]);
             assert_eq!(act_tok.range, exp_tok.range);
         }
 
