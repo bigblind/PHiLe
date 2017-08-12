@@ -769,7 +769,7 @@ fn shrink_valid_whitespace_items() {
         " \r\n",
         "\r\n", "\n", "\r",
         " \n",  "\n", " ",
-        " \r",  "\r", " "
+        " \r",  "\r", " ",
     ];
 
     assert_eq!(actual, expected);
@@ -789,6 +789,51 @@ fn shrink_valid_whitespace_size() {
     for _ in 0..100 {
         let ws = ValidWhitespace::arbitrary(&mut g);
         let num_chars = ws.buf.chars().count();
+
+        // this blows up exponentially, so only check for length < 10
+        if num_chars >= 10 { continue }
+
+        let num_actual = shrunk_transitive_closure(iter::once(ws.clone())).count();
+        let num_expected = num_shrunk(num_chars);
+
+        assert_eq!(num_actual, num_expected, "{:?}", ws);
+    }
+}
+
+#[test]
+fn shrink_valid_line_comment_items() {
+    let comment = ValidLineComment {
+        buf: "#XYZ\n".to_owned(),
+    };
+
+    let actual: Vec<_> = shrunk_transitive_closure(iter::once(comment))
+        .map(|lexeme| lexeme.buf)
+        .collect();
+
+    let expected = [
+        "#XYZ\n",
+        "#YZ\n",  "#Z\n", "#\n", "#Y\n", "#\n",
+        "#XZ\n",  "#Z\n", "#\n", "#X\n", "#\n",
+        "#XY\n",  "#Y\n", "#\n", "#X\n", "#\n",
+    ];
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn shrink_valid_line_comment_size() {
+    fn num_shrunk(len: usize) -> usize {
+        match len {
+            0 => 1,
+            _ => 1 + len * num_shrunk(len - 1),
+        }
+    }
+
+    let mut g = quickcheck::StdGen::new(rand::OsRng::new().unwrap(), 100);
+
+    for _ in 0..100 {
+        let ws = ValidLineComment::arbitrary(&mut g);
+        let num_chars = ws.buf.chars().count() - 2; // -2 for # and newline
 
         // this blows up exponentially, so only check for length < 10
         if num_chars >= 10 { continue }
