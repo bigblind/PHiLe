@@ -848,6 +848,52 @@ fn shrink_valid_line_comment_size() {
 }
 
 #[test]
+fn shrink_valid_word_items() {
+    let word = ValidWord {
+        buf: "a1b2".to_owned(),
+    };
+
+    let actual: Vec<_> = shrunk_transitive_closure(iter::once(word))
+        .map(|lexeme| lexeme.buf)
+        .collect();
+
+    let expected = [
+        "a1b2",
+        "ab2", "a2", "a", "ab", "a",
+        "a12", "a2", "a", "a1", "a",
+        "a1b", "ab", "a", "a1", "a",
+    ];
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn shrink_valid_word_size() {
+    fn num_shrunk(len: usize) -> usize {
+        match len {
+            0 => panic!("Valid word must be at least one char long"),
+            1 => 1,
+            _ => 1 + (len - 1) * num_shrunk(len - 1),
+        }
+    }
+
+    let mut g = quickcheck::StdGen::new(rand::OsRng::new().unwrap(), 100);
+
+    for _ in 0..100 {
+        let word = ValidWord::arbitrary(&mut g);
+        let num_chars = word.buf.chars().count();
+
+        // this blows up exponentially, so only check for length < 10
+        if num_chars >= 10 { continue }
+
+        let num_actual = shrunk_transitive_closure(iter::once(word.clone())).count();
+        let num_expected = num_shrunk(num_chars);
+
+        assert_eq!(num_actual, num_expected, "{:?}", word);
+    }
+}
+
+#[test]
 fn no_sources() {
     let sources: &[&str] = &[];
     assert!(lexer::lex(sources).unwrap().is_empty());
