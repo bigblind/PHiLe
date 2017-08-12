@@ -20,6 +20,7 @@ extern crate lazy_static;
 extern crate unicode_xid;
 extern crate unicode_segmentation;
 extern crate regex;
+extern crate rand;
 extern crate phile;
 
 use std::str;
@@ -738,9 +739,66 @@ fn is_ident_cont(ch: char) -> bool {
     re.is_match(ch.encode_utf8(&mut [0; CHAR_MAX_BYTES]))
 }
 
+fn shrunk_transitive_closure<T, I>(it: I) -> vec::IntoIter<T>
+    where T: Arbitrary,
+          I: Iterator<Item=T> {
+
+    let result = it.flat_map(|item| {
+        let shrunk_items = item.shrink();
+        iter::once(item).chain(shrunk_transitive_closure(shrunk_items))
+    });
+
+    result.collect::<Vec<_>>().into_iter()
+}
+
 //
 // Actual Unit Tests
 //
+
+#[test]
+fn shrink_valid_whitespace_items() {
+    let ws = ValidWhitespace {
+        buf: " \r\n".to_owned()
+    };
+
+    let actual: Vec<_> = shrunk_transitive_closure(iter::once(ws))
+        .map(|lexeme| lexeme.buf)
+        .collect();
+
+    let expected = [
+        " \r\n",
+        "\r\n", "\n", "\r",
+        " \n",  "\n", " ",
+        " \r",  "\r", " "
+    ];
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn shrink_valid_whitespace_size() {
+    fn num_shrunk(len: usize) -> usize {
+        match len {
+            0 => 0,
+            _ => 1 + len * num_shrunk(len - 1),
+        }
+    }
+
+    let mut g = quickcheck::StdGen::new(rand::OsRng::new().unwrap(), 100);
+
+    for _ in 0..100 {
+        let ws = ValidWhitespace::arbitrary(&mut g);
+        let num_chars = ws.buf.chars().count();
+
+        // this blows up exponentially, so only check for length < 10
+        if num_chars >= 10 { continue }
+
+        let num_actual = shrunk_transitive_closure(iter::once(ws.clone())).count();
+        let num_expected = num_shrunk(num_chars);
+
+        assert_eq!(num_actual, num_expected, "{:?}", ws);
+    }
+}
 
 #[test]
 fn no_sources() {
