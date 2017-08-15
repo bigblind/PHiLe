@@ -111,18 +111,20 @@ impl Arbitrary for ValidSource {
             let gen_size = g.size();
 
             (0..g.gen_range(1, gen_size)).flat_map(|_| {
-                let ws = ValidToken::Whitespace(ValidWhitespace::arbitrary(g));
+                let fill = match g.gen() {
+                    false => ValidToken::Whitespace(ValidWhitespace::arbitrary(g)),
+                    true  => ValidToken::LineComment(ValidLineComment::arbitrary(g)),
+                };
 
-                let non_ws = match g.gen_range(0, 5) {
+                let non_ws = match g.gen_range(0, 4) {
                     0 => ValidToken::Word(ValidWord::arbitrary(g)),
                     1 => ValidToken::Number(ValidNumber::arbitrary(g)),
                     2 => ValidToken::Punct(ValidPunct::arbitrary(g)),
                     3 => ValidToken::String(ValidString::arbitrary(g)),
-                    4 => ValidToken::LineComment(ValidLineComment::arbitrary(g)),
                     _ => unreachable!(),
                 };
 
-                iter::once(ws).chain(iter::once(non_ws))
+                iter::once(fill).chain(iter::once(non_ws))
             }).collect()
         }).collect();
 
@@ -1022,6 +1024,26 @@ fn all_valid_punctuation() {
         assert_eq!(token.value, *punct);
         assert_eq!(token.range, range);
     }
+}
+
+#[test]
+fn windows_newline_in_comment() {
+    let src = ValidSource {
+        files: vec![
+            vec![
+                ValidToken::LineComment(
+                    ValidLineComment {
+                        buf: "#abc\r\n".to_owned()
+                    }
+                ),
+            ]
+        ]
+    };
+    let (srcs, _) = src.render();
+    let actual = lexer::lex(&srcs).unwrap();
+
+    assert_eq!(actual.len(), 1);
+    assert_eq!(actual[0].kind, lexer::TokenKind::Comment);
 }
 
 quickcheck! {
