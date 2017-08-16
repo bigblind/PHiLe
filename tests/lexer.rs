@@ -550,7 +550,7 @@ struct ValidString {
     chars: Vec<CharacterLiteral>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum CharacterLiteral {
     Unescaped(char),
     Quote,
@@ -978,6 +978,68 @@ fn shrink_valid_punctuation() {
             .collect();
 
         assert_eq!(items, [*value]);
+    }
+}
+
+#[test]
+fn shrink_valid_string_items() {
+    use CharacterLiteral::*;
+
+    let s = ValidString {
+        chars: vec![Quote, Unicode('\u{0170}'), Unescaped('@')]
+    };
+
+    let actual: Vec<_> = shrunk_transitive_closure(iter::once(s))
+        .map(|lexeme| lexeme.chars)
+        .collect();
+
+    let expected = [
+        vec![Quote, Unicode('\u{0170}'), Unescaped('@')],
+
+        vec![Unicode('\u{0170}'), Unescaped('@')],
+        vec![Unescaped('@')],
+        vec![],
+        vec![Unicode('\u{0170}')],
+        vec![],
+
+        vec![Quote, Unescaped('@')],
+        vec![Unescaped('@')],
+        vec![],
+        vec![Quote],
+        vec![],
+
+        vec![Quote, Unicode('\u{0170}')],
+        vec![Unicode('\u{0170}')],
+        vec![],
+        vec![Quote],
+        vec![],
+    ];
+
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn shrink_valid_string_size() {
+    fn num_shrunk(len: usize) -> usize {
+        match len {
+            0 => 1,
+            _ => 1 + len * num_shrunk(len - 1),
+        }
+    }
+
+    let mut g = quickcheck::StdGen::new(rand::OsRng::new().unwrap(), 100);
+
+    for _ in 0..100 {
+        let s = ValidString::arbitrary(&mut g);
+        let num_chars = s.chars.len();
+
+        // this blows up exponentially, so only check for length < 10
+        if num_chars >= 10 { continue }
+
+        let num_actual = shrunk_transitive_closure(iter::once(s.clone())).count();
+        let num_expected = num_shrunk(num_chars);
+
+        assert_eq!(num_actual, num_expected, "{:#?}", s);
     }
 }
 
