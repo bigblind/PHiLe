@@ -896,6 +896,80 @@ fn shrink_valid_word_size() {
 }
 
 #[test]
+fn shrink_valid_number_items() {
+    let numbers = vec![
+        (
+            ValidNumber {
+                buf: "908".to_owned(),
+                kind: ValidNumberKind::DecimalInt,
+                prefix_len: 0,
+            },
+            vec![
+                "908",
+                "08", "8", "0",
+                "98", "8", "9",
+                "90", "0", "9",
+            ],
+        ),
+        (
+            ValidNumber {
+                buf: "0b110".to_owned(),
+                kind: ValidNumberKind::BinaryInt,
+                prefix_len: 2,
+            },
+            vec![
+                "0b110",
+                "0b10", "0b0", "0b1",
+                "0b10", "0b0", "0b1",
+                "0b11", "0b1", "0b1",
+            ],
+        ),
+        (
+            ValidNumber {
+                buf: "0o704".to_owned(),
+                kind: ValidNumberKind::OctalInt,
+                prefix_len: 2,
+            },
+            vec![
+                "0o704",
+                "0o04", "0o4", "0o0",
+                "0o74", "0o4", "0o7",
+                "0o70", "0o0", "0o7",
+            ],
+        ),
+        (
+            ValidNumber {
+                buf: "0x30f".to_owned(),
+                kind: ValidNumberKind::HexInt,
+                prefix_len: 2,
+            },
+            vec![
+                "0x30f",
+                "0x0f", "0xf", "0x0",
+                "0x3f", "0xf", "0x3",
+                "0x30", "0x0", "0x3",
+            ],
+        ),
+        (
+            ValidNumber {
+                buf: "123.456e+78".to_owned(),
+                kind: ValidNumberKind::FloatingPoint,
+                prefix_len: 0,
+            },
+            vec!["123.456e+78"],
+        ),
+    ];
+
+    for (number, expected) in numbers {
+        let actual: Vec<_> = shrunk_transitive_closure(iter::once(number))
+            .map(|lexeme| lexeme.buf)
+            .collect();
+
+        assert_eq!(actual, expected);
+    }
+}
+
+#[test]
 fn no_sources() {
     let sources: &[&str] = &[];
     assert!(lexer::lex(sources).unwrap().is_empty());
