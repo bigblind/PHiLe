@@ -108,7 +108,7 @@ impl Arbitrary for ValidSource {
         // Generate a random number of source "files", but at least 1
         // Fill each file with a random number of correct lexemes, but at least 1
         let files = (0..g.gen_range(1, 8)).map(|_| {
-            let gen_size = g.size();
+            let gen_size = g.size() / 8;
 
             (0..g.gen_range(1, gen_size)).flat_map(|_| {
                 let fill = match g.gen() {
@@ -275,8 +275,6 @@ impl Lexeme for ValidLineComment {
         lexer::TokenKind::Comment
     }
 }
-
-// TODO(H2CO3): type for valid line comments that DO NOT end with a newline
 
 //
 // A lexeme representing words, that is, identifiers and keywords
@@ -502,7 +500,6 @@ impl Arbitrary for ValidNumber {
     }
 }
 
-// TODO(H2CO3): this is almost the same as ValidWord::render(); refactor
 impl Lexeme for ValidNumber {
     fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         // Identifiers must not contain whitespace, including newlines
@@ -793,8 +790,8 @@ fn shrink_valid_whitespace_size() {
         let ws = ValidWhitespace::arbitrary(&mut g);
         let num_chars = ws.buf.chars().count();
 
-        // this blows up exponentially, so only check for length < 10
-        if num_chars >= 10 { continue }
+        // this blows up exponentially, so only check for length < 6
+        if num_chars >= 6 { continue }
 
         let num_actual = shrunk_transitive_closure(iter::once(ws.clone())).count();
         let num_expected = num_shrunk(num_chars);
@@ -839,8 +836,8 @@ fn shrink_valid_line_comment_size() {
         let comment = ValidLineComment::arbitrary(&mut g);
         let num_chars = comment.buf.chars().count();
 
-        // this blows up exponentially, so only check for length < 12
-        if num_chars >= 12 { continue }
+        // this blows up exponentially, so only check for length < 8
+        if num_chars >= 8 { continue }
 
         let num_actual = shrunk_transitive_closure(iter::once(comment.clone())).count();
         let num_expected = num_shrunk(num_chars);
@@ -885,8 +882,8 @@ fn shrink_valid_word_size() {
         let word = ValidWord::arbitrary(&mut g);
         let num_chars = word.buf.chars().count();
 
-        // this blows up exponentially, so only check for length < 10
-        if num_chars >= 10 { continue }
+        // this blows up exponentially, so only check for length < 6
+        if num_chars >= 6 { continue }
 
         let num_actual = shrunk_transitive_closure(iter::once(word.clone())).count();
         let num_expected = num_shrunk(num_chars);
@@ -1033,8 +1030,8 @@ fn shrink_valid_string_size() {
         let s = ValidString::arbitrary(&mut g);
         let num_chars = s.chars.len();
 
-        // this blows up exponentially, so only check for length < 10
-        if num_chars >= 10 { continue }
+        // this blows up exponentially, so only check for length < 6
+        if num_chars >= 6 { continue }
 
         let num_actual = shrunk_transitive_closure(iter::once(s.clone())).count();
         let num_expected = num_shrunk(num_chars);
