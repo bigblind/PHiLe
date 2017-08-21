@@ -1202,12 +1202,17 @@ fn interesting_valid_sources() {
         ("bar qux", vec!["bar", " ", "qux"]),
         ("if",      vec!["if"]),
         ("then",    vec!["then"]),
-        ("then",    vec!["then"]),
         ("else",    vec!["else"]),
+        ("match",   vec!["match"]),
         ("true",    vec!["true"]),
         ("false",   vec!["false"]),
         ("as",      vec!["as"]),
         ("nil",     vec!["nil"]),
+        ("struct",  vec!["struct"]),
+        ("class",   vec!["class"]),
+        ("enum",    vec!["enum"]),
+        ("impl",    vec!["impl"]),
+        ("let",     vec!["let"]),
 
         // line comments without a trailing newline
         ("#", vec!["#"]),
@@ -1250,7 +1255,9 @@ fn interesting_valid_sources() {
 
         // more complex/realistic sequences of tokens
         ("abc()", vec!["abc", "(", ")"]),
+        ("def(true, 83)", vec!["def", "(", "true", ",", " ", "83", ")"]),
         ("qux.lol[index]", vec!["qux", ".", "lol", "[", "index", "]"]),
+        ("let x_0 = \"0\";", vec!["let", " ", "x_0", " ", "=", " ", r#""0""#, ";"]),
 
         // some programmers just can't be bothered to write spaces between binary ops
         (
