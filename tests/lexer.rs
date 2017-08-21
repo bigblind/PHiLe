@@ -1194,6 +1194,83 @@ fn windows_newline_in_comment() {
     assert_eq!(actual[0].kind, lexer::TokenKind::Comment);
 }
 
+#[test]
+fn interesting_valid_sources() {
+    let test_cases: &[_] = &[
+        // Some identifiers and keywords
+        ("foo",     vec!["foo"]),
+        ("bar qux", vec!["bar", " ", "qux"]),
+        ("if",      vec!["if"]),
+        ("then",    vec!["then"]),
+        ("then",    vec!["then"]),
+        ("else",    vec!["else"]),
+        ("true",    vec!["true"]),
+        ("false",   vec!["false"]),
+        ("as",      vec!["as"]),
+        ("nil",     vec!["nil"]),
+
+        // line comments without a trailing newline
+        ("#", vec!["#"]),
+        ("# baz", vec!["# baz"]),
+
+        // without a decimal point, it's not a floating-point literal
+        ("123e456", vec!["123", "e456"]),
+
+        // Parentheses
+        ("()[]{}", vec!["(", ")", "[", "]", "{", "}"]),
+        ("{[(([{}]))]}", vec!["{", "[", "(", "(", "[", "{", "}", "]", ")", ")", "]", "}"]),
+
+        // Operators that are repetitions of the same character
+        ("......", vec!["...", "..."]),
+        (".....",  vec!["...", ".."]),
+        ("....",   vec!["...", "."]),
+        ("::::",   vec!["::", "::"]),
+        (":::",    vec!["::", ":"]),
+        ("?:",     vec!["?", ":"]),
+        ("?::",    vec!["?", "::"]),
+        ("====",   vec!["==", "=="]),
+        ("===",    vec!["==", "="]),
+
+        // no decrement/increment, separate logical/bitwise operators,
+        // nor shifts (left/logical right/arithmetic right)
+        ("--", vec!["-", "-"]),
+        ("++", vec!["+", "+"]),
+        ("&&", vec!["&", "&"]),
+        ("||", vec!["|", "|"]),
+        ("<<>>>", vec!["<", "<", ">", ">", ">"]),
+
+        // no compound assignment operators
+        (
+            "+=-=*=/=%=&=|=~=",
+            vec!["+", "=", "-", "=", "*", "=", "/", "=", "%", "=", "&", "=", "|", "=", "~", "="]
+        ),
+
+        // Operators sharing common characters
+        ("->-<->->=><=>=", vec!["->", "-", "<->", "->", "=>", "<=", ">="]),
+
+        // more complex/realistic sequences of tokens
+        ("abc()", vec!["abc", "(", ")"]),
+        ("qux.lol[index]", vec!["qux", ".", "lol", "[", "index", "]"]),
+
+        // some programmers just can't be bothered to write spaces between binary ops
+        (
+            "1.2+999*0.314e+1+2+2718.2818e-3-4",
+            vec!["1.2", "+", "999", "*", "0.314e+1", "+", "2", "+", "2718.2818e-3", "-", "4"]
+        ),
+    ];
+
+    for &(source, ref expected) in test_cases {
+        let sources = &[source];
+        let actual: Vec<_> = lexer::lex(sources)
+            .unwrap()
+            .iter()
+            .map(|token| token.value)
+            .collect();
+
+        assert_eq!(actual, *expected);
+    }
+}
+
 quickcheck! {
     #[allow(trivial_casts)]
     fn random_sources(sources: Vec<String>) -> bool {
