@@ -522,3 +522,9 @@ impl Sqir {
         self.relations.values().collect()
     }
 }
+
+impl Default for Sqir {
+    fn default() -> Sqir {
+        Sqir::new()
+    }
+}

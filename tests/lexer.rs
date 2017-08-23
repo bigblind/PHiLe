@@ -1097,8 +1097,8 @@ fn ascii_digit_is_numeric() {
         // every extended grapheme cluster in this test is ASCII, so it takes
         // up 1 byte => therefore lexeme.len() is OK to use in the Range.
         let range = lexer::Range {
-            begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
-            end:   lexer::Location { line: 1, column: lexeme.len() + 1, src_idx: 0 },
+            begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+            end:   lexer::Location { src_idx: 0, line: 1, column: lexeme.len() + 1 },
         };
         let sources = &[lexeme];
         let tokens = lexer::lex(sources).unwrap();
@@ -1126,8 +1126,8 @@ fn unicode_digit_is_not_numeric() {
 
     // They all express a single grapheme cluster.
     let err_range = lexer::Range {
-        begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
-        end:   lexer::Location { line: 1, column: 2, src_idx: 0 },
+        begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+        end:   lexer::Location { src_idx: 0, line: 1, column: 2 },
     };
 
     for lexeme in non_numeric_digits {
@@ -1158,8 +1158,8 @@ fn identifier_with_inner_unicode_digit() {
 
     for ident in identifiers {
         let range = lexer::Range {
-            begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
-            end:   lexer::Location { line: 1, column: grapheme_count(ident) + 1, src_idx: 0 },
+            begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+            end:   lexer::Location { src_idx: 0, line: 1, column: grapheme_count(ident) + 1 },
         };
         let sources = &[ident];
         let tokens = lexer::lex(sources).unwrap();
@@ -1176,8 +1176,8 @@ fn identifier_with_inner_unicode_digit() {
 fn all_valid_punctuation() {
     for punct in PUNCTUATION {
         let range = lexer::Range {
-            begin: lexer::Location { line: 1, column: 1, src_idx: 0 },
-            end:   lexer::Location { line: 1, column: punct.len() + 1, src_idx: 0 },
+            begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+            end:   lexer::Location { src_idx: 0, line: 1, column: punct.len() + 1 },
         };
         let sources = &[punct];
         let tokens = lexer::lex(sources).unwrap();

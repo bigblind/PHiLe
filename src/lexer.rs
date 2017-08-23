@@ -67,14 +67,14 @@ impl Location {
             // -1 because the \n itself doesn't count,
             // +1 because humans start counting at 1.
             Some(index) => Location {
+                src_idx: self.src_idx,
                 line:    self.line + grapheme_count_by(lexeme, |g| g.contains(line_breaks)),
                 column:  grapheme_count(&lexeme[index..]) - 1 + 1,
-                src_idx: self.src_idx,
             },
             None => Location {
+                src_idx: self.src_idx,
                 line:    self.line,
                 column:  self.column + grapheme_count(lexeme),
-                src_idx: self.src_idx,
             },
         }
     }
