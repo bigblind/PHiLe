@@ -1311,6 +1311,24 @@ fn interesting_valid_sources() {
     }
 }
 
+fn quickcheck_valid_lexeme<T: Lexeme>(lexeme: T, expected_kind: lexer::TokenKind) -> bool {
+    let mut source = String::new();
+    let begin = lexer::Location { src_idx: 0, line: 1, column: 1 };
+    let mut end = begin;
+    let rendered_kind = lexeme.render(&mut source, &mut end);
+    let range = lexer::Range { begin, end };
+    let sources = [source];
+    let tokens = lexer::lex(&sources).unwrap();
+
+    assert_eq!(tokens.len(), 1);
+    assert_eq!(rendered_kind, expected_kind);
+    assert_eq!(tokens[0].kind, expected_kind);
+    assert_eq!(tokens[0].range, range);
+    assert_eq!(tokens[0].value, sources[0]);
+
+    true
+}
+
 quickcheck! {
     #[allow(trivial_casts)]
     fn random_sources(sources: Vec<String>) -> bool {
@@ -1327,6 +1345,39 @@ quickcheck! {
                 sources.iter().any(|s| !s.is_empty()) && !tokens.is_empty()
             },
         }
+    }
+
+    //
+    // Test each valid token kind before more complex tests
+    //
+    #[allow(trivial_casts)]
+    fn valid_whitespace(lexeme: ValidWhitespace) -> bool {
+        quickcheck_valid_lexeme(lexeme, lexer::TokenKind::Whitespace)
+    }
+
+    #[allow(trivial_casts)]
+    fn valid_line_comment(lexeme: ValidLineComment) -> bool {
+        quickcheck_valid_lexeme(lexeme, lexer::TokenKind::Comment)
+    }
+
+    #[allow(trivial_casts)]
+    fn valid_word(lexeme: ValidWord) -> bool {
+        quickcheck_valid_lexeme(lexeme, lexer::TokenKind::Word)
+    }
+
+    #[allow(trivial_casts)]
+    fn valid_number(lexeme: ValidNumber) -> bool {
+        quickcheck_valid_lexeme(lexeme, lexer::TokenKind::NumericLiteral)
+    }
+
+    #[allow(trivial_casts)]
+    fn valid_string(lexeme: ValidString) -> bool {
+        quickcheck_valid_lexeme(lexeme, lexer::TokenKind::StringLiteral)
+    }
+
+    #[allow(trivial_casts)]
+    fn valid_punct(lexeme: ValidPunct) -> bool {
+        quickcheck_valid_lexeme(lexeme, lexer::TokenKind::Punctuation)
     }
 
     #[allow(trivial_casts)]
