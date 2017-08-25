@@ -1449,6 +1449,59 @@ fn interesting_valid_sources() {
     }
 }
 
+#[test]
+fn invalid_punct() {
+    let lexemes: &[&str] = &[
+        "^",
+        "!",
+        "@",
+        "'",
+        "$",
+        "\\",
+        "`",
+        "´",
+        "–",
+        "—",
+        "…",
+        "˚",
+        "∞",
+        "™",
+        "¡",
+        "¬",
+        "§",
+        "¶",
+        "•",
+        "≈",
+        "˜",
+        "√",
+        "©",
+        "˙",
+        "¨",
+        "“",
+        "”",
+        "‘",
+        "’",
+        "«",
+        "»",
+        "±",
+    ];
+
+    for lexeme in lexemes {
+        match lexer::lex(&[lexeme]) {
+            Ok(tokens) => panic!("Invalid lexeme '{}' was unexpectedly recognized as {:?}", lexeme, tokens),
+            Err(Error::Syntax { message, range }) => {
+                let expected_range = lexer::Range {
+                    begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+                    end:   lexer:: Location { src_idx: 0, line: 1, column: 2 },
+                };
+                assert_eq!(message, "Invalid token");
+                assert_eq!(range, Some(expected_range));
+            },
+            Err(err) => panic!("Lexer must always return a syntax error; got: {}", err),
+        }
+    }
+}
+
 fn quickcheck_valid_lexeme<T: Lexeme>(lexeme: T) -> bool {
     let mut source = String::new();
     let begin = lexer::Location { src_idx: 0, line: 1, column: 1 };
@@ -1470,7 +1523,7 @@ quickcheck! {
     #[allow(trivial_casts)]
     fn random_sources(sources: Vec<String>) -> bool {
         match lexer::lex(&sources) {
-            Err(Error::Syntax { ref message, range }) => {
+            Err(Error::Syntax { message, range }) => {
                 assert_eq!(message, "Invalid token");
                 assert!(!sources[range.unwrap().begin.src_idx].is_empty());
                 true
