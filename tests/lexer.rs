@@ -99,20 +99,21 @@ impl Arbitrary for ValidSource {
             let gen_size = g.size() / 8;
 
             (0..g.gen_range(1, gen_size)).flat_map(|_| {
-                let fill = match g.gen() {
-                    false => ValidToken::Whitespace(ValidWhitespace::arbitrary(g)),
-                    true  => ValidToken::LineComment(ValidLineComment::arbitrary(g)),
-                };
+                let ws_gens: &[fn(&mut G) -> ValidToken] = &[
+                    |g| ValidToken::Whitespace(ValidWhitespace::arbitrary(g)),
+                    |g| ValidToken::LineComment(ValidLineComment::arbitrary(g)),
+                ];
+                let non_ws_gens: &[fn(&mut G) -> ValidToken] = &[
+                    |g| ValidToken::Word(ValidWord::arbitrary(g)),
+                    |g| ValidToken::Number(ValidNumber::arbitrary(g)),
+                    |g| ValidToken::Punct(ValidPunct::arbitrary(g)),
+                    |g| ValidToken::String(ValidString::arbitrary(g)),
+                ];
 
-                let non_ws = match g.gen_range(0, 4) {
-                    0 => ValidToken::Word(ValidWord::arbitrary(g)),
-                    1 => ValidToken::Number(ValidNumber::arbitrary(g)),
-                    2 => ValidToken::Punct(ValidPunct::arbitrary(g)),
-                    3 => ValidToken::String(ValidString::arbitrary(g)),
-                    _ => unreachable!(),
-                };
+                let ws_gen = *g.choose(ws_gens).unwrap();
+                let non_ws_gen = *g.choose(non_ws_gens).unwrap();
 
-                iter::once(fill).chain(iter::once(non_ws))
+                iter::once(ws_gen(g)).chain(iter::once(non_ws_gen(g)))
             }).collect()
         }).collect();
 
@@ -176,15 +177,17 @@ impl Arbitrary for ValidToken {
     fn arbitrary<G: Gen>(g: &mut G) -> ValidToken {
         use ValidToken::*;
 
-        match g.gen_range(0, 6) {
-            0 => Whitespace(ValidWhitespace::arbitrary(g)),
-            1 => LineComment(ValidLineComment::arbitrary(g)),
-            2 => Word(ValidWord::arbitrary(g)),
-            3 => Number(ValidNumber::arbitrary(g)),
-            4 => String(ValidString::arbitrary(g)),
-            5 => Punct(ValidPunct::arbitrary(g)),
-            _ => unreachable!(),
-        }
+        let token_gens: &[fn(&mut G) -> ValidToken] = &[
+            |g| Whitespace(ValidWhitespace::arbitrary(g)),
+            |g| LineComment(ValidLineComment::arbitrary(g)),
+            |g| Word(ValidWord::arbitrary(g)),
+            |g| Number(ValidNumber::arbitrary(g)),
+            |g| String(ValidString::arbitrary(g)),
+            |g| Punct(ValidPunct::arbitrary(g)),
+        ];
+        let gen = *g.choose(token_gens).unwrap();
+
+        gen(g)
     }
 
     fn shrink(&self) -> Box<Iterator<Item=Self>> {
@@ -616,16 +619,18 @@ impl Arbitrary for ValidString {
         // generate a possibly empty string, 25% of which are escape sequences
         let it = (0..g.gen_range(0, 16)).map(|_| {
             if g.gen::<u8>() < 0x40 {
-                return match g.gen::<u8>() {
-                    0x00...0x1f => Quote,            // 2/16
-                    0x20...0x3f => Backslash,        // 2/16
-                    0x40...0x5f => Cr,               // 2/16
-                    0x60...0x7f => Lf,               // 2/16
-                    0x80...0x9f => Tab,              // 2/16
-                    0xa0...0xcf => Hex(g.gen()),     // 3/16
-                    0xd0...0xff => Unicode(g.gen()), // 3/16
-                    _ => unreachable!(),
-                }
+                let char_gens: &[fn(&mut G) -> CharacterLiteral] = &[
+                    |_| Quote,
+                    |_| Backslash,
+                    |_| Cr,
+                    |_| Lf,
+                    |_| Tab,
+                    |g| Hex(g.gen()),
+                    |g| Unicode(g.gen()),
+                ];
+                let char_gen = *g.choose(char_gens).unwrap();
+
+                return char_gen(g);
             }
 
             // Otherwise, generate any valid Unicode scalar except " and \
