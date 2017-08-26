@@ -177,8 +177,8 @@ impl<T> RcCell<T> {
     ///
     /// # Return value:
     ///
-    /// `Ok(Ref<T>)`, if an immutable borrow is dynamically possible.
-    /// `Err(Error::Borrow)`, if an immutable borrow is dynamically
+    /// * `Ok(Ref<T>)`, if an immutable borrow is dynamically possible.
+    /// * `Err(Error::Borrow)`, if an immutable borrow is dynamically
     /// impossible, e.g. because there is outstanding mutable loan.
     pub fn borrow(&self) -> Result<Ref<T>> {
         self.ptr.try_borrow().map_err(From::from)
@@ -188,8 +188,8 @@ impl<T> RcCell<T> {
     ///
     /// # Return value:
     ///
-    /// `Ok(Ref<T>)`, if a mutable borrow is dynamically possible.
-    /// `Err(Error::BorrowMyut)`, if a mutable borrow is dynamically
+    /// * `Ok(Ref<T>)`, if a mutable borrow is dynamically possible.
+    /// * `Err(Error::BorrowMut)`, if a mutable borrow is dynamically
     /// impossible, e.g. because there is outstanding immutable loan.
     pub fn borrow_mut(&self) -> Result<RefMut<T>> {
         self.ptr.try_borrow_mut().map_err(From::from)
