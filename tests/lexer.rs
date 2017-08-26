@@ -700,6 +700,14 @@ impl Lexeme for ValidString {
     }
 }
 
+// TODO(H2CO3): test invalid lexemes (e.g. unterminated string
+// literals, string literals with invalid escapes or disallowed
+// [e.g. deprecated, surrogate, ...] characters, lonely integer
+// base prefixes without following digits [0b, 0x, etc.],
+// floating-point literals with missing parts [e.g. .5, 1.])
+// using QuickCheck. (Currently there are only manually-written
+// unit tests.)
+
 //
 // Constants and functions for generating pseudorandom strings
 //
@@ -1450,8 +1458,9 @@ fn interesting_valid_sources() {
 }
 
 #[test]
-fn invalid_punct() {
+fn invalid_source() {
     let lexemes: &[&str] = &[
+        // Invalid punctuation
         "^",
         "!",
         "@",
@@ -1484,6 +1493,36 @@ fn invalid_punct() {
         "«",
         "»",
         "±",
+
+        // Invalid string literals
+        r#""abc def"#,      // Unterminated, no right "
+        r#""\x0z""#,        // Invalid character in escape sequence #0
+        r#""\u{abcdefg}""#, // Invalid character in escape sequence #1
+        r#""\q""#,          // Invalid character in escape sequence #2
+        r#""\U{20}""#,      // Invalid character in escape sequence #3
+        r#""\X0a""#,        // Invalid character in escape sequence #4
+        r#""\x"#,           // Escape sequence too short #0
+        r#""\x""#,          // Escape sequence too short #1
+        r#""\x9""#,         // Escape sequence too short #2
+        r#""\u""#,          // Missing delimiter in Unicode escape #0
+        r#""\u{""#,         // Missing delimiter in Unicode escape #1
+        r#""\u{}""#,        // Escape sequence too short #3
+        r#"\"#,             // Unterminated escape sequence
+
+        // Tricky Unicode (some borrowed from QuickCheck)
+        "\u{e0001}",        // Tag
+        "\u{e0020}",        // Tag Space
+        "\u{e000}",         // Private Use, etc.
+        "\u{e001}",
+        "\u{ef8ff}",
+        "\u{f0000}",
+        "\u{ffffd}",
+        "\u{ffffe}",
+        "\u{fffff}",
+        "\u{100000}",
+        "\u{10fffd}",
+        "\u{10fffe}",
+        "\u{10ffff}",       // Highest valid code point
     ];
 
     for lexeme in lexemes {
@@ -1492,7 +1531,7 @@ fn invalid_punct() {
             Err(Error::Syntax { message, range }) => {
                 let expected_range = lexer::Range {
                     begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
-                    end:   lexer::Location { src_idx: 0, line: 1, column: 2 },
+                    end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
                 };
                 assert_eq!(message, "Invalid token");
                 assert_eq!(range, Some(expected_range));
