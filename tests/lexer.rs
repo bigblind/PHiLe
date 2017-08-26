@@ -1492,7 +1492,7 @@ fn invalid_punct() {
             Err(Error::Syntax { message, range }) => {
                 let expected_range = lexer::Range {
                     begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
-                    end:   lexer:: Location { src_idx: 0, line: 1, column: 2 },
+                    end:   lexer::Location { src_idx: 0, line: 1, column: 2 },
                 };
                 assert_eq!(message, "Invalid token");
                 assert_eq!(range, Some(expected_range));

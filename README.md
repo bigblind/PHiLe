@@ -7,6 +7,8 @@
 [![PHiLe Download](https://img.shields.io/crates/d/phile.svg)](https://crates.io/crates/phile)
 [![PHiLe License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/H2CO3/PHiLe/blob/master/LICENSE.txt)
 [![Test Coverage](https://codecov.io/gh/H2CO3/PHiLe/branch/master/graphs/badge.svg)](https://codecov.io/gh/H2CO3/PHiLe)
+[![Gitter chat](https://badges.gitter.im/H2CO3/PHiLe.png)](https://gitter.im/PHiLe-DB)
+[![Lines of Code](https://tokei.rs/b1/github/H2CO3/PHiLe)](https://github.com/Aaronepower/tokei)
 
 ### What's PHiLe?
 
