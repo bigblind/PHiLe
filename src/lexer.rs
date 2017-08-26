@@ -12,37 +12,60 @@ use error::{ Error, Result };
 use util::{ grapheme_count, grapheme_count_by };
 
 
+/// Represents the location of a single extended grapheme cluster
+/// in the sources fed to the lexer.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Location {
-    pub src_idx: usize, // index of the source `self` points into
+    /// 0-based index of the source that this location points into.
+    pub src_idx: usize,
+    /// 1-based line index within the aforementioned source.
     pub line:    usize,
+    /// 1-based character index within the line.
     pub column:  usize,
 }
 
+/// A half-open range representing a source span.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Range {
+    /// Location at the beginning of the source range.
     pub begin: Location,
+    /// Location one past the end of the source range.
     pub end:   Location,
 }
 
+/// This trait is to be implemented by entities that correspond
+/// to some range in the source. This is used for generating
+/// location information in user-visible error messages.
 pub trait Ranged {
+    /// Returns the range `self` was generated from.
     fn range(&self) -> Range;
 }
 
+/// Describes the type of a single token or lexeme.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenKind {
+    /// Horizontal and vertical (e.g. newline) whitespace. Unicode-aware.
     Whitespace,
+    /// Currently, a line comment, beginning with '#' and ending with vertical whitespace or end-of-source.
     Comment,
-    Word, // identifier or keyword
+    /// An identifier or a keyword.
+    Word,
+    /// Operators and other punctuation characters, e.g. semicolons.
     Punctuation,
+    /// String literal.
     StringLiteral,
+    /// Integer or floating-point literal.
     NumericLiteral,
 }
 
+/// Represents a lexeme and its associated type and location information as an abstract token.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Token<'a> {
+    /// The kind associated with the recognized lexeme.
     pub kind:  TokenKind,
+    /// A pointer into the source where the underlying lexeme was found.
     pub value: &'a str,
+    /// Human-readable range information for the underlying lexeme.
     pub range: Range,
 }
 
@@ -55,6 +78,18 @@ struct Lexer<'a> {
 }
 
 
+/// Given an array of source strings, returns an array of tokens
+/// extracted from those strings, or an error if there is a syntactic
+/// (more precisely, lexical) error in any of the source strings.
+///
+/// # Arguments
+///
+/// * `sources`: a slice of `str`-convertible source strings.
+///
+/// # Return value
+///
+/// * `Ok(Vec<Token>)` if the source files were lexically correct.
+/// * `Err(Error::Syntax)` if there was a lexical error in the input.
 pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>> {
     Lexer::new().lex(sources)
 }

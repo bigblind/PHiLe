@@ -1,6 +1,6 @@
 [package]
 name          = "phile"
-version       = "0.1.0"
+version       = "0.1.1"
 authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository    = "https://github.com/H2CO3/PHiLe.git"
 homepage      = "https://h2co3.github.io/phile/"
