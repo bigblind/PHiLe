@@ -6,6 +6,12 @@
 // on 02/05/2017
 //
 
+//! The `util` module provides various useful helper functions,
+//! types and macros, used extensively throughout the PHiLe
+//! source tree. Generic reference-counted smart pointers,
+//! string manipulation specific to the syntax of PHiLe, and
+//! commonly-used constants are all part of this file.
+
 use std::rc::{ Rc, Weak };
 use std::cell::{ RefCell, Ref, RefMut };
 use std::hash::{ Hash, Hasher };

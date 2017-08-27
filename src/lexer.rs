@@ -6,6 +6,11 @@
 // on 07/04/2017
 //
 
+//! This module contains type definitions and functions for
+//! breaking up unstructured source text into lexemes and tokens.
+//! It also provides types for mapping tokens to their original
+//! location within the source code in a human-readable manner.
+
 use std::fmt::{ self, Display, Formatter };
 use regex::Regex;
 use error::{ Error, Result };

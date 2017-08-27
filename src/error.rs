@@ -6,6 +6,11 @@
 // on 12/06/2017
 //
 
+//! This module defines types for representing possible errors
+//! that may be generated during the compilation of some PHiLe
+//! source code. It also provides useful macros for reporting
+//! errors in a way that is consistent across modules.
+
 use std; // for error
 use std::io;
 use std::result;

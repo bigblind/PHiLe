@@ -6,6 +6,13 @@
 // on 07/04/2017
 //
 
+//! This module contains types for building Abstract Syntax Trees
+//! (ASTs). ASTs describe the syntactic structure of PHiLe programs.
+//! Defined here are various kinds of AST nodes that the `parser`
+//! module emits from a sequence of tokens produced by the `lexer`
+//! module. AST nodes, like tokens, contain source location data
+//! in order to easily map them to the original source code.
+
 use lexer::{ Range, Ranged };
 
 
