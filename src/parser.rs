@@ -25,6 +25,19 @@ type TyResult<'a>   = Result<Ty<'a>>;
 type LexResult<'a>  = Result<&'a Token<'a>>;
 
 
+/// Given an array of tokens, parses the token sequence, and
+/// returns the corresponding AST.
+///
+/// # Arguments:
+///
+/// * `tokens`: the list of `Token`s extracted from the source to be parsed.
+///
+/// # Return value:
+///
+/// * `Ok(Prog)`, the root node of the AST, if the source was
+///   syntactically correct.
+/// * `Err(Error::Syntax)`, if there was a syntax error in the
+///   source.
 pub fn parse<'a>(tokens: &'a [Token]) -> ProgResult<'a> {
     Parser::new(tokens).parse()
 }
