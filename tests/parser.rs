@@ -57,32 +57,16 @@ fn empty_struct_or_class_decl() {
             name: "Foo",
             fields: vec![],
             range: Range {
-                begin: Location {
-                    src_idx: 0,
-                    line: 1,
-                    column: 1,
-                },
-                end: Location {
-                    src_idx: 0,
-                    line: 1,
-                    column: 14,
-                },
+                begin: Location { src_idx: 0, line: 1, column: 1 },
+                end: Location { src_idx: 0, line: 1, column: 14 },
             },
         }),
         ast::Item::ClassDecl(ast::ClassDecl {
             name: "Bar",
             fields: vec![],
             range: Range {
-                begin: Location {
-                    src_idx: 0,
-                    line: 1,
-                    column: 15,
-                },
-                end: Location {
-                    src_idx: 0,
-                    line: 1,
-                    column: 27,
-                },
+                begin: Location { src_idx: 0, line: 1, column: 15 },
+                end: Location { src_idx: 0, line: 1, column: 27 },
             },
         }),
     ];

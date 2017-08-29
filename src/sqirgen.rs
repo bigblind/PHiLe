@@ -11,7 +11,6 @@ use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
-use parser;
 use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, FuncArg, Field };
 use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ Error, Result };
@@ -120,6 +119,88 @@ fn unwrap_class_name(class: &RcType) -> Result<String> {
         Type::Class(ref c) => Ok(c.name.clone()),
         ref ty => bug!("Non-class class type?! {}", ty),
     }
+}
+
+fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
+    // TODO(H2CO3): actually unescape string literals
+    if lexeme.contains('\\') {
+        Err(Error::Syntax {
+            message: format!("Parsing nontrivial string literal is unimplemented: {}", lexeme),
+            range: Some(range),
+        })
+    } else {
+        Ok(lexeme.to_owned()) // TODO(H2CO3): trim delimiters
+    }
+}
+
+fn parse_bool_literal(lexeme: &str, range: Range) -> Result<bool> {
+    lexeme.parse().map_err(|err| Error::Syntax {
+        message: format!("Invalid boolean literal {}: {}", lexeme, err),
+        range: Some(range),
+    })
+}
+
+fn parse_float_literal(lexeme: &str, range: Range) -> Result<f64> {
+    lexeme.parse().map_err(|err| Error::Syntax {
+        message: format!("Invalid float literal {}: {}", lexeme, err),
+        range: Some(range),
+    })
+}
+
+fn parse_int_literal(lexeme: &str, range: Range) -> Result<u64> {
+    let radix_map = [
+        ("0b",  2),
+        ("0B",  2),
+        ("0o",  8),
+        ("0O",  8),
+        ("0x", 16),
+        ("0X", 16),
+    ];
+
+    for &(prefix, radix) in &radix_map {
+        if lexeme.starts_with(prefix) {
+              return parse_int_with_radix(&lexeme[prefix.len()..], radix, range);
+        }
+    }
+
+    parse_int_with_radix(lexeme, 10, range)
+}
+
+// Helper for parse_int_literal()
+fn parse_int_with_radix(lexeme: &str, radix: u32, range: Range) -> Result<u64> {
+    u64::from_str_radix(lexeme, radix).map_err(
+        |err| Error::Syntax {
+            message: format!("Invalid base-{} integer {}: {}", radix, lexeme, err),
+            range: Some(range),
+        }
+    )
+}
+
+fn parse_cardinality_op(op: &str, range: Range) -> Result<(Cardinality, Cardinality)> {
+    let op_error = || Error::Syntax {
+        message: format!("Invalid cardinality operator: {}", op),
+        range: Some(range),
+    };
+
+    let cardinality_from_char = |ch| Ok(match ch {
+        '<' => Cardinality::One,
+        '>' => Cardinality::One,
+        '?' => Cardinality::ZeroOrOne,
+        '!' => Cardinality::One,
+        '*' => Cardinality::ZeroOrMore,
+        '+' => Cardinality::OneOrMore,
+        _   => return Err(op_error()),
+    });
+
+    // TODO(H2CO3): &op_error should be op_error once #1369 is
+    // resolved (https://github.com/rust-lang/rfcs/issues/1369)
+    let mut chars = op.chars();
+    let first = chars.next().ok_or_else(&op_error)?;
+    let last = chars.next_back().ok_or_else(&op_error)?;
+    let lhs = cardinality_from_char(first)?;
+    let rhs = cardinality_from_char(last)?;
+
+    Ok((lhs, rhs))
 }
 
 impl Ranged for TyCtx {
@@ -936,7 +1017,7 @@ impl SqirGen {
         range:          &R,
     ) -> Result<()> {
         // Ensure that declared RHS cardinality matches with the field type
-        let (lhs_card, rhs_card) = self.cardinalities_from_operator(relation.cardinality);
+        let (lhs_card, rhs_card) = parse_cardinality_op(relation.cardinality, range.range())?;
         let rhs_class_type = self.validate_type_cardinality(lhs_field_type, rhs_card, range)?;
 
         let rhs_field_name = match relation.field {
@@ -1144,26 +1225,6 @@ impl SqirGen {
         };
 
         Ok(Some(type_and_cardinality))
-    }
-
-    fn cardinalities_from_operator(&self, op: &str) -> (Cardinality, Cardinality) {
-        let cardinality_from_char = |ch| match ch {
-            '<' => Cardinality::One,
-            '>' => Cardinality::One,
-            '?' => Cardinality::ZeroOrOne,
-            '!' => Cardinality::One,
-            '*' => Cardinality::ZeroOrMore,
-            '+' => Cardinality::OneOrMore,
-            _   => unreachable!("invalid cardinality operator '{}'", op),
-        };
-
-        let mut chars = op.chars();
-        let first = chars.next().expect("cardinality operator too short");
-        let last = chars.next_back().expect("cardinality operator too short");
-        let lhs = cardinality_from_char(first);
-        let rhs = cardinality_from_char(last);
-
-        (lhs, rhs)
     }
 
     //
@@ -1403,7 +1464,7 @@ impl SqirGen {
 
     fn generate_bool_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_bool_type();
-        let b = parser::parse_bool_literal(val, range)?;
+        let b = parse_bool_literal(val, range)?;
         let value = Value::BoolConst(b);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
@@ -1417,7 +1478,7 @@ impl SqirGen {
         }
 
         let ty = self.get_int_type();
-        let n = parser::parse_int_literal(val, range)?;
+        let n = parse_int_literal(val, range)?;
         let value = Value::IntConst(n);
         let id = self.next_temp_id();
 
@@ -1426,7 +1487,7 @@ impl SqirGen {
 
     fn generate_float_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_float_type();
-        let x = parser::parse_float_literal(val, range)?;
+        let x = parse_float_literal(val, range)?;
         let value = Value::FloatConst(x);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
@@ -1434,7 +1495,7 @@ impl SqirGen {
 
     fn generate_string_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_string_type();
-        let s = parser::parse_string_literal(val, range)?;
+        let s = parse_string_literal(val, range)?;
         let value = Value::StringConst(s);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
