@@ -148,28 +148,6 @@ pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
     string.graphemes(true).filter(|g| pred(*g)).count()
 }
 
-/// Parses escape sequences in a string literal and returns the
-/// 'raw' string that is represented by the (escaped) input.
-/// Also removes the leading and trailing quotation marks.
-///
-/// # Arguments:
-///
-/// * `string`: a potentially-escaped string literal in PHiLe syntax.
-///
-/// # Return value:
-///
-/// * `Ok(String)`: The unescaped, quote-trimmed raw string if
-///   the string literal is in the correct format.
-/// * `Err(Error::Syntax)`, if the string literal contained an
-///   invalid escape sequence (or any other syntactic error).
-pub fn unescape_string_literal(string: &str) -> Result<String> {
-    if string.contains('\\') {
-        unimplemented!() // TODO(H2CO3): unescape string literals
-    } else {
-        Ok(string.to_owned())
-    }
-}
-
 
 impl<T> RcCell<T> {
     /// Creates an `RcCell` owning the `value`.

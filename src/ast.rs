@@ -25,7 +25,7 @@ pub type Exp<'a>  = Node<ExpKind<'a>>;
 pub type Ty<'a>   = Node<TyKind<'a>>;
 
 /// Generic AST node (helper for Exp, Ty, etc.)
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Node<T> {
     /// Discriminant describing the type and value of the node.
     pub kind:  T,
@@ -34,7 +34,7 @@ pub struct Node<T> {
 }
 
 /// A top-level source item.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Item<'a> {
     /// Definition of a `struct` type.
     StructDecl(StructDecl<'a>),
@@ -49,7 +49,7 @@ pub enum Item<'a> {
 }
 
 /// Type and value of an `Exp` expression node.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum ExpKind<'a> {
     /// `?:`, the Elvis operator.
     CondExp(Box<CondExp<'a>>),
@@ -74,14 +74,14 @@ pub enum ExpKind<'a> {
     /// Literal `nil`
     NilLiteral,
     /// Literal `true` or `false`.
-    BoolLiteral(bool),
-    /// A pre-parsed integer literal, without a sign.
-    IntLiteral(u64),
-    /// A pre-parsed floating-point literal.
-    FloatLiteral(f64),
-    /// An already unescaped 'raw' string literal.
-    StringLiteral(String),
-    /// The name of an entity, e.g. function, variable or type.
+    BoolLiteral(&'a str),
+    /// An unparsed integer literal, without a sign.
+    IntLiteral(&'a str),
+    /// An unparsed floating-point literal.
+    FloatLiteral(&'a str),
+    /// A still potentially escaped string literal.
+    StringLiteral(&'a str),
+    /// The name of an entity, e.g. function, variable, or type.
     Identifier(&'a str),
     /// A tuple literal.
     TupleLiteral(Vec<Exp<'a>>),
@@ -106,7 +106,7 @@ pub enum ExpKind<'a> {
 }
 
 /// Type and value of a `Ty` type node.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TyKind<'a> {
     /// A pointer to the inner type.
     Pointer(Box<Ty<'a>>),
@@ -127,7 +127,7 @@ pub enum TyKind<'a> {
 //
 
 /// Definition of a `struct` type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StructDecl<'a> {
     /// The source range of the type definition.
     pub range:  Range,
@@ -138,7 +138,7 @@ pub struct StructDecl<'a> {
 }
 
 /// Definition of a `class` type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ClassDecl<'a> {
     /// The source range of the type definition.
     pub range:  Range,
@@ -152,7 +152,7 @@ pub struct ClassDecl<'a> {
 /// A `RelDecl` node semantically means that the LHS of the
 /// relation is the class in which the `RelDecl` is contained,
 /// while the RHS is the type of the corresponding field.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct RelDecl<'a> {
     /// The cardinality operator.
     pub cardinality: &'a str,
@@ -163,7 +163,7 @@ pub struct RelDecl<'a> {
 }
 
 /// A field specification within a struct or class type definition.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Field<'a> {
     /// The source range of the field definition.
     pub range:    Range,
@@ -176,7 +176,7 @@ pub struct Field<'a> {
 }
 
 /// Definition of an `enum` type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct EnumDecl<'a> {
     /// The source range of the type definition.
     pub range:    Range,
@@ -187,7 +187,7 @@ pub struct EnumDecl<'a> {
 }
 
 /// Definition of one enum variant.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Variant<'a> {
     /// Source range of the definition.
     pub range: Range,
@@ -198,7 +198,7 @@ pub struct Variant<'a> {
 }
 
 /// A function definition.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Function<'a> {
     /// Source range of the function.
     pub range:     Range,
@@ -213,7 +213,7 @@ pub struct Function<'a> {
 }
 
 /// Declaration of a single function argument.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FuncArg<'a> {
     /// Source range of the declaration.
     pub range: Range,
@@ -224,7 +224,7 @@ pub struct FuncArg<'a> {
 }
 
 /// Implementation of the methods of a user-defined type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Impl<'a> {
     /// Source range if the `impl`.
     pub range:     Range,
@@ -239,7 +239,7 @@ pub struct Impl<'a> {
 //
 
 /// A conditional expression or 'Elvis operator', `?:`.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct CondExp<'a> {
     /// The LHS is the condition.
     pub condition: Exp<'a>,
@@ -251,7 +251,7 @@ pub struct CondExp<'a> {
 }
 
 /// Any binary operator.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct BinaryOp<'a> {
     /// Textual representation of the operator itself.
     pub op:  &'a str,
@@ -262,7 +262,7 @@ pub struct BinaryOp<'a> {
 }
 
 /// An indexing or subscripting operator.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Subscript<'a> {
     /// The expression being indexed into.
     pub base:  Exp<'a>,
@@ -271,7 +271,7 @@ pub struct Subscript<'a> {
 }
 
 /// Dot syntax for accessing fields and methods.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct MemberAccess<'a> {
     /// The expression of which a field or method is requested.
     pub base:   Box<Exp<'a>>,
@@ -280,7 +280,7 @@ pub struct MemberAccess<'a> {
 }
 
 /// Namespace-style member access, for e.g. enums.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct QualAccess<'a> {
     /// The expression of which a member is requested.
     pub base:   Box<Exp<'a>>,
@@ -289,7 +289,7 @@ pub struct QualAccess<'a> {
 }
 
 /// A function call operation.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FuncCall<'a> {
     /// The LHS, that is, the function being called.
     pub function:  Box<Exp<'a>>,
@@ -298,7 +298,7 @@ pub struct FuncCall<'a> {
 }
 
 /// A struct literal.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StructLiteral<'a> {
     /// Name of the struct type being instantiated.
     pub name:   &'a str,
@@ -307,7 +307,7 @@ pub struct StructLiteral<'a> {
 }
 
 /// An if statement or expression.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct If<'a> {
     /// The Boolean condition of the `if`.
     pub condition: Exp<'a>,
@@ -318,7 +318,7 @@ pub struct If<'a> {
 }
 
 /// A match statement or expression.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Match<'a> {
     /// The value to match.
     pub discriminant: Box<Exp<'a>>,
@@ -328,7 +328,7 @@ pub struct Match<'a> {
 }
 
 /// A variable declaration statement for locals.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct VarDecl<'a> {
     /// The name of the local variable.
     pub name: &'a str,
@@ -343,7 +343,7 @@ pub struct VarDecl<'a> {
 //
 
 /// A function type.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FunctionTy<'a> {
     /// The list of argument types the function takes, in order.
     pub arg_types: Vec<Ty<'a>>,

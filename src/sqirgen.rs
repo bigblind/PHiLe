@@ -11,6 +11,7 @@ use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
+use parser;
 use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, FuncArg, Field };
 use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ Error, Result };
@@ -1309,10 +1310,10 @@ impl SqirGen {
 
         let tmp = match node.kind {
             ExpKind::NilLiteral           => self.generate_nil_literal(ctx.clone()),
-            ExpKind::BoolLiteral(b)       => self.generate_bool_literal(b),
-            ExpKind::IntLiteral(n)        => self.generate_int_literal(ctx.clone(), n),
-            ExpKind::FloatLiteral(x)      => self.generate_float_literal(x),
-            ExpKind::StringLiteral(ref s) => self.generate_string_literal(s),
+            ExpKind::BoolLiteral(val)     => self.generate_bool_literal(val, range),
+            ExpKind::IntLiteral(val)      => self.generate_int_literal(ctx.clone(), val, range),
+            ExpKind::FloatLiteral(val)    => self.generate_float_literal(val, range),
+            ExpKind::StringLiteral(val)   => self.generate_string_literal(val, range),
             ExpKind::Identifier(name)     => self.generate_name_ref(name, range),
             ExpKind::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
             ExpKind::Empty                => self.generate_empty_stmt(ctx.clone()),
@@ -1400,37 +1401,41 @@ impl SqirGen {
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_bool_literal(&mut self, b: bool) -> Result<RcExpr> {
+    fn generate_bool_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_bool_type();
+        let b = parser::parse_bool_literal(val, range)?;
         let value = Value::BoolConst(b);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_int_literal(&mut self, ctx: TyCtx, n: u64) -> Result<RcExpr> {
+    fn generate_int_literal(&mut self, ctx: TyCtx, val: &str, range: Range) -> Result<RcExpr> {
         if let Some(hint) = ctx.ty {
             if let Type::Float = *hint.borrow()? {
-                return self.generate_float_literal(n as f64)
+                return self.generate_float_literal(val, range)
             }
         }
 
         let ty = self.get_int_type();
+        let n = parser::parse_int_literal(val, range)?;
         let value = Value::IntConst(n);
         let id = self.next_temp_id();
 
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_float_literal(&mut self, x: f64) -> Result<RcExpr> {
+    fn generate_float_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_float_type();
+        let x = parser::parse_float_literal(val, range)?;
         let value = Value::FloatConst(x);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_string_literal(&mut self, s: &str) -> Result<RcExpr> {
+    fn generate_string_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_string_type();
-        let value = Value::StringConst(s.to_owned());
+        let s = parser::parse_string_literal(val, range)?;
+        let value = Value::StringConst(s);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
