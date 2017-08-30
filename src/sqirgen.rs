@@ -129,11 +129,12 @@ pub fn generate_sqir(program: &[Item]) -> Result<Sqir> {
     SqirGen::new().generate_sqir(program)
 }
 
-// This is to be used ONLY when you know you have a Class type
-fn unwrap_class_name(class: &RcType) -> Result<String> {
-    match *class.borrow()? {
+// This is to be used ONLY when you _know_
+// you have an entity (currently, a Class) type
+fn unwrap_entity_name(entity: &RcType) -> Result<String> {
+    match *entity.borrow()? {
         Type::Class(ref c) => Ok(c.name.clone()),
-        ref ty => bug!("Non-class class type?! {}", ty),
+        ref ty => bug!("Non-class entity type?! {}", ty),
     }
 }
 
@@ -344,7 +345,7 @@ impl SqirGen {
     }
 
     fn check_relation_reciprocity(&self, lhs_type: &RcType, lhs_field: &str, relation: &Relation) -> Result<()> {
-        let rhs_type = relation.rhs.class.clone();
+        let rhs_type = relation.rhs.entity.clone();
         let rhs_field = match relation.rhs.field {
             Some(ref name) => name.clone(),
             None => return Ok(()), // unilateral relations need no reciprocal references
@@ -356,17 +357,17 @@ impl SqirGen {
         match self.sqir.relations.get(&rhs_key) {
             None => return reciprocity_error!(
                 "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
-                unwrap_class_name(&lhs_type)?,
+                unwrap_entity_name(&lhs_type)?,
                 lhs_field,
-                unwrap_class_name(&rhs_type)?,
+                unwrap_entity_name(&rhs_type)?,
                 rhs_field,
             ),
             Some(ref inverse_relation) => if relation != *inverse_relation {
                 return reciprocity_error!(
                     "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
-                    unwrap_class_name(&lhs_type)?,
+                    unwrap_entity_name(&lhs_type)?,
                     lhs_field,
-                    unwrap_class_name(&rhs_type)?,
+                    unwrap_entity_name(&rhs_type)?,
                     rhs_field,
                 )
             },
@@ -789,7 +790,7 @@ impl SqirGen {
                     Type::Placeholder { kind: PlaceholderKind::Class, .. } => {},
                     _ => return sema_error!(
                         decl,
-                        "Pointer to non-class type {}",
+                        "Pointer to non-entity type {}",
                         *ptr,
                     ),
                 }
@@ -983,7 +984,7 @@ impl SqirGen {
 
         let class = match *class_type {
             Type::Class(ref c) => c,
-            ref ty => bug!("Non-class class type?! {}", ty),
+            ref ty => bug!("Non-class entity type?! {}", ty),
         };
 
         let field_type_rc = class.fields[field.name].as_rc()?;
@@ -1062,7 +1063,7 @@ impl SqirGen {
                     rhs_field_name,
                 )
             },
-            ref ty => bug!("Non-class class type?! {}", ty),
+            ref ty => bug!("Non-class entity type?! {}", ty),
         }
 
         // The rest of the validation is a separate task,
@@ -1071,12 +1072,12 @@ impl SqirGen {
         // to the cache --- if an error is found later,
         // they'll be discarded anyway, so this is harmless.
         let lhs = RelationSide {
-            class:       lhs_class_type.clone(),
+            entity:      lhs_class_type.clone(),
             field:       Some(lhs_field_name.to_owned()),
             cardinality: lhs_card,
         };
         let rhs = RelationSide {
-            class:       rhs_class_type.clone(),
+            entity:      rhs_class_type.clone(),
             field:       Some(rhs_field_name.to_owned()),
             cardinality: rhs_card,
         };
@@ -1108,12 +1109,12 @@ impl SqirGen {
         rhs_cardinality: Cardinality,
     ) -> Result<()> {
         let lhs = RelationSide {
-            class:       lhs_type.clone(),
+            entity:      lhs_type.clone(),
             field:       Some(lhs_field_name.to_owned()),
             cardinality: lhs_cardinality,
         };
         let rhs = RelationSide {
-            class:       rhs_type.clone(),
+            entity:      rhs_type.clone(),
             field:       None,
             cardinality: rhs_cardinality,
         };
@@ -1198,12 +1199,12 @@ impl SqirGen {
 
         // Make the relation
         let lhs = RelationSide {
-            class:       class_type.clone(),
+            entity:      class_type.clone(),
             field:       Some(field_name.to_owned()),
             cardinality: Cardinality::ZeroOrMore,
         };
         let rhs = RelationSide {
-            class:       pointed_type,
+            entity:      pointed_type,
             field:       None,
             cardinality: rhs_card,
         };

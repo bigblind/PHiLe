@@ -191,7 +191,7 @@ pub struct FunctionType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationSide {
     /// Pointer to the type which forms this side of the relationship.
-    pub class:       RcType,
+    pub entity:      RcType,
     /// Name of the field this side uses to refer to the other side.
     pub field:       Option<String>,
     /// Number of instances of this entity that may correspond to
@@ -648,8 +648,8 @@ impl PartialOrd for RelationSide {
 
 impl Ord for RelationSide {
     fn cmp(&self, other: &Self) -> Ordering {
-        let self_ref = self.class.borrow().expect("self class");
-        let other_ref = other.class.borrow().expect("other class");
+        let self_ref = self.entity.borrow().expect("self entity");
+        let other_ref = other.entity.borrow().expect("other entity");
 
         let self_name = match *self_ref {
             Type::Class(ref c) => &c.name,
