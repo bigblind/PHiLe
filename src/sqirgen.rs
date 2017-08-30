@@ -6,6 +6,10 @@
 // on 07/04/2017
 //
 
+//! This module provides functionality to convert an Abstract
+//! Syntax Tree into PHiLe's intermediate language, SQIR (short
+//! for Schema and Query Intermediate Representation).
+
 use std::collections::{ HashMap, BTreeMap };
 use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
@@ -109,6 +113,18 @@ macro_rules! reciprocity_error {
 }
 
 
+/// Takes a borrowed AST, performs various kinds of semantic
+/// analysis on it, and if it represents a correct program,
+/// then outputs the corresponding SQIR code.
+///
+/// # Arguments:
+///
+/// * `program`: the borrowed form of an AST.
+///
+/// # Return value:
+///
+/// * `Ok(Sqir)`, if the program described by the AST was semantically valid.
+/// * `Err(Error)`, if the program contains some sort of a semantic error.
 pub fn generate_sqir(program: &[Item]) -> Result<Sqir> {
     SqirGen::new().generate_sqir(program)
 }
