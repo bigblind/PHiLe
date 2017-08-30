@@ -24,7 +24,6 @@ use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
 use phile::sqiropt::*;
-use phile::codegen::*;
 use phile::dalgen::*;
 use phile::error::*;
 

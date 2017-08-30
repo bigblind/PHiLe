@@ -9,7 +9,7 @@
 use std::io;
 use error::Result;
 use dalgen::go::NAMING_CONVENTION;
-use codegen::*;
+use dalgen::*;
 use sqir::*;
 use util::*;
 

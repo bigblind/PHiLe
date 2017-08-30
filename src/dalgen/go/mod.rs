@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 use error::{ Error, Result };
-use codegen::*;
+use dalgen::*;
 use sqir::*;
 use util::*;
 

@@ -7,7 +7,7 @@
 //
 
 use error::Result;
-use codegen::*;
+use dalgen::*;
 use sqir::*;
 
 

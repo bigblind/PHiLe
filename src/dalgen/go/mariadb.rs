@@ -7,7 +7,7 @@
 //
 
 use std::io;
-use codegen::*;
+use dalgen::*;
 use sqir::*;
 
 
