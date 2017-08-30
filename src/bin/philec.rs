@@ -6,6 +6,90 @@
 // on 07/04/2017
 //
 
+//! `philec` is the command-line driver for the PHiLe Compiler.
+//!
+//! ## Basic usage:
+//!
+//! `philec -d mongodb -l go -o src/dal -n dbwrapper src/User.phi src/Post.phi`
+//!
+//! The absolute minimum of arguments to be provided are:
+//!
+//! * `-d`, `--database`: the name of the database engine to use.
+//!   Currently, it is one of:
+//!   * `sqlite3`
+//!   * `mongodb`
+//!   * `mariadb`
+//!
+//! * `-l`, `--language`: the programming language in which the
+//!   generated Database Abstraction Layer will be emitted.
+//!   Currently, it is one of:
+//!   * `rust`
+//!   * `c`
+//!   * `cxx`
+//!   * `objc`
+//!   * `swift`
+//!   * `go`
+//!   * `js`
+//!   * `python`
+//!   * `java`
+//!
+//! * At least one PHiLe source file, typically with extension `.phi`.
+//!
+//! There are more command-line parameters, for greater flexibility:
+//!
+//! * A namespace can be specified using the `-n` or `--namespace`
+//!   argument. Different backends treat it differently, in a way that
+//!   is most idiomatic and most useful for the programming language
+//!   in question. For example, in Go, it will be used for naming the
+//!   package. For this reason, this argument is mandatory for the Go
+//!   backend.
+//! * The output directory of PHiLe is the current directory, `.`, by
+//!   default. This can be changed via the `-o` or `--outdir` option.
+//! * By default, PHiLe generates a DAL that retrieves values using
+//!   POD (Plain Old Data) objects. These are immutable and do not
+//!   automatically reflect changes in the underlying database. If
+//!   you wish to use the Active Record strategy instead, which will
+//!   create "smart" objects which automatically synchronize with the
+//!   underlying storage, then you can pass the `-a` or `--access`
+//!   parameter. The supported values for this argument are:
+//!   * `pod` for Plain Old Data,
+//!   * `acr` for Active Record.
+//! * Since the PHiLe DSL probably has different stylistic conventions
+//!   from those of your programming language of choice (unless that
+//!   language happens to be Rust), names of program entities, such
+//!   as types, functions, and class fields, need to be rewritten
+//!   when generating the actual DAL. PHiLe has built-in defaults that
+//!   are the most idiomatic/correct/useful for each supported
+//!   language, but for maximal flexibility, all of them can be
+//!   overridden. The following command line options are available for
+//!   this purpose:
+//!   * `-t`, `--typexform`: applied to user-defined type names (`class`es, `struct`s and `enum`s).
+//!   * `-e`, `--fieldxform`: applied to `struct` and `class` field names.
+//!   * `-v`, `--varxform`: applied to `enum` variant names.
+//!   * `-f`, `--funcxform`: applied to function names.
+//!   * `-s`, `--nsxform`: applied to namespace names.
+//!
+//!   Each of these parameters may take one of the following values:
+//!
+//!   * `default`: the default transform for the language will be applied.
+//!   * `identity`: the name will be copied verbatim into the generated code.
+//!   * `lowsnake`: the name will be transformed to `lower_snake_case`.
+//!   * `upsnake`: the name will be transformed to `UPPER_SNAKE_CASE`.
+//!   * `lowcamel`: the name will be transformed to `lowerCamelCase`.
+//!   * `upcamel`: the name will be transformed to `UpperCamelCase`.
+//!
+//! ## Exit Status
+//!
+//! The command-line compiler exits with status `0` if the compilation
+//! succeeds. If the compilation fails, it exits with a non-zero status,
+//! after having removed all generated temporary files.
+
+#![deny(missing_debug_implementations, missing_copy_implementations,
+        trivial_casts, trivial_numeric_casts,
+        unsafe_code,
+        unstable_features,
+        unused_import_braces, unused_qualifications, missing_docs)]
+
 #[macro_use]
 extern crate clap;
 extern crate phile;
@@ -37,11 +121,11 @@ struct ProgramArgs {
     sources:          Vec<String>,
 }
 
-// TODO(H2CO3): Rewrite this using RcCell once custom smart pointers
-//              can point to trait objects, i.e. when CoerceUnsized
-//              and Unsize are stabilized (see issue #27732)
+// TODO(H2CO3): Rewrite this using `RcCell` once custom smart pointers
+//              can point to trait objects, i.e. when `CoerceUnsized`
+//              and `Unsize` are stabilized (see issue #27732).
 struct FileWriterProvider {
-    files: HashMap<PathBuf, Rc<RefCell<io::Write>>>,
+    files: HashMap<PathBuf, Rc<RefCell<Write>>>,
     base_path: PathBuf,
     outfile_prefix: String,
 }
@@ -55,7 +139,7 @@ impl FileWriterProvider {
         }
     }
 
-    fn writer_with_name(&mut self, name: &str) -> Result<Rc<RefCell<io::Write>>> {
+    fn writer_with_name(&mut self, name: &str) -> Result<Rc<RefCell<Write>>> {
         let path = self.base_path.join(self.outfile_prefix.clone() + name);
 
         if let Some(rc) = self.files.get(&path) {
@@ -63,7 +147,7 @@ impl FileWriterProvider {
         }
 
         let file = File::create(&path)?;
-        let rc = Rc::new(RefCell::new(file)) as Rc<RefCell<io::Write>>;
+        let rc: Rc<RefCell<Write>> = Rc::new(RefCell::new(file));
 
         self.files.insert(path, rc.clone());
 
@@ -269,7 +353,7 @@ fn main() {
 
     // Handle errors by printing them, removing partially-written files, then bailing out
     result.unwrap_or_else(|error| {
-        error.pretty_print(&mut io::stderr(), &args.sources).unwrap();
+        error.pretty_print(&mut stderr(), &args.sources).unwrap();
         wp1.borrow_mut().unwrap().remove_files();
         std::process::exit(1);
     });

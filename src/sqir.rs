@@ -17,9 +17,13 @@ use std::cmp::*;
 use util::*;
 
 
+/// Convenience type alias for a reference-counted type descriptor.
 pub type RcType = RcCell<Type>;
+/// Weak counterpart of `RcType`.
 pub type WkType = WkCell<Type>;
+/// Convenience type alias for a reference-counted expression node.
 pub type RcExpr = RcCell<Expr>;
+/// Weak counterpart of `RcExpr`.
 pub type WkExpr = WkCell<Expr>;
 
 //
@@ -27,6 +31,7 @@ pub type WkExpr = WkCell<Expr>;
 //
 
 /// Centralized container for the name of each builtin type.
+#[allow(missing_docs)] // field names are self-explanatory...
 #[derive(Debug, Clone, Copy)]
 pub struct BuiltinName {
     pub bool_name:    &'static str,
@@ -544,14 +549,24 @@ pub struct Group {
 /// `Some("Name")` for `impl Name`.
 #[derive(Debug)]
 pub struct Sqir {
+    /// Stores named builtins and user-defined types.
     pub named_types:    BTreeMap<String, RcType>,
+    /// Stores decimal types, parametrized by `(integral_digits, fractional_digits)`.
     pub decimal_types:  HashMap<(usize, usize), RcType>,
+    /// Stores cached optional types. Keys are the inner, wrapped types.
     pub optional_types: HashMap<RcType, RcType>,
+    /// Stores cached pointer types. Keys are pointed types.
     pub pointer_types:  HashMap<RcType, RcType>,
+    /// Stores cached array types. Keys are element types.
     pub array_types:    HashMap<RcType, RcType>,
+    /// Stores cached tuple types. Keys are the product of contained types.
     pub tuple_types:    HashMap<Vec<RcType>, RcType>,
+    /// Stores cached function types. Keys are `([argument_types], return_type)`.
     pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
+    /// Stores relations between entities. Keys are `(referring_entity, referring_field)`.
     pub relations:      HashMap<(RcType, String), Relation>,
+    /// Stores global values (currently, functions only). Keys are namespace
+    /// (`impl`) names; `None` means top-level/free function, not in an `impl`.
     pub globals:        BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
 }
 

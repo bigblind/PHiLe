@@ -6,6 +6,10 @@
 // on 02/06/2017
 //
 
+//! DALGen, the backend of the PHiLe compiler. This is the part
+//! that generates actual code in your programming language of
+//! choice for a Database Abstraction Layer from optimized SQIR.
+
 mod rust;
 mod c;
 mod cxx;
@@ -50,7 +54,7 @@ pub enum Language {
     Swift,
     /// Go 1.x.
     Go,
-    /// ECMAScript, if we are being technical
+    /// ECMAScript, if we are being technical.
     JavaScript,
     /// Python. 2 or 3? I don't know yet.
     Python,
@@ -117,10 +121,11 @@ pub struct CodegenParams {
 /// specified as the string parameter of the function, is sometimes
 /// a file name derived from the `impl` of a user-defined type.
 ///
-/// TODO(H2CO3): rewrite this using RcCell once custom smart pointers
+/// TODO(H2CO3): rewrite this using `RcCell` once custom smart pointers
 /// can point to trait objects, i.e. when `CoerceUnsized` and `Unsize`
 /// are stabilized. See [issue #27732](https://github.com/rust-lang/rust/issues/27732).
 pub type WriterProvider = FnMut(&str) -> Result<Rc<RefCell<io::Write>>>;
+
 
 macro_rules! call_dalgen {
     ($module: ident, $sqir: expr, $params: expr, $wp: expr) => {
@@ -131,6 +136,21 @@ macro_rules! call_dalgen {
     }
 }
 
+/// Given the SQIR representation of a program, and some configuration parameters,
+/// generates a Database Abstraction Layer and writes the code into `io::Write`s.
+///
+/// # Arguments:
+///
+/// * `sqir`: Optimized SQIR intermediate representation for a PHiLe program.
+/// * `params`: code generation parameters; see the docs for `CodegenParams`.
+/// * `wp`: a provider of `io::Write`s that will accumulate generated code.
+///
+/// # Return value:
+///
+/// * `Ok(())`, if code generation completed successfully.
+/// * `Err(Error)`, if an error occurred. This is typically an I/O error (`Error::IO`)
+///   or an `Error::Semantic` induced by some special requirement of the backend
+///   (e.g. a missing namespace when generating Go code).
 pub fn generate_dal(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     match params.language {
         Language::Rust       => call_dalgen!(rust,   sqir, params, wp),
