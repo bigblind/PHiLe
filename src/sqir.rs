@@ -670,9 +670,7 @@ impl Ord for RelationSide {
 /// **NOTE:** Since an entity relationship is an **unordered** pair
 /// of two relation sides, `==` has some additional symmetry:
 ///
-/// ```
-/// Relation { lhs: S1, rhs: S2 } == Relation { lhs: S2, rhs: S1 }
-/// ```
+/// `Relation { lhs: S1, rhs: S2 } == Relation { lhs: S2, rhs: S1 }`
 ///
 /// yields `true` for any two `RelationSide`s `S1` and `S2`.
 impl PartialEq for Relation {
