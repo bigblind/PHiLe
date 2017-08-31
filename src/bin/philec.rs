@@ -130,11 +130,11 @@ use phile::error::*;
 
 #[derive(Debug)]
 struct ProgramArgs {
-    codegen_params:   CodegenParams,
+    codegen_params: CodegenParams,
     output_directory: String,
-    outfile_prefix:   String,
+    outfile_prefix: String,
     migration_script: Option<String>,
-    sources:          Vec<String>,
+    sources: Vec<String>,
 }
 
 // TODO(H2CO3): Rewrite this using `RcCell` once custom smart pointers

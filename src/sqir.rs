@@ -151,7 +151,7 @@ pub enum ComplexTypeKind {
 #[derive(Debug)]
 pub struct EnumType {
     /// The name of the enum type.
-    pub name:     String,
+    pub name: String,
     /// The list of variants: keys are variant names, each value
     /// is the type of the associated value of the variant.
     pub variants: BTreeMap<String, WkType>,
@@ -161,7 +161,7 @@ pub struct EnumType {
 #[derive(Debug)]
 pub struct StructType {
     /// The name of the struct type.
-    pub name:   String,
+    pub name: String,
     /// The list of fields: keys are the field names;
     /// each value is the type of the referred field.
     pub fields: BTreeMap<String, WkType>,
@@ -171,7 +171,7 @@ pub struct StructType {
 #[derive(Debug)]
 pub struct ClassType {
     /// The name of the class type.
-    pub name:   String,
+    pub name: String,
     /// The list of fields: keys are the field names;
     /// each value is the type of the referred field.
     pub fields: BTreeMap<String, WkType>,
@@ -183,7 +183,7 @@ pub struct FunctionType {
     /// The list of types of each argument in order.
     pub arg_types: Vec<WkType>,
     /// The return type of the function.
-    pub ret_type:  WkType,
+    pub ret_type: WkType,
 }
 
 //
@@ -196,9 +196,9 @@ pub struct FunctionType {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RelationSide {
     /// Pointer to the type which forms this side of the relationship.
-    pub entity:      RcType,
+    pub entity: RcType,
     /// Name of the field this side uses to refer to the other side.
-    pub field:       Option<String>,
+    pub field: Option<String>,
     /// Number of instances of this entity that may correspond to
     /// an instance in the other entity.
     pub cardinality: Cardinality,
@@ -240,11 +240,11 @@ pub struct Relation {
 #[derive(Debug)]
 pub struct Expr {
     /// The type of the expression.
-    pub ty:    RcType, // can be Rc: no cycles are possible
+    pub ty: RcType, // can be Rc: no cycles are possible
     /// The value of the expression.
     pub value: Value,
     /// The identifier of the expression, unique within a top-level function.
-    pub id:    ExprId,
+    pub id: ExprId,
 }
 
 /// Represents the value of an expression node.
@@ -459,7 +459,7 @@ pub struct Call {
     /// The function being called.
     pub callee: RcExpr,
     /// The list of actual arguments, in order.
-    pub args:   Vec<RcExpr>,
+    pub args: Vec<RcExpr>,
 }
 
 /// A multi-way branch expression. *The* way to do control flow.
@@ -469,7 +469,7 @@ pub struct Branch {
     pub discriminant: RcExpr,
     /// The patterns that match the discriminant, along with their
     /// associated expression that will be evaluated upon match.
-    pub arms:         Vec<BranchArm>,
+    pub arms: Vec<BranchArm>,
 }
 
 /// A match-value pair, representing one possible direction of control flow.
@@ -487,7 +487,7 @@ pub struct Map {
     /// The sequence/collection which is the domain of the projection.
     pub domain: RcExpr,
     /// A unary function applied to every element of `domain`.
-    pub op:     RcExpr,
+    pub op: RcExpr,
 }
 
 /// A general `reduce` or aggregation operation.
@@ -496,9 +496,9 @@ pub struct Reduce {
     /// The domain of the aggregation (see `Map` too).
     pub domain: RcExpr,
     /// The identity element of the operation.
-    pub zero:   RcExpr,
+    pub zero: RcExpr,
     /// A binary operation on the next element and the previous partial result.
-    pub op:     RcExpr,
+    pub op: RcExpr,
 }
 
 /// A general `filter` or selection operation.
@@ -507,7 +507,7 @@ pub struct Filter {
     /// The domain of the selection (see `Map` too).
     pub domain: RcExpr,
     /// The unary, boolean-valued predicate applied to each element of the domain.
-    pub pred:   RcExpr,
+    pub pred: RcExpr,
 }
 
 /// A general sorting operation.
@@ -516,7 +516,7 @@ pub struct Sort {
     /// The domain of the sorting operation.
     pub domain: RcExpr,
     /// Binary, boolean-valued comparison function for `LHS < RHS`.
-    pub cmp:    RcExpr,
+    pub cmp: RcExpr,
 }
 
 /// A general grouping operation.
@@ -525,7 +525,7 @@ pub struct Group {
     /// Elements to be grouped.
     pub domain: RcExpr,
     /// A function that returns a key that grouping will be based on.
-    pub key:    RcExpr,
+    pub key: RcExpr,
 }
 
 /// Top-level type for wrapping SQIR for a complete program.
@@ -550,24 +550,24 @@ pub struct Group {
 #[derive(Debug)]
 pub struct Sqir {
     /// Stores named builtins and user-defined types.
-    pub named_types:    BTreeMap<String, RcType>,
+    pub named_types: BTreeMap<String, RcType>,
     /// Stores decimal types, parametrized by `(integral_digits, fractional_digits)`.
-    pub decimal_types:  HashMap<(usize, usize), RcType>,
+    pub decimal_types: HashMap<(usize, usize), RcType>,
     /// Stores cached optional types. Keys are the inner, wrapped types.
     pub optional_types: HashMap<RcType, RcType>,
     /// Stores cached pointer types. Keys are pointed types.
-    pub pointer_types:  HashMap<RcType, RcType>,
+    pub pointer_types: HashMap<RcType, RcType>,
     /// Stores cached array types. Keys are element types.
-    pub array_types:    HashMap<RcType, RcType>,
+    pub array_types: HashMap<RcType, RcType>,
     /// Stores cached tuple types. Keys are the product of contained types.
-    pub tuple_types:    HashMap<Vec<RcType>, RcType>,
+    pub tuple_types: HashMap<Vec<RcType>, RcType>,
     /// Stores cached function types. Keys are `([argument_types], return_type)`.
     pub function_types: HashMap<(Vec<RcType>, RcType), RcType>,
     /// Stores relations between entities. Keys are `(referring_entity, referring_field)`.
-    pub relations:      HashMap<(RcType, String), Relation>,
+    pub relations: HashMap<(RcType, String), Relation>,
     /// Stores global values (currently, functions only). Keys are namespace
     /// (`impl`) names; `None` means top-level/free function, not in an `impl`.
-    pub globals:        BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
+    pub globals: BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
 }
 
 

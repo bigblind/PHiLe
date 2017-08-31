@@ -55,15 +55,15 @@ macro_rules! btree_map {
 #[derive(Debug, Clone, Copy)]
 pub struct PackageInfo {
     /// The name of the PHiLe package.
-    pub name:        &'static str,
+    pub name: &'static str,
     /// The version of the PHiLe package.
-    pub version:     &'static str,
+    pub version: &'static str,
     /// The list of authors of PHiLe.
-    pub authors:     &'static str,
+    pub authors: &'static str,
     /// A short summary of this package.
     pub description: &'static str,
     /// URL of the PHiLe home page.
-    pub home_page:   &'static str,
+    pub home_page: &'static str,
 }
 
 /// A struct that contains escape sequences for ANSI terminal color
@@ -73,15 +73,15 @@ pub struct PackageInfo {
 #[derive(Debug, Clone, Copy)]
 pub struct Color {
     /// ANSI escape sequence for resetting all color settings.
-    pub reset:     &'static str,
+    pub reset: &'static str,
     /// ANSI escape sequence for displaying informative messages.
-    pub info:      &'static str,
+    pub info: &'static str,
     /// ANSI escape sequence for displaying highlighted messages.
     pub highlight: &'static str,
     /// ANSI escape sequence for indicating successful compilation.
-    pub success:   &'static str,
+    pub success: &'static str,
     /// ANSI escape sequence for reporting errors.
-    pub error:     &'static str,
+    pub error: &'static str,
 }
 
 /// A reference counted, dynamically borrow checked smart pointer.

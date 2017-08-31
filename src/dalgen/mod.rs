@@ -95,25 +95,25 @@ pub enum NameTransform {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CodegenParams {
     /// The database flavor to be targeted. See the docs of `DatabaseEngine`.
-    pub database:               DatabaseEngine,
+    pub database: DatabaseEngine,
     /// The programming language to be targeted. See the docs of `Language`.
-    pub language:               Language,
+    pub language: Language,
     /// Database access strategy. See the docs for `DatabaseAccessMode`.
-    pub database_access_mode:   DatabaseAccessMode,
+    pub database_access_mode: DatabaseAccessMode,
     /// Namespace name. This will be used in different ways for different
     /// programming languages. For example, in Go, it will be the package
     /// name, and is thus **mandatory**.
-    pub namespace:              Option<String>,
+    pub namespace: Option<String>,
     /// The transform to be applied to names of user-defined types.
-    pub type_name_transform:    Option<NameTransform>,
+    pub type_name_transform: Option<NameTransform>,
     /// The transform to be applied to fields of `struct`s and `class`es.
-    pub field_name_transform:   Option<NameTransform>,
+    pub field_name_transform: Option<NameTransform>,
     /// The transform to be applied to variants of `enum`s.
     pub variant_name_transform: Option<NameTransform>,
     /// The transform to be applied to names of user-defined functions.
-    pub func_name_transform:    Option<NameTransform>,
+    pub func_name_transform: Option<NameTransform>,
     /// The transform to be applied to the name of the namespace.
-    pub namespace_transform:    Option<NameTransform>,
+    pub namespace_transform: Option<NameTransform>,
 }
 
 /// Functions of this type are expected to yield a (possibly cached)

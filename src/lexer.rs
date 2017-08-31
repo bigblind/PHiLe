@@ -24,9 +24,9 @@ pub struct Location {
     /// 0-based index of the source that this location points into.
     pub src_idx: usize,
     /// 1-based line index within the aforementioned source.
-    pub line:    usize,
+    pub line: usize,
     /// 1-based character index within the line.
-    pub column:  usize,
+    pub column: usize,
 }
 
 /// A half-open range representing a source span.
@@ -35,7 +35,7 @@ pub struct Range {
     /// Location at the beginning of the source range.
     pub begin: Location,
     /// Location one past the end of the source range.
-    pub end:   Location,
+    pub end: Location,
 }
 
 /// This trait is to be implemented by entities that correspond
@@ -67,7 +67,7 @@ pub enum TokenKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Token<'a> {
     /// The kind associated with the recognized lexeme.
-    pub kind:  TokenKind,
+    pub kind: TokenKind,
     /// A pointer into the source where the underlying lexeme was found.
     pub value: &'a str,
     /// Human-readable range information for the underlying lexeme.
@@ -76,10 +76,10 @@ pub struct Token<'a> {
 
 #[derive(Debug)]
 struct Lexer<'a> {
-    source:   &'a str,
+    source: &'a str,
     location: Location,
-    tokens:   Vec<Token<'a>>,
-    regexes:  [(TokenKind, Regex); 6],
+    tokens: Vec<Token<'a>>,
+    regexes: [(TokenKind, Regex); 6],
 }
 
 
@@ -147,10 +147,10 @@ impl<'a> Ranged for Token<'a> {
 impl<'a> Lexer<'a> {
     fn new() -> Lexer<'a> {
         Lexer {
-            source:   "",
+            source: "",
             location: Default::default(),
-            tokens:   Vec::new(),
-            regexes:  [
+            tokens: Vec::new(),
+            regexes: [
                 (TokenKind::Whitespace,     Regex::new(r#"^\s+"#).unwrap()),
                 (TokenKind::Comment,        Regex::new(r#"^#[^\n\v\f\r\x{0085}\x{2028}\x{2029}]*(\r\n|[\n\v\f\r\x{0085}\x{2028}\x{2029}])?"#).unwrap()),
                 (TokenKind::Word,           Regex::new(r#"^[_\p{XID_Start}]\p{XID_Continue}*"#).unwrap()),

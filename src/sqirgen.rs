@@ -22,7 +22,7 @@ use error::{ Error, Result };
 
 #[derive(Debug, Clone)]
 struct TyCtx {
-    ty:    Option<RcType>, // type hint
+    ty: Option<RcType>, // type hint
     range: Range,
 }
 
@@ -38,14 +38,14 @@ struct ScopeGuard {
 // scope vectors, variable names are stored in order of declaration.
 #[derive(Debug, Default)]
 struct Locals {
-    var_map:     HashMap<String, RcExpr>,
+    var_map: HashMap<String, RcExpr>,
     scope_stack: Vec<Vec<String>>,
 }
 
 #[derive(Debug)]
 struct SqirGen {
-    sqir:    Sqir,
-    locals:  RcCell<Locals>,
+    sqir: Sqir,
+    locals: RcCell<Locals>,
     tmp_idx: usize,
 }
 

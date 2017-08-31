@@ -32,7 +32,7 @@ pub struct Prog<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Node<T> {
     /// Discriminant describing the type and value of the node.
-    pub kind:  T,
+    pub kind: T,
     /// Source range that this node was generated from.
     pub range: Range,
 }
@@ -134,9 +134,9 @@ pub enum TyKind<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StructDecl<'a> {
     /// The source range of the type definition.
-    pub range:  Range,
+    pub range: Range,
     /// The name of the struct type.
-    pub name:   &'a str,
+    pub name: &'a str,
     /// The fields of the struct type.
     pub fields: Vec<Field<'a>>,
 }
@@ -145,9 +145,9 @@ pub struct StructDecl<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct ClassDecl<'a> {
     /// The source range of the type definition.
-    pub range:  Range,
+    pub range: Range,
     /// The name of the class type.
-    pub name:   &'a str,
+    pub name: &'a str,
     /// The fields of the class type.
     pub fields: Vec<Field<'a>>,
 }
@@ -163,18 +163,18 @@ pub struct RelDecl<'a> {
     /// The name of the field in the RHS that points back to
     /// the LHS class, forming the inverse relation. If the
     /// relation has no explicit inverse, this is `None`.
-    pub field:       Option<&'a str>,
+    pub field: Option<&'a str>,
 }
 
 /// A field specification within a struct or class type definition.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Field<'a> {
     /// The source range of the field definition.
-    pub range:    Range,
+    pub range: Range,
     /// The name of the field.
-    pub name:     &'a str,
+    pub name: &'a str,
     /// The declared type of the field.
-    pub ty:       Ty<'a>,
+    pub ty: Ty<'a>,
     /// Optional explicit relation specification for the field.
     pub relation: Option<RelDecl<'a>>,
 }
@@ -183,9 +183,9 @@ pub struct Field<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct EnumDecl<'a> {
     /// The source range of the type definition.
-    pub range:    Range,
+    pub range: Range,
     /// The name of the `enum` type.
-    pub name:     &'a str,
+    pub name: &'a str,
     /// The list of variants in the enum type.
     pub variants: Vec<Variant<'a>>,
 }
@@ -196,24 +196,24 @@ pub struct Variant<'a> {
     /// Source range of the definition.
     pub range: Range,
     /// The name of the variant.
-    pub name:  &'a str,
+    pub name: &'a str,
     /// Type of the contained value of the variant, if any.
-    pub ty:    Option<Ty<'a>>,
+    pub ty: Option<Ty<'a>>,
 }
 
 /// A function definition.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Function<'a> {
     /// Source range of the function.
-    pub range:     Range,
+    pub range: Range,
     /// Name of the function if it is a named global, `None` for closures.
-    pub name:      Option<&'a str>,
+    pub name: Option<&'a str>,
     /// The list of arguments to the function.
     pub arguments: Vec<FuncArg<'a>>,
     /// The return type specification, if present.
-    pub ret_type:  Option<Ty<'a>>,
+    pub ret_type: Option<Ty<'a>>,
     /// The function body expression.
-    pub body:      Exp<'a>,
+    pub body: Exp<'a>,
 }
 
 /// Declaration of a single function argument.
@@ -222,18 +222,18 @@ pub struct FuncArg<'a> {
     /// Source range of the declaration.
     pub range: Range,
     /// Name of the argument.
-    pub name:  &'a str,
+    pub name: &'a str,
     /// Type specification of the argument, if present.
-    pub ty:    Option<Ty<'a>>,
+    pub ty: Option<Ty<'a>>,
 }
 
 /// Implementation of the methods of a user-defined type.
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Impl<'a> {
     /// Source range if the `impl`.
-    pub range:     Range,
+    pub range: Range,
     /// Name of the type for which methods are implemented.
-    pub name:      &'a str,
+    pub name: &'a str,
     /// The list of methods in the implementation.
     pub functions: Vec<Function<'a>>,
 }
@@ -249,7 +249,7 @@ pub struct CondExp<'a> {
     pub condition: Exp<'a>,
     /// The value when the condition is true. `None` when `?:` is
     /// used as the nil coalescing operator, e.g. `foo ?: default`.
-    pub true_val:  Option<Exp<'a>>,
+    pub true_val: Option<Exp<'a>>,
     /// The value when the condition is false or `nil`.
     pub false_val: Exp<'a>,
 }
@@ -258,7 +258,7 @@ pub struct CondExp<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct BinaryOp<'a> {
     /// Textual representation of the operator itself.
-    pub op:  &'a str,
+    pub op: &'a str,
     /// The left-hand side operand.
     pub lhs: Exp<'a>,
     /// The right-hand side operand.
@@ -269,7 +269,7 @@ pub struct BinaryOp<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Subscript<'a> {
     /// The expression being indexed into.
-    pub base:  Exp<'a>,
+    pub base: Exp<'a>,
     /// The expression being used as the subscript in brackets.
     pub index: Exp<'a>,
 }
@@ -278,7 +278,7 @@ pub struct Subscript<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct MemberAccess<'a> {
     /// The expression of which a field or method is requested.
-    pub base:   Box<Exp<'a>>,
+    pub base: Box<Exp<'a>>,
     /// The name of the field or method being accessed.
     pub member: &'a str,
 }
@@ -287,7 +287,7 @@ pub struct MemberAccess<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct QualAccess<'a> {
     /// The expression of which a member is requested.
-    pub base:   Box<Exp<'a>>,
+    pub base: Box<Exp<'a>>,
     /// The name of the member.
     pub member: &'a str,
 }
@@ -296,7 +296,7 @@ pub struct QualAccess<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct FuncCall<'a> {
     /// The LHS, that is, the function being called.
-    pub function:  Box<Exp<'a>>,
+    pub function: Box<Exp<'a>>,
     /// The RHS, that is, the list of actual arguments.
     pub arguments: Vec<Exp<'a>>,
 }
@@ -305,7 +305,7 @@ pub struct FuncCall<'a> {
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub struct StructLiteral<'a> {
     /// Name of the struct type being instantiated.
-    pub name:   &'a str,
+    pub name: &'a str,
     /// The list of fields: `(name, value)`.
     pub fields: Vec<(&'a str, Exp<'a>)>,
 }
@@ -316,9 +316,9 @@ pub struct If<'a> {
     /// The Boolean condition of the `if`.
     pub condition: Exp<'a>,
     /// The expression evaulated when the condition is true.
-    pub then_arm:  Exp<'a>,
+    pub then_arm: Exp<'a>,
     /// The expression evaluated when the condition is false.
-    pub else_arm:  Option<Exp<'a>>,
+    pub else_arm: Option<Exp<'a>>,
 }
 
 /// A match statement or expression.
@@ -328,7 +328,7 @@ pub struct Match<'a> {
     pub discriminant: Box<Exp<'a>>,
     /// The list of patterns and the expressions that are evaluated
     /// when one of them matches: `(pattern, expression)`.
-    pub arms:         Vec<(Exp<'a>, Exp<'a>)>,
+    pub arms: Vec<(Exp<'a>, Exp<'a>)>,
 }
 
 /// A variable declaration statement for locals.
@@ -337,7 +337,7 @@ pub struct VarDecl<'a> {
     /// The name of the local variable.
     pub name: &'a str,
     /// The type specification of the variable, if present.
-    pub ty:   Option<Ty<'a>>,
+    pub ty: Option<Ty<'a>>,
     /// The initializer expression of the variable.
     pub expr: Exp<'a>,
 }
@@ -352,7 +352,7 @@ pub struct FunctionTy<'a> {
     /// The list of argument types the function takes, in order.
     pub arg_types: Vec<Ty<'a>>,
     /// The return type of the function.
-    pub ret_type:  Box<Ty<'a>>,
+    pub ret_type: Box<Ty<'a>>,
 }
 
 //
