@@ -16,13 +16,17 @@
 use lexer::{ Range, Ranged };
 
 
-/// Root of the AST. A list of top-level items, such as
-/// type definitions, function definitions, or `impl`s.
-pub type Prog<'a> = Vec<Item<'a>>;
 /// AST node representing an expression.
 pub type Exp<'a>  = Node<ExpKind<'a>>;
 /// AST node representing a type annotation.
 pub type Ty<'a>   = Node<TyKind<'a>>;
+
+/// Root of the AST.
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct Prog<'a> {
+    /// The list of top-level items: type and function definitions or `impl`s.
+    pub items: Vec<Item<'a>>,
+}
 
 /// Generic AST node (helper for Exp, Ty, etc.)
 #[derive(Debug, PartialEq, Eq, Hash)]

@@ -41,7 +41,7 @@ fn parse_valid<'a>(tokens: &'a [Token]) -> ast::Prog<'a> {
 #[test]
 fn empty_source() {
     match parser::parse(&[]) {
-        Ok(ast) => assert!(ast.is_empty()),
+        Ok(ast) => assert!(ast.items.is_empty()),
         Err(err) => panic!("Empty source erroneously rejected: {}", err),
     }
 }
@@ -52,24 +52,26 @@ fn empty_struct_or_class_decl() {
     let tokens = lex_filter_ws_comment(&sources);
     let actual_ast = parse_valid(&tokens);
 
-    let expected_ast = vec![
-        ast::Item::StructDecl(ast::StructDecl {
-            name: "Foo",
-            fields: vec![],
-            range: Range {
-                begin: Location { src_idx: 0, line: 1, column: 1 },
-                end: Location { src_idx: 0, line: 1, column: 14 },
-            },
-        }),
-        ast::Item::ClassDecl(ast::ClassDecl {
-            name: "Bar",
-            fields: vec![],
-            range: Range {
-                begin: Location { src_idx: 0, line: 1, column: 15 },
-                end: Location { src_idx: 0, line: 1, column: 27 },
-            },
-        }),
-    ];
+    let expected_ast = ast::Prog {
+        items: vec![
+            ast::Item::StructDecl(ast::StructDecl {
+                name: "Foo",
+                fields: vec![],
+                range: Range {
+                    begin: Location { src_idx: 0, line: 1, column:  1 },
+                    end:   Location { src_idx: 0, line: 1, column: 14 },
+                },
+            }),
+            ast::Item::ClassDecl(ast::ClassDecl {
+                name: "Bar",
+                fields: vec![],
+                range: Range {
+                    begin: Location { src_idx: 0, line: 1, column: 15 },
+                    end:   Location { src_idx: 0, line: 1, column: 27 },
+                },
+            }),
+        ]
+    };
 
     assert_eq!(actual_ast, expected_ast);
 }

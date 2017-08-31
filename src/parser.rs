@@ -170,7 +170,7 @@ impl<'a> Parser<'a> {
             items.push(self.parse_toplevel()?);
         }
 
-        Ok(items)
+        Ok(Prog { items })
     }
 
     fn parse_toplevel(&mut self) -> ItemResult<'a> {

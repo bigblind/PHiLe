@@ -92,7 +92,7 @@ pub struct RcCell<T: ?Sized> {
 }
 
 /// Weak counterpart of `RcCell<T>`.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct WkCell<T: ?Sized> {
     ptr: Weak<RefCell<T>>,
 }
@@ -270,6 +270,16 @@ impl<T> Clone for WkCell<T> {
         WkCell {
             ptr: self.ptr.clone()
         }
+    }
+}
+
+/// Creates a `WkCell` that doesn't point anywhere, just like `new()`.
+///
+/// (This is implemented manually because `#[derive]`ing
+/// imposes the overly conservative bound `T: Default`.)
+impl<T> Default for WkCell<T> {
+    fn default() -> WkCell<T> {
+        WkCell::new()
     }
 }
 

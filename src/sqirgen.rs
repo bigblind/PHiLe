@@ -16,7 +16,7 @@ use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
 use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, FuncArg, Field };
-use ast::{ EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
+use ast::{ Prog, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ Error, Result };
 
 
@@ -119,13 +119,13 @@ macro_rules! reciprocity_error {
 ///
 /// # Arguments:
 ///
-/// * `program`: the borrowed form of an AST.
+/// * `program`: the AST representing the program to be compiled.
 ///
 /// # Return value:
 ///
 /// * `Ok(Sqir)`, if the program described by the AST was semantically valid.
 /// * `Err(Error)`, if the program contains some sort of a semantic error.
-pub fn generate_sqir(program: &[Item]) -> Result<Sqir> {
+pub fn generate_sqir(program: &Prog) -> Result<Sqir> {
     SqirGen::new().generate_sqir(program)
 }
 
@@ -252,14 +252,14 @@ impl SqirGen {
     // Top-level SQIR generation methods and helpers
     //
 
-    fn generate_sqir(mut self, program: &[Item]) -> Result<Sqir> {
-        self.forward_declare_user_defined_types(program)?;
-        self.define_user_defined_types(program)?;
+    fn generate_sqir(mut self, program: &Prog) -> Result<Sqir> {
+        self.forward_declare_user_defined_types(&program.items)?;
+        self.define_user_defined_types(&program.items)?;
         self.occurs_check_user_defined_types()?;
-        self.define_relations(program)?;
+        self.define_relations(&program.items)?;
         self.validate_relations()?;
-        self.forward_declare_functions(program)?;
-        self.generate_functions(program)?;
+        self.forward_declare_functions(&program.items)?;
+        self.generate_functions(&program.items)?;
 
         Ok(self.sqir)
     }

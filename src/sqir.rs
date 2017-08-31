@@ -136,7 +136,7 @@ pub enum PlaceholderKind {
 /// * Value types are enums, structs, and tuples, along with
 ///   the built-in types.
 /// * Entity types are only classes (for now).
-/// * Function types are... function types, obviously.
+/// * Function types are… function types, obviously.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ComplexTypeKind {
     /// A complex type that is a value type: `struct`, `enum`, tuple

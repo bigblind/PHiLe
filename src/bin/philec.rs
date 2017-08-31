@@ -83,7 +83,23 @@
 //! The command-line compiler exits with status `0` if the compilation
 //! succeeds. If the compilation fails, it exits with a non-zero status,
 //! after having removed all generated temporary files.
+//!
+//! # See Also
+//!
+//! Depending on how you are willing to use PHiLe, you may be looking for…
+//!
+//! * [The Tutorial](https://h2co3.github.io/phile/tutorial). This gets you
+//!   started quickly and painlessly with writing schemas and queries in
+//!   PHiLe's domain-specific language.
+//! * [The Examples](https://github.com/H2CO3/PHiLe/tree/master/doc/examples).
+//!   Check out these code snippets if you learn easier by example.
+//! * [The Reference](https://h2co3.github.io/phile/reference).
+//!   Search through this document if you are already familiar with the basics
+//!   and you are now looking for the details of a specific feature.
+//! * [API documentation](https://docs.rs/phile/) for the `phile` library,
+//!   useful when you want to embed PHiLe into your own Rust programs.
 
+#![doc(html_root_url = "https://docs.rs/phile/0.1.2")]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,
