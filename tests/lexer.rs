@@ -259,7 +259,7 @@ impl Lexeme for ValidWhitespace {
             }
         }
 
-        buf.push_str(&self.buf);
+        *buf += &self.buf;
 
         lexer::TokenKind::Whitespace
     }
@@ -323,7 +323,7 @@ impl Lexeme for ValidLineComment {
         end.line += 1;
         end.column = 1;
 
-        buf.push_str(&self.buf);
+        *buf += &self.buf;
 
         lexer::TokenKind::Comment
     }
@@ -387,7 +387,7 @@ impl Lexeme for ValidWord {
         assert!(!self.buf.contains(char::is_whitespace));
 
         end.column += grapheme_count(&self.buf); // because we contain no newlines
-        buf.push_str(&self.buf);
+        *buf += &self.buf;
 
         lexer::TokenKind::Word
     }
@@ -559,7 +559,7 @@ impl Lexeme for ValidNumber {
         assert!(!self.buf.contains(char::is_whitespace));
 
         end.column += grapheme_count(&self.buf); // because we contain no newlines
-        buf.push_str(&self.buf);
+        *buf += &self.buf;
 
         lexer::TokenKind::NumericLiteral
     }
@@ -586,7 +586,7 @@ impl Lexeme for ValidPunct {
         assert!(self.value.is_ascii());
 
         end.column += grapheme_count(self.value);
-        buf.push_str(self.value);
+        *buf += self.value;
 
         lexer::TokenKind::Punctuation
     }
@@ -673,11 +673,11 @@ impl Lexeme for ValidString {
         for ch in &self.chars {
             match *ch {
                 Unescaped(uch) => buf.push(uch),
-                Backslash      => buf.push_str(r#"\\"#),
-                Quote          => buf.push_str(r#"\""#),
-                Cr             => buf.push_str(r#"\r"#),
-                Lf             => buf.push_str(r#"\n"#),
-                Tab            => buf.push_str(r#"\t"#),
+                Backslash      => *buf += r#"\\"#,
+                Quote          => *buf += r#"\""#,
+                Cr             => *buf += r#"\r"#,
+                Lf             => *buf += r#"\n"#,
+                Tab            => *buf += r#"\t"#,
                 Hex(byte)      => write!(buf, "\\x{:02x}", byte).unwrap(),
                 Unicode(uch)   => write!(buf, "\\u{{{:x}}}", uch as u32).unwrap(),
             }
