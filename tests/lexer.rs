@@ -1240,11 +1240,9 @@ fn ascii_digit_is_numeric() {
     ];
 
     for lexeme in lexemes {
-        // every extended grapheme cluster in this test is ASCII, so it takes
-        // up 1 byte => therefore lexeme.len() is OK to use in the Range.
         let range = lexer::Range {
             begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
-            end:   lexer::Location { src_idx: 0, line: 1, column: lexeme.len() + 1 },
+            end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
         };
         let sources = &[lexeme];
         let tokens = lexer::lex(sources).unwrap();
@@ -1305,7 +1303,7 @@ fn identifier_with_inner_unicode_digit() {
     for ident in identifiers {
         let range = lexer::Range {
             begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
-            end:   lexer::Location { src_idx: 0, line: 1, column: grapheme_count(ident) + 1 },
+            end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(ident) },
         };
         let sources = &[ident];
         let tokens = lexer::lex(sources).unwrap();
@@ -1323,7 +1321,7 @@ fn all_valid_punctuation() {
     for punct in PUNCTUATION {
         let range = lexer::Range {
             begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
-            end:   lexer::Location { src_idx: 0, line: 1, column: punct.len() + 1 },
+            end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(punct) },
         };
         let sources = &[punct];
         let tokens = lexer::lex(sources).unwrap();
