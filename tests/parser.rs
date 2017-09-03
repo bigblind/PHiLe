@@ -38,6 +38,13 @@ fn parse_valid<'a>(tokens: &'a [Token]) -> Prog<'a> {
     parser::parse(tokens).unwrap()
 }
 
+fn oneline_range(src_idx: usize, char_range: std::ops::Range<usize>) -> Range {
+    Range {
+        begin: Location { src_idx, line: 1, column: char_range.start },
+        end:   Location { src_idx, line: 1, column: char_range.end },
+    }
+}
+
 #[test]
 fn empty_source() {
     match parser::parse(&[]) {
@@ -57,99 +64,65 @@ fn valid_struct_or_class_decl() {
         // "struct Multi { f0: (Tup, Le), f1: String -> float, }",
         // "class More { id: UUID, date_time: Date, }",
     ];
-    let expected_ast = Prog {
-        items: vec![
-            Item::StructDecl(StructDecl {
-                name: "Foo",
-                fields: vec![],
-                range: Range {
-                    begin: Location { src_idx: 0, line: 1, column:  1 },
-                    end:   Location { src_idx: 0, line: 1, column: 14 },
-                },
-            }),
-            Item::ClassDecl(ClassDecl {
-                name: "Bar",
-                fields: vec![],
-                range: Range {
-                    begin: Location { src_idx: 0, line: 1, column: 15 },
-                    end:   Location { src_idx: 0, line: 1, column: 27 },
-                },
-            }),
-            Item::StructDecl(StructDecl {
-                name: "Single",
-                fields: vec![
-                    Field {
-                        range: Range {
-                            begin: Location { src_idx: 1, line: 1, column: 17 },
-                            end:   Location { src_idx: 1, line: 1, column: 34 },
-                        },
-                        name: "some_field",
-                        ty: Ty {
-                            kind: TyKind::Optional(
-                                Box::new(Ty {
-                                    kind: TyKind::Named("int"),
-                                    range: Range {
-                                        begin: Location { src_idx: 1, line: 1, column: 29 },
-                                        end:   Location { src_idx: 1, line: 1, column: 32 },
-                                    },
-                                })
-                            ),
-                            range: Range {
-                                begin: Location { src_idx: 1, line: 1, column: 29 },
-                                end:   Location { src_idx: 1, line: 1, column: 33 },
-                            },
-                        },
-                        relation: None,
+    let items = vec![
+        Item::StructDecl(StructDecl {
+            name: "Foo",
+            fields: vec![],
+            range: oneline_range(0, 1..14),
+        }),
+        Item::ClassDecl(ClassDecl {
+            name: "Bar",
+            fields: vec![],
+            range: oneline_range(0, 15..27),
+        }),
+        Item::StructDecl(StructDecl {
+            name: "Single",
+            fields: vec![
+                Field {
+                    range: oneline_range(1, 17..34),
+                    name: "some_field",
+                    ty: Ty {
+                        kind: TyKind::Optional(
+                            Box::new(Ty {
+                                kind: TyKind::Named("int"),
+                                range: oneline_range(1, 29..32),
+                            })
+                        ),
+                        range: oneline_range(1, 29..33),
                     },
-                ],
-                range: Range {
-                    begin: Location { src_idx: 1, line: 1, column:  1 },
-                    end:   Location { src_idx: 1, line: 1, column: 36 },
+                    relation: None,
                 },
-            }),
-            Item::ClassDecl(ClassDecl {
-                name: "One",
-                fields: vec![
-                    Field {
-                        range: Range {
-                            begin: Location { src_idx: 1, line: 1, column: 49 },
-                            end:   Location { src_idx: 1, line: 1, column: 63 },
-                        },
-                        name: "name",
-                        ty: Ty {
-                            kind: TyKind::Array(
-                                Box::new(Ty {
-                                    kind: TyKind::Pointer(
-                                        Box::new(Ty {
-                                            kind: TyKind::Named("Type"),
-                                            range: Range {
-                                                begin: Location { src_idx: 1, line: 1, column: 57 },
-                                                end:   Location { src_idx: 1, line: 1, column: 61 },
-                                            },
-                                        })
-                                    ),
-                                    range: Range {
-                                        begin: Location { src_idx: 1, line: 1, column: 56 },
-                                        end:   Location { src_idx: 1, line: 1, column: 61 },
-                                    },
-                                })
-                            ),
-                            range: Range {
-                                begin: Location { src_idx: 1, line: 1, column: 55 },
-                                end:   Location { src_idx: 1, line: 1, column: 62 },
-                            },
-                        },
-                        relation: None,
+            ],
+            range: oneline_range(1, 1..36),
+        }),
+        Item::ClassDecl(ClassDecl {
+            name: "One",
+            fields: vec![
+                Field {
+                    range: oneline_range(1, 49..63),
+                    name: "name",
+                    ty: Ty {
+                        kind: TyKind::Array(
+                            Box::new(Ty {
+                                kind: TyKind::Pointer(
+                                    Box::new(Ty {
+                                        kind: TyKind::Named("Type"),
+                                        range: oneline_range(1, 57..61),
+                                    })
+                                ),
+                                range: oneline_range(1, 56..61),
+                            })
+                        ),
+                        range: oneline_range(1, 55..62),
                     },
-                ],
-                range: Range {
-                    begin: Location { src_idx: 1, line: 1, column: 37 },
-                    end:   Location { src_idx: 1, line: 1, column: 65 },
+                    relation: None,
                 },
-            }),
-        ]
-    };
+            ],
+            range: oneline_range(1, 37..65),
+        }),
+    ];
 
+    let expected_ast = Prog { items };
     let tokens = lex_filter_ws_comment(&sources);
     let actual_ast = parse_valid(&tokens);
 
