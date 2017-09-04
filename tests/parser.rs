@@ -41,7 +41,7 @@ fn parse_valid<'a>(tokens: &'a [Token]) -> Prog<'a> {
 fn oneline_range(src_idx: usize, char_range: std::ops::Range<usize>) -> Range {
     Range {
         begin: Location { src_idx, line: 1, column: char_range.start },
-        end:   Location { src_idx, line: 1, column: char_range.end },
+        end:   Location { src_idx, line: 1, column: char_range.end   },
     }
 }
 

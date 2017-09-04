@@ -1381,6 +1381,12 @@ fn interesting_valid_sources() {
         // without a decimal point, it's not a floating-point literal
         ("123e456", vec!["123", "e456"]),
 
+        // .. and ... after a number is a range, not a floating-point literal
+        ("10..99", vec!["10", "..", "99"]),
+        ("32...85", vec!["32", "...", "85"]),
+        ("25.7..0.34", vec!["25.7", "..", "0.34"]),
+        ("3.14...2.71", vec!["3.14", "...", "2.71"]),
+
         // Parentheses
         ("()[]{}", vec!["(", ")", "[", "]", "{", "}"]),
         ("{[(([{}]))]}", vec!["{", "[", "(", "(", "[", "{", "}", "]", ")", ")", "]", "}"]),
@@ -1435,6 +1441,14 @@ fn interesting_valid_sources() {
         ("def(true, 83)", vec!["def", "(", "true", ",", " ", "83", ")"]),
         ("qux.lol[index]", vec!["qux", ".", "lol", "[", "index", "]"]),
         ("let x_0 = \"0\";", vec!["let", " ", "x_0", " ", "=", " ", r#""0""#, ";"]),
+
+        (
+            "fn recent_followers(start_date: Date) -> [User] {\n    []\n}",
+            vec![
+                "fn", " ", "recent_followers", "(", "start_date", ":", " ", "Date", ")",
+                " ", "->", " ", "[", "User", "]", " ", "{", "\n    ", "[", "]", "\n", "}",
+            ]
+        ),
 
         // some programmers just can't be bothered to write spaces between binary ops
         (
