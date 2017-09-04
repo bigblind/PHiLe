@@ -945,23 +945,26 @@ impl SqirGen {
         self.get_tuple_type(&[])
     }
 
-    fn get_builtin_type(&self, name: &str) -> RcType {
-        self.sqir.named_types[name].clone()
+    fn get_builtin_type(&self, name: &str) -> Result<RcType> {
+        match self.sqir.named_types.get(name) {
+            Some(rc) => Ok(rc.clone()),
+            None => bug!("Cannot find builtin type {}", name),
+        }
     }
 
-    fn get_bool_type(&self) -> RcType {
+    fn get_bool_type(&self) -> Result<RcType> {
         self.get_builtin_type(BUILTIN_NAME.bool_name)
     }
 
-    fn get_int_type(&self) -> RcType {
+    fn get_int_type(&self) -> Result<RcType> {
         self.get_builtin_type(BUILTIN_NAME.int_name)
     }
 
-    fn get_float_type(&self) -> RcType {
+    fn get_float_type(&self) -> Result<RcType> {
         self.get_builtin_type(BUILTIN_NAME.float_name)
     }
 
-    fn get_string_type(&self) -> RcType {
+    fn get_string_type(&self) -> Result<RcType> {
         self.get_builtin_type(BUILTIN_NAME.string_name)
     }
 
@@ -1480,7 +1483,7 @@ impl SqirGen {
     }
 
     fn generate_bool_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
-        let ty = self.get_bool_type();
+        let ty = self.get_bool_type()?;
         let b = parse_bool_literal(val, range)?;
         let value = Value::BoolConst(b);
         let id = self.next_temp_id();
@@ -1494,7 +1497,7 @@ impl SqirGen {
             }
         }
 
-        let ty = self.get_int_type();
+        let ty = self.get_int_type()?;
         let n = parse_int_literal(val, range)?;
         let value = Value::IntConst(n);
         let id = self.next_temp_id();
@@ -1503,7 +1506,7 @@ impl SqirGen {
     }
 
     fn generate_float_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
-        let ty = self.get_float_type();
+        let ty = self.get_float_type()?;
         let x = parse_float_literal(val, range)?;
         let value = Value::FloatConst(x);
         let id = self.next_temp_id();
@@ -1511,7 +1514,7 @@ impl SqirGen {
     }
 
     fn generate_string_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
-        let ty = self.get_string_type();
+        let ty = self.get_string_type()?;
         let s = parse_string_literal(val, range)?;
         let value = Value::StringConst(s);
         let id = self.next_temp_id();
