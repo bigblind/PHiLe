@@ -20,40 +20,10 @@ use ast::{ Prog, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ Error, Result };
 
 
-#[derive(Debug, Clone)]
-struct TyCtx {
-    ty: Option<RcType>, // type hint
-    range: Range,
-}
-
-#[derive(Debug)]
-struct ScopeGuard {
-    locals: RcCell<Locals>,
-}
-
-// var_map is the map of all currently-visible local variables,
-// transitively. That is, var_map.keys() ~ scope_stack.flat_map(id).
-// scope_stack is the vector of currently-active scopes: the higher
-// the index, the smaller/inner the corresponding scope is. Within
-// scope vectors, variable names are stored in order of declaration.
-#[derive(Debug, Default)]
-struct Locals {
-    var_map: HashMap<String, RcExpr>,
-    scope_stack: Vec<Vec<String>>,
-}
-
-#[derive(Debug)]
-struct SqirGen {
-    sqir: Sqir,
-    locals: RcCell<Locals>,
-    tmp_idx: usize,
-}
-
-
 // This macro generates caching getter functions for types
 // that simply wrap other types, e.g. &T, [T], T?, etc.
 macro_rules! implement_wrapping_type_getter {
-    ($fn_name: ident, $variant: ident, $cache: ident) => {
+    (fn $fn_name:ident(&mut self, decl: &Ty) -> Result<RcType> { self.$cache:ident => Type::$variant:ident }) => {
         fn $fn_name(&mut self, decl: &Ty) -> Result<RcType> {
             // get the current wrapped type
             let wrapped = self.type_from_decl(decl)?;
@@ -126,7 +96,7 @@ macro_rules! reciprocity_error {
 /// * `Ok(Sqir)`, if the program described by the AST was semantically valid.
 /// * `Err(Error)`, if the program contains some sort of a semantic error.
 pub fn generate_sqir(program: &Prog) -> Result<Sqir> {
-    SqirGen::new().generate_sqir(program)
+    SqirGen::default().generate_sqir(program)
 }
 
 // This is to be used ONLY when you _know_
@@ -141,7 +111,7 @@ fn unwrap_entity_name(entity: &RcType) -> Result<String> {
 fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
     // TODO(H2CO3): actually unescape string literals
     if lexeme.contains('\\') {
-        Err(Error::Syntax {
+        Err(Error::Semantic {
             message: format!("Parsing nontrivial string literal is unimplemented: {}", lexeme),
             range: Some(range),
         })
@@ -151,14 +121,14 @@ fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
 }
 
 fn parse_bool_literal(lexeme: &str, range: Range) -> Result<bool> {
-    lexeme.parse().map_err(|err| Error::Syntax {
+    lexeme.parse().map_err(|err| Error::Semantic {
         message: format!("Invalid boolean literal {}: {}", lexeme, err),
         range: Some(range),
     })
 }
 
 fn parse_float_literal(lexeme: &str, range: Range) -> Result<f64> {
-    lexeme.parse().map_err(|err| Error::Syntax {
+    lexeme.parse().map_err(|err| Error::Semantic {
         message: format!("Invalid float literal {}: {}", lexeme, err),
         range: Some(range),
     })
@@ -186,7 +156,7 @@ fn parse_int_literal(lexeme: &str, range: Range) -> Result<u64> {
 // Helper for parse_int_literal()
 fn parse_int_with_radix(lexeme: &str, radix: u32, range: Range) -> Result<u64> {
     u64::from_str_radix(lexeme, radix).map_err(
-        |err| Error::Syntax {
+        |err| Error::Semantic {
             message: format!("Invalid base-{} integer {}: {}", radix, lexeme, err),
             range: Some(range),
         }
@@ -194,7 +164,7 @@ fn parse_int_with_radix(lexeme: &str, radix: u32, range: Range) -> Result<u64> {
 }
 
 fn parse_cardinality_op(op: &str, range: Range) -> Result<(Cardinality, Cardinality)> {
-    let op_error = || Error::Syntax {
+    let op_error = || Error::Semantic {
         message: format!("Invalid cardinality operator: {}", op),
         range: Some(range),
     };
@@ -220,10 +190,21 @@ fn parse_cardinality_op(op: &str, range: Range) -> Result<(Cardinality, Cardinal
     Ok((lhs, rhs))
 }
 
+#[derive(Debug, Clone)]
+struct TyCtx {
+    ty: Option<RcType>, // type hint
+    range: Range,
+}
+
 impl Ranged for TyCtx {
     fn range(&self) -> Range {
         self.range
     }
+}
+
+#[derive(Debug)]
+struct ScopeGuard {
+    locals: RcCell<Locals>,
 }
 
 impl Drop for ScopeGuard {
@@ -239,19 +220,25 @@ impl Drop for ScopeGuard {
     }
 }
 
+// var_map is the map of all currently-visible local variables,
+// transitively. That is, var_map.keys() ~ scope_stack.flat_map(id).
+// scope_stack is the vector of currently-active scopes: the higher
+// the index, the smaller/inner the corresponding scope is. Within
+// scope vectors, variable names are stored in order of declaration.
+#[derive(Debug, Default)]
+struct Locals {
+    var_map: HashMap<String, RcExpr>,
+    scope_stack: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Default)]
+struct SqirGen {
+    sqir: Sqir,
+    locals: RcCell<Locals>,
+    tmp_idx: usize,
+}
+
 impl SqirGen {
-    fn new() -> SqirGen {
-        SqirGen {
-            sqir:    Sqir::new(),
-            locals:  Default::default(),
-            tmp_idx: 0,
-        }
-    }
-
-    //
-    // Top-level SQIR generation methods and helpers
-    //
-
     fn generate_sqir(mut self, program: &Prog) -> Result<Sqir> {
         self.forward_declare_user_defined_types(&program.items)?;
         self.define_user_defined_types(&program.items)?;
@@ -263,6 +250,10 @@ impl SqirGen {
 
         Ok(self.sqir)
     }
+
+    //
+    // Top-level SQIR generation methods and helpers
+    //
 
     // Forward declare every struct/class/enum definition
     // by inserting a placeholder type for each of them
@@ -810,21 +801,21 @@ impl SqirGen {
     }
 
     implement_wrapping_type_getter! {
-        get_pointer_type_raw,
-        Pointer,
-        pointer_types
+        fn get_pointer_type_raw(&mut self, decl: &Ty) -> Result<RcType> {
+            self.pointer_types => Type::Pointer
+        }
     }
 
     implement_wrapping_type_getter! {
-        get_optional_type_raw,
-        Optional,
-        optional_types
+        fn get_optional_type_raw(&mut self, decl: &Ty) -> Result<RcType> {
+             self.optional_types => Type::Optional
+        }
     }
 
     implement_wrapping_type_getter! {
-        get_array_type_raw,
-        Array,
-        array_types
+        fn get_array_type_raw(&mut self, decl: &Ty) -> Result<RcType> {
+            self.array_types => Type::Array
+        }
     }
 
     fn get_tuple_type(&mut self, nodes: &[Ty]) -> Result<RcType> {
