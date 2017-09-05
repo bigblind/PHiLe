@@ -235,7 +235,7 @@ impl<T> RcCell<T> {
     }
 
     /// Converts the strong pointer to a weak pointer.
-    pub fn as_weak(&self) -> WkCell<T> {
+    pub fn to_weak(&self) -> WkCell<T> {
         WkCell {
             ptr: Rc::downgrade(&self.ptr)
         }
@@ -305,7 +305,7 @@ pub struct WkCell<T: ?Sized> {
 
 impl<T> WkCell<T> {
     /// Creates a `WkCell` that doesn't refer to any value.
-    /// `as_rc()` will always return an `Err` for such `WkCell`s.
+    /// `to_rc()` will always return an `Err` for such `WkCell`s.
     pub fn new() -> WkCell<T> {
         WkCell {
             ptr: Weak::new()
@@ -318,7 +318,7 @@ impl<T> WkCell<T> {
     ///
     /// * `Ok(RcCell<T>)` if `self` points to a still-existing value.
     /// * `Err(Error::Strongify)` if `self` pointed to a now-deallocated value.
-    pub fn as_rc(&self) -> Result<RcCell<T>> {
+    pub fn to_rc(&self) -> Result<RcCell<T>> {
         self.ptr.upgrade().map(|rc| RcCell { ptr: rc }).ok_or(Error::Strongify)
     }
 }
@@ -346,7 +346,7 @@ impl<T> Default for WkCell<T> {
 
 impl<T> Display for WkCell<T> where RcCell<T>: Display {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self.as_rc() {
+        match self.to_rc() {
             Ok(rc) => rc.fmt(f),
             Err(_) => f.write_str("<cannot strongify WkCell>"),
         }

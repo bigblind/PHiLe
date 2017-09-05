@@ -206,7 +206,7 @@ impl<'a> PodUdTypeGen<'a> {
 //
 
 fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> Result<()> {
-    let rc = ty.as_rc()?;
+    let rc = ty.to_rc()?;
     let ptr = rc.borrow()?;
 
     match *ptr {
@@ -464,7 +464,7 @@ fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr, params: &Codege
     write!(wr, "    ")?;
     write_expr_id(wr, &id, params)?;
     write!(wr, " = ")?;
-    let rc = expr.as_rc()?;
+    let rc = expr.to_rc()?;
     write_expr_id(wr, &rc.borrow()?.id, params)?;
     writeln!(wr)?;
     Ok(())
@@ -569,7 +569,7 @@ fn write_expr_decl(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) ->
     let ptr = expr.borrow()?;
     write_expr_id(wr, &ptr.id, params)?;
     write!(wr, " ")?;
-    write_type(wr, &ptr.ty.as_weak(), params)
+    write_type(wr, &ptr.ty.to_weak(), params)
 }
 
 // Helper for writing the prefixed name of a global function. `ns` is the namespace.

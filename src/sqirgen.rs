@@ -60,7 +60,7 @@ macro_rules! implement_wrapping_type_getter {
 
             // look up corresponding wrapping type in cache; insert if not found
             let wrapping = self.sqir.$cache.entry(wrapped.clone()).or_insert_with(
-                || RcCell::new(Type::$variant(wrapped.as_weak()))
+                || RcCell::new(Type::$variant(wrapped.to_weak()))
             );
 
             // return the wrapping type
@@ -310,7 +310,7 @@ impl SqirGen {
     // all placeholders that could hide self-containing types.)
     fn occurs_check_user_defined_types(&self) -> Result<()> {
         for (_, t) in &self.sqir.named_types {
-            self.occurs_check(&t.as_weak())?
+            self.occurs_check(&t.to_weak())?
         }
 
         Ok(())
@@ -471,7 +471,7 @@ impl SqirGen {
             }
 
             let field_type_rc = self.type_from_decl(&field.ty)?;
-            let field_type_wk = field_type_rc.as_weak();
+            let field_type_wk = field_type_rc.to_weak();
 
             self.validate_complex_type_item(&field_type_wk, field, ComplexTypeKind::Value)?;
 
@@ -492,7 +492,7 @@ impl SqirGen {
 
         for field in &decl.fields {
             let field_type_rc = self.type_from_decl(&field.ty)?;
-            let field_type_wk = field_type_rc.as_weak();
+            let field_type_wk = field_type_rc.to_weak();
 
             self.validate_complex_type_item(&field_type_wk, field, ComplexTypeKind::Entity)?;
 
@@ -517,7 +517,7 @@ impl SqirGen {
                 None        => self.get_unit_type()?,
             };
 
-            let type_wk = type_rc.as_weak();
+            let type_wk = type_rc.to_weak();
 
             self.validate_complex_type_item(&type_wk, variant, ComplexTypeKind::Value)?;
 
@@ -540,7 +540,7 @@ impl SqirGen {
         range:       &R,
         parent_kind: ComplexTypeKind
     ) -> Result<()> {
-        let rc = item_type.as_rc()?;
+        let rc = item_type.to_rc()?;
         let ptr = rc.borrow()?;
 
         match *ptr {
@@ -675,7 +675,7 @@ impl SqirGen {
         wrapper_type_name: &str,
     ) -> Result<()> {
         validation_result.or_else(|err| {
-            let rc = wrapped_type.as_rc()?;
+            let rc = wrapped_type.to_rc()?;
             let ptr = rc.borrow()?;
 
             // As an immediate member of a class type, in addition
@@ -705,7 +705,7 @@ impl SqirGen {
     // contained/wrapped types that occur without indirection,
     // i.e. those that are _not_ behind a pointer or in an array.
     fn occurs_check_type(&self, root: &WkType, child: &WkType) -> Result<()> {
-        let rc = child.as_rc()?;
+        let rc = child.to_rc()?;
         let ptr = rc.borrow()?;
 
         match *ptr {
@@ -740,7 +740,7 @@ impl SqirGen {
     }
 
     fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> Result<()> {
-        if root.as_rc()? == child.as_rc()? {
+        if root.to_rc()? == child.to_rc()? {
             occurs_check_error!(
                 "Recursive type {} contains itself without indirection",
                 root,
@@ -780,7 +780,7 @@ impl SqirGen {
 
         match *pointer_type.borrow()? {
             Type::Pointer(ref pointed_type) => {
-                let rc = pointed_type.as_rc()?;
+                let rc = pointed_type.to_rc()?;
                 let ptr = rc.borrow()?;
 
                 // Only pointer-to-class types are permitted.
@@ -847,7 +847,7 @@ impl SqirGen {
         // Tuples are full-fledged value types, similar to structs.
         // Therefore we must check their items during construction.
         let weak_types = types.iter().zip(ranges).map(|(ty, range)| {
-            let ty_wk = ty.as_weak();
+            let ty_wk = ty.to_weak();
             self.validate_complex_type_item(&ty_wk, range, ComplexTypeKind::Value)?;
             Ok(ty_wk)
         }).collect::<Result<_>>()?;
@@ -885,8 +885,8 @@ impl SqirGen {
               R1: Ranged,
               R2: Ranged + 'a {
 
-        let arg_types: Vec<_> = arg_types_rc.iter().map(RcCell::as_weak).collect();
-        let ret_type = ret_type_rc.as_weak();
+        let arg_types: Vec<_> = arg_types_rc.iter().map(RcCell::to_weak).collect();
+        let ret_type = ret_type_rc.to_weak();
 
         self.validate_function_type_components(
             arg_types.iter(),
@@ -990,7 +990,7 @@ impl SqirGen {
             ref ty => bug!("Non-class entity type?! {}", ty),
         };
 
-        let field_type_rc = class.fields[field.name].as_rc()?;
+        let field_type_rc = class.fields[field.name].to_rc()?;
         let field_type = field_type_rc.borrow()?;
 
         // If the field has an explicit relation, typecheck it.
@@ -1157,12 +1157,12 @@ impl SqirGen {
 
         macro_rules! validate_and_unwrap_pointer_type {
             ($ty: expr, $name: expr, $($card: ident),*) => ({
-                let rc = $ty.as_rc()?;
+                let rc = $ty.to_rc()?;
                 let ptr = rc.borrow()?;
 
                 match *ptr {
                     Type::Pointer(ref pointed) => match cardinality {
-                        $(Cardinality::$card => pointed.as_rc(),)*
+                        $(Cardinality::$card => pointed.to_rc(),)*
                         _ => cardinality_mismatch_error($name),
                     },
                     _ => not_relational_error(),
@@ -1178,7 +1178,7 @@ impl SqirGen {
                 element, "Array",            ZeroOrMore, OneOrMore
             ),
             Type::Pointer(ref pointed) => match cardinality {
-                Cardinality::One => pointed.as_rc(),
+                Cardinality::One => pointed.to_rc(),
                 _ => cardinality_mismatch_error("Simple pointer"),
             },
             _ => not_relational_error(),
@@ -1227,11 +1227,11 @@ impl SqirGen {
     fn try_infer_type_cardinality(&self, t: &Type) -> Result<Option<(RcType, Cardinality)>> {
         macro_rules! try_unwrap_pointer_type {
             ($ty: expr, $card: ident) => ({
-                let rc = $ty.as_rc()?;
+                let rc = $ty.to_rc()?;
                 let ptr = rc.borrow()?;
 
                 match *ptr {
-                    Type::Pointer(ref pointed) => (pointed.as_rc()?, Cardinality::$card),
+                    Type::Pointer(ref pointed) => (pointed.to_rc()?, Cardinality::$card),
                     _ => return Ok(None),
                 }
             })
@@ -1240,7 +1240,7 @@ impl SqirGen {
         let type_and_cardinality = match *t {
             Type::Optional(ref wrapped) => try_unwrap_pointer_type!(wrapped, ZeroOrOne),
             Type::Array(ref element)    => try_unwrap_pointer_type!(element, ZeroOrMore),
-            Type::Pointer(ref pointed)  => (pointed.as_rc()?, Cardinality::One),
+            Type::Pointer(ref pointed)  => (pointed.to_rc()?, Cardinality::One),
             _                           => return Ok(None), // not a relational type
         };
 
@@ -1449,7 +1449,7 @@ impl SqirGen {
         let expr_ref = expr.borrow()?;
 
         if let Type::Optional(ref inner) = *ty.borrow()? {
-            if expr_ref.ty == inner.as_rc()? {
+            if expr_ref.ty == inner.to_rc()? {
                 let ty = ty.clone();
                 let id = self.next_temp_id();
                 let value = Value::OptionalWrap(expr.clone());
@@ -1545,7 +1545,7 @@ impl SqirGen {
     // Helper for generate_name_ref()
     fn generate_load(&mut self, expr: RcExpr) -> Result<RcExpr> {
         let ty = expr.borrow()?.ty.clone();
-        let value = Value::Load(expr.as_weak());
+        let value = Value::Load(expr.to_weak());
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
@@ -1554,7 +1554,7 @@ impl SqirGen {
         let init_type_hint = match decl.ty {
             Some(ref node) => {
                 let ty = self.type_from_decl(node)?;
-                self.validate_complex_type_item(&ty.as_weak(), node, ComplexTypeKind::Function)?;
+                self.validate_complex_type_item(&ty.to_weak(), node, ComplexTypeKind::Function)?;
                 Some(ty)
             },
             None => None,
@@ -1615,7 +1615,7 @@ impl SqirGen {
 
                 return if expected_len == actual_len {
                     nodes.iter().zip(types).map(
-                        |(node, ty)| self.generate_expr(node, Some(ty.as_rc()?))
+                        |(node, ty)| self.generate_expr(node, Some(ty.to_rc()?))
                     ).collect()
                 } else {
                     sema_error!(
@@ -1780,7 +1780,7 @@ impl SqirGen {
     fn fixup_function_arguments(args: Vec<RcExpr>, fn_expr: &RcExpr) -> Result<()> {
         for arg in args {
             match arg.borrow_mut()?.value {
-                Value::FuncArg { ref mut func, .. } => *func = fn_expr.as_weak(),
+                Value::FuncArg { ref mut func, .. } => *func = fn_expr.to_weak(),
                 ref val => bug!("Non-FuncArg argument?! {:#?}", val),
             }
         }
@@ -1810,9 +1810,9 @@ impl SqirGen {
 
     fn arg_type_with_hint(&mut self, arg: &FuncArg, ty: &WkType) -> Result<RcType> {
         match arg.ty {
-            None => Ok(ty.as_rc()?),
+            None => ty.to_rc(),
             Some(ref arg_ty) => {
-                let expected_type = ty.as_rc()?;
+                let expected_type = ty.to_rc()?;
                 let actual_type = self.type_from_decl(arg_ty)?;
 
                 if expected_type == actual_type {
@@ -1878,10 +1878,10 @@ impl SqirGen {
         func:      &ast::Function,
     ) -> Result<Option<RcType>> {
         let ret_type_hint = match (type_hint, &func.ret_type) {
-            (&Some(ref t), &None) => Some(t.ret_type.as_rc()?),
+            (&Some(ref t), &None) => Some(t.ret_type.to_rc()?),
             (&None, &Some(ref rt_decl)) => Some(self.type_from_decl(rt_decl)?),
             (&Some(ref t), &Some(ref rt_decl)) => {
-                let expected_ret_type = t.ret_type.as_rc()?;
+                let expected_ret_type = t.ret_type.to_rc()?;
                 let actual_ret_type = self.type_from_decl(rt_decl)?;
 
                 if actual_ret_type == expected_ret_type {
