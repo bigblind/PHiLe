@@ -66,37 +66,6 @@ pub struct PackageInfo {
     pub home_page: &'static str,
 }
 
-/// A struct that contains escape sequences for ANSI terminal color
-/// codes. This is used for maintaining a uniform and consistent
-/// color scheme across diagnostic messages printed by the PHiLe
-/// compiler and 3rd-party tools.
-#[derive(Debug, Clone, Copy)]
-pub struct Color {
-    /// ANSI escape sequence for resetting all color settings.
-    pub reset: &'static str,
-    /// ANSI escape sequence for displaying informative messages.
-    pub info: &'static str,
-    /// ANSI escape sequence for displaying highlighted messages.
-    pub highlight: &'static str,
-    /// ANSI escape sequence for indicating successful compilation.
-    pub success: &'static str,
-    /// ANSI escape sequence for reporting errors.
-    pub error: &'static str,
-}
-
-/// A reference counted, dynamically borrow checked smart pointer.
-/// Like `Rc<RefCell<T>>`, but with a more convenient interface.
-#[derive(Debug, Default)]
-pub struct RcCell<T: ?Sized> {
-    ptr: Rc<RefCell<T>>,
-}
-
-/// Weak counterpart of `RcCell<T>`.
-#[derive(Debug)]
-pub struct WkCell<T: ?Sized> {
-    ptr: Weak<RefCell<T>>,
-}
-
 /// Holds metadata about the PHiLe package as defined in the Cargo manifest.
 pub static PACKAGE_INFO: PackageInfo = PackageInfo {
     name:        env!["CARGO_PKG_NAME"],
@@ -106,15 +75,95 @@ pub static PACKAGE_INFO: PackageInfo = PackageInfo {
     home_page:   env!["CARGO_PKG_HOMEPAGE"],
 };
 
-/// The definition of the PHiLe diagnostic color scheme.
-pub static COLOR: Color = Color {
-    reset:     "\x1b[0m",
-    info:      "\x1b[1;33m",
-    highlight: "\x1b[1;36m",
-    success:   "\x1b[1;32m",
-    error:     "\x1b[1;31m",
-};
+/// Used for distinguishing between the types of
+/// diagnostic that the compiler can emit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DiagnosticKind {
+    /// A message without any special attributes or coloring.
+    Default,
+    /// An informative message, eg. compilation progress or performance.
+    Info,
+    /// A highlighted part of a diagnostic.
+    Highlight,
+    /// Indicates successful compilation.
+    Success,
+    /// Indicates that an error occurred during compilation.
+    Error,
+}
 
+/// Returns `DiagnosticKind::Default`.
+impl Default for DiagnosticKind {
+    fn default() -> Self {
+        DiagnosticKind::Default
+    }
+}
+
+/// A string which, when `Display`ed, looks pretty and colorful.
+/// It is used for formatting diagnostic messages.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Diagnostic<T> {
+    value: T,
+    kind: DiagnosticKind,
+}
+
+impl<T> Diagnostic<T> {
+    /// Makes a pretty-printable diagnostic that displays
+    /// a given value in the specified diagnostic style.
+    ///
+    /// # Arguments:
+    ///
+    /// * `value`: the value to be pretty-printed.
+    /// * `kind`: the diagnostic style to apply when pretty-printing.
+    /// # Return value:
+    ///
+    /// An initialized `Diagnostic` instance.
+    pub fn new(value: T, kind: DiagnosticKind) -> Self {
+        Diagnostic { value, kind }
+    }
+
+    /// Consumes `self` and returns the inner value, discarding style information.
+    pub fn into_inner(self) -> T {
+        self.value
+    }
+
+    /// Returns the diagnostic kind associated with this instance.
+    pub fn kind(&self) -> DiagnosticKind {
+        self.kind
+    }
+}
+
+impl<T> AsRef<T> for Diagnostic<T> {
+    fn as_ref(&self) -> &T {
+        &self.value
+    }
+}
+
+impl<T> AsMut<T> for Diagnostic<T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.value
+    }
+}
+
+impl<T> From<T> for Diagnostic<T> {
+    fn from(value: T) -> Self {
+        Self::new(value, DiagnosticKind::Default)
+    }
+}
+
+impl<T> Display for Diagnostic<T> where T: Display {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let reset = "\x1b[0m";
+        let color = match self.kind {
+            DiagnosticKind::Default   => "",
+            DiagnosticKind::Info      => "\x1b[1;33m",
+            DiagnosticKind::Highlight => "\x1b[1;36m",
+            DiagnosticKind::Success   => "\x1b[1;32m",
+            DiagnosticKind::Error     => "\x1b[1;31m",
+        };
+
+        write!(f, "{}{}{}{}", reset, color, self.value, reset)
+    }
+}
 
 /// Returns the number of extended grapheme clusters in `string`.
 /// Useful for counting 'characters' in accordance with a user's
@@ -148,6 +197,12 @@ pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
     string.graphemes(true).filter(|g| pred(*g)).count()
 }
 
+/// A reference counted, dynamically borrow checked smart pointer.
+/// Like `Rc<RefCell<T>>`, but with a more convenient interface.
+#[derive(Debug, Default)]
+pub struct RcCell<T: ?Sized> {
+    ptr: Rc<RefCell<T>>,
+}
 
 impl<T> RcCell<T> {
     /// Creates an `RcCell` owning the `value`.
@@ -240,6 +295,12 @@ impl<T> From<T> for RcCell<T> {
     fn from(value: T) -> RcCell<T> {
         RcCell::new(value)
     }
+}
+
+/// Weak counterpart of `RcCell<T>`.
+#[derive(Debug)]
+pub struct WkCell<T: ?Sized> {
+    ptr: Weak<RefCell<T>>,
 }
 
 impl<T> WkCell<T> {

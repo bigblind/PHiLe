@@ -16,8 +16,8 @@ use std::io;
 use std::result;
 use std::fmt::{ self, Display, Formatter };
 use std::cell::{ BorrowError, BorrowMutError };
+use util::{ Diagnostic, DiagnosticKind };
 use lexer::Range;
-use util::COLOR;
 
 
 /// Indicates a compiler error. Makes the current function return
@@ -121,23 +121,15 @@ impl Error {
         if let Some(r) = range {
             write!(
                 wr,
-                "\n\n    In file {clr_hgl}{file}{clr_rst}, near {clr_hgl}{range}{clr_rst}:\n",
-                file = sources[r.begin.src_idx].as_ref(),
-                range = r,
-                clr_hgl = COLOR.highlight,
-                clr_rst = COLOR.reset,
+                "\n\n    In file {}, near {}:\n",
+                Diagnostic::new(sources[r.begin.src_idx].as_ref(), DiagnosticKind::Highlight),
+                Diagnostic::new(r, DiagnosticKind::Highlight),
             )?;
         } else {
             write!(wr, "\n\n")?;
         }
 
-        write!(
-            wr,
-            "        {clr_err}{error}{clr_rst}\n\n",
-            error = self,
-            clr_err = COLOR.error,
-            clr_rst = COLOR.reset,
-        )
+        write!(wr, "        {}\n\n", Diagnostic::new(self, DiagnosticKind::Error))
     }
 }
 

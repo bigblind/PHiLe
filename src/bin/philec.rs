@@ -119,7 +119,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::io::{ self, stderr };
 use std::io::prelude::*;
-use phile::util::{ RcCell, COLOR, PACKAGE_INFO };
+use phile::util::{ RcCell, Diagnostic, DiagnosticKind, PACKAGE_INFO };
 use phile::lexer::*;
 use phile::parser::*;
 use phile::sqirgen::*;
@@ -188,7 +188,8 @@ macro_rules! stopwatch {
         let t1 = Instant::now();
         let dt = t1 - t0;
         let secs = dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
-        eprintln!("{}{:6.1} ms{}", COLOR.info, secs * 1e3, COLOR.reset);
+        let message = format!("{:6.1} ms", secs * 1e3);
+        eprintln!("{}", Diagnostic::new(message, DiagnosticKind::Info));
         val
     })
 }
@@ -307,11 +308,9 @@ fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
 
 fn handle_argument_error(arg_name: &str, value: &str) -> ! {
     eprint!(
-        "    Invalid {arg_name}: {clr_err}'{value}'{clr_rst}\n\n",
-        arg_name = arg_name,
-        value = value,
-        clr_err = COLOR.error,
-        clr_rst = COLOR.reset,
+        "    Invalid {}: '{}'\n\n",
+        arg_name,
+        Diagnostic::new(value, DiagnosticKind::Error),
     );
     ::std::process::exit(1)
 }
@@ -375,6 +374,6 @@ fn main() {
     });
 
     eprintln!();
-    eprintln!("    {}Compilation Successful{}", COLOR.success, COLOR.reset);
+    eprintln!("    {}", Diagnostic::new("Compilation Successful", DiagnosticKind::Success));
     eprintln!();
 }
