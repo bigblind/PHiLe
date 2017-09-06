@@ -62,7 +62,8 @@ fn valid_struct_or_class_decl() {
         "struct Single { some_field: int?, } class One { name: [&Type], }",
         // multiple fields
         "struct Multi { f0: (Tup, Le), f1: String -> float, }",
-        // "class More { relative: Foo? +<->? preimage, date_time: Date, }",
+        // multiple fields with relations
+        "class More { relative: &Qux? +<->? preimage, maybe_parent: &More *<->, }",
     ];
     let items = vec![
         Item::StructDecl(StructDecl {
@@ -163,6 +164,51 @@ fn valid_struct_or_class_decl() {
                 },
             ],
             range: oneline_range(2, 1..53),
+        }),
+        Item::ClassDecl(ClassDecl {
+            name: "More",
+            fields: vec![
+                Field {
+                    range: oneline_range(3, 14..45),
+                    name: "relative",
+                    ty: Ty {
+                        kind: TyKind::Optional(
+                            Box::new(Ty {
+                                kind: TyKind::Pointer(
+                                    Box::new(Ty {
+                                        kind: TyKind::Named("Qux"),
+                                        range: oneline_range(3, 25..28),
+                                    })
+                                ),
+                                range: oneline_range(3, 24..28),
+                            })
+                        ),
+                        range: oneline_range(3, 24..29),
+                    },
+                    relation: Some(RelDecl {
+                        cardinality: "+<->?",
+                        field: Some("preimage"),
+                    }),
+                },
+                Field {
+                    range: oneline_range(3, 46..71),
+                    name: "maybe_parent",
+                    ty: Ty {
+                        kind: TyKind::Pointer(
+                            Box::new(Ty {
+                                kind: TyKind::Named("More"),
+                                range: oneline_range(3, 61..65),
+                            })
+                        ),
+                        range: oneline_range(3, 60..65),
+                    },
+                    relation: Some(RelDecl {
+                        cardinality: "*<->",
+                        field: None,
+                    }),
+                },
+            ],
+            range: oneline_range(3, 1..73),
         }),
     ];
 
