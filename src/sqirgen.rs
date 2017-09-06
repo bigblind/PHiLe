@@ -23,7 +23,7 @@ use error::{ Error, Result };
 // This macro generates caching getter functions for types
 // that simply wrap other types, e.g. &T, [T], T?, etc.
 macro_rules! implement_wrapping_type_getter {
-    (fn $fn_name:ident(&mut self, decl: &Ty) -> Result<RcType> { self.$cache:ident => Type::$variant:ident }) => {
+    (fn $fn_name:ident(&mut self, decl: &Ty) -> Result<RcType> { Sqir::$cache:ident => Type::$variant:ident }) => {
         fn $fn_name(&mut self, decl: &Ty) -> Result<RcType> {
             // get the current wrapped type
             let wrapped = self.type_from_decl(decl)?;
@@ -802,19 +802,19 @@ impl SqirGen {
 
     implement_wrapping_type_getter! {
         fn get_pointer_type_raw(&mut self, decl: &Ty) -> Result<RcType> {
-            self.pointer_types => Type::Pointer
+            Sqir::pointer_types => Type::Pointer
         }
     }
 
     implement_wrapping_type_getter! {
         fn get_optional_type_raw(&mut self, decl: &Ty) -> Result<RcType> {
-             self.optional_types => Type::Optional
+             Sqir::optional_types => Type::Optional
         }
     }
 
     implement_wrapping_type_getter! {
         fn get_array_type_raw(&mut self, decl: &Ty) -> Result<RcType> {
-            self.array_types => Type::Array
+            Sqir::array_types => Type::Array
         }
     }
 

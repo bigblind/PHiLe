@@ -61,8 +61,8 @@ fn valid_struct_or_class_decl() {
         // one field
         "struct Single { some_field: int?, } class One { name: [&Type], }",
         // multiple fields
-        // "struct Multi { f0: (Tup, Le), f1: String -> float, }",
-        // "class More { id: UUID, date_time: Date, }",
+        "struct Multi { f0: (Tup, Le), f1: String -> float, }",
+        // "class More { relative: Foo? +<->? preimage, date_time: Date, }",
     ];
     let items = vec![
         Item::StructDecl(StructDecl {
@@ -119,6 +119,50 @@ fn valid_struct_or_class_decl() {
                 },
             ],
             range: oneline_range(1, 37..65),
+        }),
+        Item::StructDecl(StructDecl {
+            name: "Multi",
+            fields: vec![
+                Field {
+                    range: oneline_range(2, 16..30),
+                    name: "f0",
+                    ty: Ty {
+                        kind: TyKind::Tuple(vec![
+                            Ty {
+                                kind: TyKind::Named("Tup"),
+                                range: oneline_range(2, 21..24),
+                            },
+                            Ty {
+                                kind: TyKind::Named("Le"),
+                                range: oneline_range(2, 26..28),
+                            },
+                        ]),
+                        range: oneline_range(2, 20..29),
+                    },
+                    relation: None,
+                },
+                Field {
+                    range: oneline_range(2, 31..51),
+                    name: "f1",
+                    ty: Ty {
+                        kind: TyKind::Function(FunctionTy {
+                            arg_types: vec![
+                                Ty {
+                                    kind: TyKind::Named("String"),
+                                    range: oneline_range(2, 35..41),
+                                },
+                            ],
+                            ret_type: Box::new(Ty {
+                                kind: TyKind::Named("float"),
+                                range: oneline_range(2, 45..50),
+                            }),
+                        }),
+                        range: oneline_range(2, 35..50),
+                    },
+                    relation: None,
+                },
+            ],
+            range: oneline_range(2, 1..53),
         }),
     ];
 
