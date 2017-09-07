@@ -556,7 +556,7 @@ impl<'a> Parser<'a> {
         let kind = match op {
             "."  => ExpKind::MemberAccess(MemberAccess { base, member }),
             "::" => ExpKind::QualAccess(QualAccess { base, member }),
-            _    => bug!("forgot to handle '{}'", op),
+            _    => bug!("Forgot to handle '{}'", op),
         };
 
         Ok(Exp { kind, range })

@@ -10,6 +10,7 @@ use std::io;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::fmt::{ self, Write, Formatter, Display };
 use error::{ Error, Result };
 use dalgen::*;
 use sqir::*;
@@ -338,12 +339,27 @@ fn write_dummy_uses(wr: &mut io::Write, params: &CodegenParams) -> io::Result<()
 // Escaping string literals
 //
 
-fn escape_string_literal(s: &str) -> String {
-    // printable characters need not be escaped
-    if s.chars().all(|c| 0x20 as char <= c && c <= 0x7e as char) {
-        s.to_owned()
-    } else {
-        unimplemented!() // TODO(H2CO3): escape string literals; NB escape_default()!
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+struct EscapedStr<'a>(&'a str);
+
+impl<'a> Display for EscapedStr<'a> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_char('"')?;
+
+        for ch in self.0.chars() {
+            match ch {
+                '\"' => f.write_str(r#"\""#)?,
+                '\\' => f.write_str(r"\\")?,
+                '\n' => f.write_str(r"\n")?,
+                '\r' => f.write_str(r"\r")?,
+                '\t' => f.write_str(r"\t")?,
+                '\x20'...'\x7e' => f.write_char(ch)?, // printable
+                '\u{0000}'...'\u{ffff}' => write!(f, r"\u{:04x}", ch as u32)?,
+                _ => write!(f, r"\U{:08X}", ch as u32)?,
+            }
+        }
+
+        f.write_char('"')
     }
 }
 
@@ -456,7 +472,7 @@ fn generate_float_literal(wr: &mut io::Write, id: &ExprId, x: f64, params: &Code
 fn generate_string_literal(wr: &mut io::Write, id: &ExprId, s: &str, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
     write_expr_id(wr, id, params)?;
-    writeln!(wr, " = {}", escape_string_literal(s))?;
+    writeln!(wr, " = {}", EscapedStr(s))?;
     Ok(())
 }
 

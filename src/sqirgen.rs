@@ -10,6 +10,8 @@
 //! Syntax Tree into PHiLe's intermediate language, SQIR (short
 //! for Schema and Query Intermediate Representation).
 
+use std::char;
+use std::str::Chars;
 use std::collections::{ HashMap, BTreeMap };
 use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
@@ -109,29 +111,98 @@ fn unwrap_entity_name(entity: &RcType) -> Result<String> {
 }
 
 fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
-    // TODO(H2CO3): actually unescape string literals
-    if lexeme.contains('\\') {
-        Err(Error::Semantic {
-            message: format!("Parsing nontrivial string literal is unimplemented: {}", lexeme),
-            range: Some(range),
-        })
+    if !lexeme.starts_with('"') || !lexeme.ends_with('"') || lexeme.len() < 2 {
+        bug!("Missing leading or trailing \" in string at {}", range)
+    }
+
+    let mut chars = lexeme[1..lexeme.len() - 1].chars();
+    let mut buf = String::with_capacity(lexeme.len());
+    let unterm_err = lazy_bug!("Unterminated escape sequence in string at {}", range);
+
+    // TODO(H2CO3): keep this in sync with the lexer
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next().ok_or_else(&unterm_err)? {
+                '\\' => buf.push('\\'),
+                '"' => buf.push('\"'),
+                'n' => buf.push('\n'),
+                'r' => buf.push('\r'),
+                't' => buf.push('\t'),
+                'x' => buf.push(unescape_hex(&mut chars, range)?),
+                'u' => buf.push(unescape_unicode(&mut chars, range)?),
+                esc => bug!("Invalid escape \\{} in string at {}", esc, range),
+            }
+        } else {
+            buf.push(ch); // unescaped
+        }
+    }
+
+    Ok(buf)
+}
+
+// Helper for parse_string_literal().
+// TODO(H2CO3): keep this is sync with the lexer.
+fn unescape_hex(chars: &mut Chars, range: Range) -> Result<char> {
+    // exactly 2 hex digits following the \x must have been picked up by the lexer
+    let s = chars.as_str().get(..2).ok_or_else(
+        lazy_bug!("Expected 2 hex digits after \\x in string at {}", range)
+    )?;
+    let code_point = u8::from_str_radix(s, 16).or_else(
+        |err| bug!("Non-hex digits {} in string at {} ({})", s, range, err)
+    )?;
+
+    // skip the 2 hex characters
+    chars.nth(1);
+
+    // the range, however, cannot/is not checked in the lexer
+    if code_point < 0x80 {
+        Ok(code_point as char)
     } else {
-        Ok(lexeme.to_owned()) // TODO(H2CO3): trim delimiters
+        sema_error!(range, "\\x escape must be in range 0x00...0x7f")
     }
 }
 
-fn parse_bool_literal(lexeme: &str, range: Range) -> Result<bool> {
-    lexeme.parse().map_err(|err| Error::Semantic {
-        message: format!("Invalid boolean literal {}: {}", lexeme, err),
-        range: Some(range),
-    })
+// Helper for parse_string_literal().
+// TODO(H2CO3): keep this is sync with the lexer.
+fn unescape_unicode(chars: &mut Chars, range: Range) -> Result<char> {
+    match chars.next() {
+        Some('{') => {},
+        _ => bug!("digits in \\u escape must be within {{}}s (string at {})", range),
+    }
+
+    let s = chars.as_str();
+    let pos = s.find('}').ok_or_else(
+        lazy_bug!("digits in \\u escape must be within {{}}s (string at {})", range)
+    )?;
+
+    // The hex number fitting into an u32 can't/isn't checked by the lexer
+    let code_point = u32::from_str_radix(&s[..pos], 16).or_else(
+        |err| sema_error!(range, "Invalid \\u escape: {}", err)
+    )?;
+
+    // skip the characters _and_ the subsequent closing brace
+    chars.nth(pos);
+
+    // It is not checked by the lexer whether the number is a valid Unicode scalar
+    match char::from_u32(code_point) {
+        Some(ch) => Ok(ch),
+        None => sema_error!(range, "U+{:4X} isn't a valid Unicode scalar", code_point),
+    }
 }
 
+// Invalid bool literals should have been caught by the lexer/parser.
+fn parse_bool_literal(lexeme: &str, range: Range) -> Result<bool> {
+    lexeme.parse().or_else(
+        |_| bug!("Invalid boolean literal {} at {}", lexeme, range)
+    )
+}
+
+// This returns a `Semantic` error and not a `[lazy_]bug!()`, because
+// overflowing floats can't/aren't validated in the lexer/parser.
 fn parse_float_literal(lexeme: &str, range: Range) -> Result<f64> {
-    lexeme.parse().map_err(|err| Error::Semantic {
-        message: format!("Invalid float literal {}: {}", lexeme, err),
-        range: Some(range),
-    })
+    lexeme.parse().or_else(
+        |err| sema_error!(range, "Invalid float literal {}: {}", lexeme, err)
+    )
 }
 
 fn parse_int_literal(lexeme: &str, range: Range) -> Result<u64> {
@@ -153,21 +224,18 @@ fn parse_int_literal(lexeme: &str, range: Range) -> Result<u64> {
     parse_int_with_radix(lexeme, 10, range)
 }
 
-// Helper for parse_int_literal()
+// Helper for parse_int_literal().
+// This returns a `Semantic` error and not a `[lazy_]bug!()`, because
+// overflowing integers can't/aren't validated in the lexer/parser.
 fn parse_int_with_radix(lexeme: &str, radix: u32, range: Range) -> Result<u64> {
-    u64::from_str_radix(lexeme, radix).map_err(
-        |err| Error::Semantic {
-            message: format!("Invalid base-{} integer {}: {}", radix, lexeme, err),
-            range: Some(range),
-        }
+    u64::from_str_radix(lexeme, radix).or_else(
+        |err| sema_error!(range, "Invalid base-{} integer {}: {}", radix, lexeme, err)
     )
 }
 
+// Invalid operators should have been caught by the lexer/parser.
 fn parse_cardinality_op(op: &str, range: Range) -> Result<(Cardinality, Cardinality)> {
-    let op_error = || Error::Semantic {
-        message: format!("Invalid cardinality operator: {}", op),
-        range: Some(range),
-    };
+    let op_error = lazy_bug!("Invalid cardinality operator {} at {}", op, range);
 
     let cardinality_from_char = |ch| Ok(match ch {
         '<' => Cardinality::One,
@@ -1680,7 +1748,7 @@ impl SqirGen {
         };
 
         // Add name to innermost (topmost) scope on the stack
-        let scope = locals.scope_stack.last_mut().ok_or_else(lazy_bug!("no innermost scope"))?;
+        let scope = locals.scope_stack.last_mut().ok_or_else(lazy_bug!("No innermost scope"))?;
         scope.push(name.to_owned());
 
         Ok(decl)

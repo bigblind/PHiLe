@@ -24,7 +24,7 @@ use lexer::Range;
 /// an `Error::Unreachable`. This is basically a non-panicking
 /// substitute for the standard `unreachable!()` macro.
 macro_rules! bug {
-    () => { bug!("internal inconsistency") };
+    () => { bug!("Internal inconsistency") };
     ($msg: expr) => { bug!("{}", $msg) };
     ($fmt: expr, $($args: expr),+) => {
         return Err(Error::Unreachable {
@@ -33,22 +33,22 @@ macro_rules! bug {
             line:    line!() as usize,
         })
     };
-    ($fmt: expr, $($args: expr),+,) => {
-        bug!($fmt, $($args),+)
-    };
+    ($fmt: expr, $($args: expr),+,) => { bug!($fmt, $($args),+) };
 }
 
 /// Similar to `bug!()`, but it yields a closure that returns an
 /// `Error::Unreachable`. Useful for handling errors efficiently,
 /// lazily, primarily using `Option::ok_or_else()`.
 macro_rules! lazy_bug {
-    ($msg: expr) => {
+    ($msg: expr) => { lazy_bug!("{}", $msg) };
+    ($fmt: expr, $($args: expr),+) => {
         || Error::Unreachable {
-            message: $msg.into(),
+            message: format!($fmt, $($args),+),
             file:    file!(),
             line:    line!() as usize,
         }
-    }
+    };
+    ($fmt: expr, $($args: expr),+,) => { lazy_bug!($fmt, $($args),+) };
 }
 
 

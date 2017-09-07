@@ -241,9 +241,29 @@ fn invalid_struct_or_class_decl() {
             oneline_range(0, 1..7),
         ),
         (
+            "class",
+            "Expected identifier; found end of input",
+            oneline_range(0, 1..6),
+        ),
+        (
+            "struct if",
+            "Expected identifier; found if",
+            oneline_range(0, 8..10),
+        ),
+        (
+            "class match",
+            "Expected identifier; found match",
+            oneline_range(0, 7..12),
+        ),
+        (
             "struct MyStruct",
             "Expected {; found end of input",
             oneline_range(0, 8..16),
+        ),
+        (
+            "class Classy",
+            "Expected {; found end of input",
+            oneline_range(0, 7..13),
         ),
     ];
 
