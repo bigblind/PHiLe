@@ -144,49 +144,59 @@ fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
 // TODO(H2CO3): keep this is sync with the lexer.
 fn unescape_hex(chars: &mut Chars, range: Range) -> Result<char> {
     // exactly 2 hex digits following the \x must have been picked up by the lexer
-    let s = chars.as_str().get(..2).ok_or_else(
+    const NUM_DIGITS: usize = 2;
+    // \x escapes must denote Unicode scalars strictly less than 128
+    const MAX_ALLOWED: u8 = 0b1000_0000;
+
+    // hex characters are ASCII, so one byte == one `char`
+    let payload = chars.as_str().get(..NUM_DIGITS).ok_or_else(
         lazy_bug!("Expected 2 hex digits after \\x in string at {}", range)
     )?;
-    let code_point = u8::from_str_radix(s, 16).or_else(
-        |err| bug!("Non-hex digits {} in string at {} ({})", s, range, err)
+    let code_point = u8::from_str_radix(payload, 16).or_else(
+        |err| bug!("Non-hex digits {} in string at {} ({})", payload, range, err)
     )?;
 
-    // skip the 2 hex characters
-    chars.nth(1);
+    // skip the hex characters
+    chars.skip_n(NUM_DIGITS);
 
     // the range, however, cannot/is not checked in the lexer
-    if code_point < 0x80 {
+    if code_point < MAX_ALLOWED {
         Ok(code_point as char)
     } else {
-        sema_error!(range, "\\x escape must be in range 0x00...0x7f")
+        sema_error!(
+            range,
+            "Invalid escape \\x{:02x}: must be in range [0x00..0x{:02x})",
+            code_point,
+            MAX_ALLOWED,
+        )
     }
 }
 
 // Helper for parse_string_literal().
 // TODO(H2CO3): keep this is sync with the lexer.
 fn unescape_unicode(chars: &mut Chars, range: Range) -> Result<char> {
-    match chars.next() {
-        Some('{') => {},
-        _ => bug!("digits in \\u escape must be within {{}}s (string at {})", range),
+    if chars.next() != Some('{') {
+        bug!("digits in \\u escape must be within {{}}s (string at {})", range)
     }
 
-    let s = chars.as_str();
-    let pos = s.find('}').ok_or_else(
+    let payload = chars.as_str();
+    let pos = payload.find('}').ok_or_else(
         lazy_bug!("digits in \\u escape must be within {{}}s (string at {})", range)
     )?;
 
     // The hex number fitting into an u32 can't/isn't checked by the lexer
-    let code_point = u32::from_str_radix(&s[..pos], 16).or_else(
+    let code_point = u32::from_str_radix(&payload[..pos], 16).or_else(
         |err| sema_error!(range, "Invalid \\u escape: {}", err)
     )?;
 
-    // skip the characters _and_ the subsequent closing brace
-    chars.nth(pos);
+    // Skip the `payload` _and_ the subsequent closing brace.
+    // This works with the byte `pos`ition, as they are all ASCII.
+    chars.skip_n(pos + 1);
 
     // It is not checked by the lexer whether the number is a valid Unicode scalar
     match char::from_u32(code_point) {
         Some(ch) => Ok(ch),
-        None => sema_error!(range, "U+{:4X} isn't a valid Unicode scalar", code_point),
+        None => sema_error!(range, "U+{:04X} isn't a valid Unicode scalar", code_point),
     }
 }
 

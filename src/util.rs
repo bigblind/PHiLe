@@ -197,6 +197,27 @@ pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
     string.graphemes(true).filter(|g| pred(*g)).count()
 }
 
+/// Extends iterators with the `skip_n()` function.
+pub trait SkipN: Iterator {
+    /// Retrieves and ignores the first `n` items of the iterator. In
+    /// other words, this is equivalent with calling `Iterator::nth()`
+    /// with `n - 1` if `n > 0`, and is a no-op if `n == 0`.
+    /// If there are less than `n` elements remaining in the iterator,
+    /// then it is silently exhausted.
+    ///
+    /// # Arguments:
+    ///
+    /// * `it`: an iterator of which to skip some elements.
+    /// * `n`: the number of items to skip.
+    fn skip_n(&mut self, n: usize) {
+        for _ in 0..n {
+            self.next();
+        }
+    }
+}
+
+impl<T: Iterator> SkipN for T {}
+
 /// A reference counted, dynamically borrow checked smart pointer.
 /// Like `Rc<RefCell<T>>`, but with a more convenient interface.
 #[derive(Debug, Default)]
