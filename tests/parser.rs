@@ -19,6 +19,7 @@ extern crate phile;
 
 use phile::lexer::{ self, Token, TokenKind, Location, Range };
 use phile::ast::*;
+use phile::error::*;
 use phile::parser;
 
 
@@ -35,7 +36,18 @@ fn lex_filter_ws_comment<'a>(sources: &'a [&str]) -> Vec<Token<'a>> {
 }
 
 fn parse_valid<'a>(tokens: &'a [Token]) -> Prog<'a> {
-    parser::parse(tokens).unwrap()
+    parser::parse(tokens).expect("valid source was rejected")
+}
+
+fn parse_invalid(source: &str) -> (String, Range) {
+    let sources = [source];
+    let tokens = lex_filter_ws_comment(&sources);
+
+    match parser::parse(&tokens) {
+        Ok(_) => panic!("invalid source was accepted"),
+        Err(Error::Syntax { message, range }) => (message, range),
+        Err(err) => panic!("Parser returned a non-syntactic error: {}", err),
+    }
 }
 
 fn oneline_range(src_idx: usize, char_range: std::ops::Range<usize>) -> Range {
@@ -217,4 +229,28 @@ fn valid_struct_or_class_decl() {
     let actual_ast = parse_valid(&tokens);
 
     assert_eq!(actual_ast, expected_ast);
+}
+
+#[test]
+fn invalid_struct_or_class_decl() {
+    // (source, expected error message, expected error range)
+    let test_cases: &[_] = &[
+        (
+            "struct",
+            "Expected identifier; found end of input",
+            oneline_range(0, 1..7),
+        ),
+        (
+            "struct MyStruct",
+            "Expected {; found end of input",
+            oneline_range(0, 8..16),
+        ),
+    ];
+
+    for &(source, expected_message, expected_range) in test_cases {
+        let (actual_message, actual_range) = parse_invalid(source);
+
+        assert_eq!(actual_message, expected_message);
+        assert_eq!(actual_range, expected_range);
+    }
 }

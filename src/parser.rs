@@ -17,11 +17,6 @@ use error::{ Error, Result };
 use ast::*;
 
 
-#[derive(Debug)]
-struct Parser<'a> {
-    tokens: slice::Iter<'a, Token<'a>>,
-}
-
 type ProgResult<'a> = Result<Prog<'a>>;
 type ItemResult<'a> = Result<Item<'a>>;
 type ExpResult<'a>  = Result<Exp<'a>>;
@@ -74,25 +69,42 @@ fn is_keyword(lexeme: &str) -> bool {
     keywords.contains(&lexeme)
 }
 
+#[derive(Debug)]
+struct Parser<'a> {
+    tokens: slice::Iter<'a, Token<'a>>,
+    end_range: Range,
+}
+
 impl<'a> Parser<'a> {
+    // `Range::default()` returns an invalid range, but that's OK,
+    // because if `tokens.last()` is `None`, that means that the
+    // source was empty, so parsing has necessarily succeeded,
+    // therefore we won't ever look at the (invalid) `end_range`.
     fn new(tokens: &'a [Token]) -> Parser<'a> {
-        Parser { tokens: tokens.iter() }
+        Parser {
+            tokens: tokens.iter(),
+            end_range: tokens.last().map(Ranged::range).unwrap_or_default()
+        }
     }
 
+    //
     // Lexer helpers
+    //
 
     fn has_tokens(&self) -> bool {
         self.tokens.len() > 0
     }
 
-    fn expectation_error(&self, expected: &str) -> Error {
-        let token = self.next_token();
-        let actual = token.map_or("end of input", |t| t.value);
+    fn error_range(&self) -> Range {
+        self.next_token().map_or(self.end_range, Ranged::range)
+    }
 
-        Error::Syntax {
-            message: format!("Expected {}; found {}", expected, actual),
-            range:   token.map(Ranged::range),
-        }
+    fn expectation_error(&self, expected: &str) -> Error {
+        let actual = self.next_token().map_or("end of input", |t| t.value);
+        let message = format!("Expected {}; found {}", expected, actual);
+        let range = self.error_range();
+
+        Error::Syntax { message, range }
     }
 
     fn next_token(&self) -> Option<&'a Token<'a>> {
@@ -161,7 +173,9 @@ impl<'a> Parser<'a> {
         }
     }
 
+    //
     // Actual parser methods
+    //
 
     fn parse(mut self) -> ProgResult<'a> {
         let mut items = Vec::new();
@@ -750,7 +764,7 @@ impl<'a> Parser<'a> {
 
             if self.is_at_one_of(tokens) {
                 let message = format!("Binary operator {} is not associative", op);
-                let range = self.next_token().map(Ranged::range);
+                let range = self.error_range();
 
                 Err(Error::Syntax { message, range })
             } else {

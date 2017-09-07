@@ -1239,7 +1239,7 @@ fn ascii_digit_is_numeric() {
         "53.46e24", "39.81E31", "65.43e+21", "75.64E+13", "13.37e-37", "42.24E-31",
     ];
 
-    for lexeme in lexemes {
+    for &lexeme in lexemes {
         let range = lexer::Range {
             begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
             end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
@@ -1250,7 +1250,7 @@ fn ascii_digit_is_numeric() {
 
         assert_eq!(tokens.len(), 1);
         assert_eq!(token.kind, lexer::TokenKind::NumericLiteral);
-        assert_eq!(token.value, *lexeme);
+        assert_eq!(token.value, lexeme);
         assert_eq!(token.range, range);
     }
 }
@@ -1274,14 +1274,14 @@ fn unicode_digit_is_not_numeric() {
         end:   lexer::Location { src_idx: 0, line: 1, column: 2 },
     };
 
-    for lexeme in non_numeric_digits {
+    for &lexeme in non_numeric_digits {
         let sources = &[lexeme];
         let result = lexer::lex(sources);
 
         match result {
             Err(Error::Syntax { ref message, range }) => {
                 assert_eq!(message, "Invalid token");
-                assert_eq!(range, Some(err_range));
+                assert_eq!(range, err_range);
             },
             Err(other) => panic!("Lexer returned a non-syntax error: {}", other),
             Ok(tokens) => panic!("Lexer unexpectedly accepted {}: {:#?}", lexeme, tokens),
@@ -1300,7 +1300,7 @@ fn identifier_with_inner_unicode_digit() {
         "\u{0938}\u{A8F1}\u{FF15}", // Devanagari + Combining Avagraha + Digit
     ];
 
-    for ident in identifiers {
+    for &ident in identifiers {
         let range = lexer::Range {
             begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
             end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(ident) },
@@ -1311,14 +1311,14 @@ fn identifier_with_inner_unicode_digit() {
 
         assert_eq!(tokens.len(), 1);
         assert_eq!(token.kind, lexer::TokenKind::Word);
-        assert_eq!(token.value, *ident);
+        assert_eq!(token.value, ident);
         assert_eq!(token.range, range);
     }
 }
 
 #[test]
 fn all_valid_punctuation() {
-    for punct in PUNCTUATION {
+    for &punct in PUNCTUATION {
         let range = lexer::Range {
             begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
             end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(punct) },
@@ -1329,7 +1329,7 @@ fn all_valid_punctuation() {
 
         assert_eq!(tokens.len(), 1);
         assert_eq!(token.kind, lexer::TokenKind::Punctuation);
-        assert_eq!(token.value, *punct);
+        assert_eq!(token.value, punct);
         assert_eq!(token.range, range);
     }
 }
@@ -1546,7 +1546,7 @@ fn invalid_source() {
                     end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
                 };
                 assert_eq!(message, "Invalid token");
-                assert_eq!(range, Some(expected_range));
+                assert_eq!(range, expected_range);
             },
             Err(err) => panic!("Lexer must always return a syntax error; got: {}", err),
         }
@@ -1576,7 +1576,7 @@ quickcheck! {
         match lexer::lex(&sources) {
             Err(Error::Syntax { message, range }) => {
                 assert_eq!(message, "Invalid token");
-                assert!(!sources[range.unwrap().begin.src_idx].is_empty());
+                assert!(!sources[range.begin.src_idx].is_empty());
                 true
             },
             Err(_) => false, // lexer must always produce a syntax error on failure

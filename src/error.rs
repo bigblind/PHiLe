@@ -72,17 +72,16 @@ pub enum Error {
         /// Description of the bug.
         message: String,
         /// Source file inside the PHiLe compiler that caused the bug.
-        file:    &'static str,
+        file: &'static str,
         /// Source line index within the offending file.
-        line:    usize,
+        line: usize,
     },
     /// A syntactic error was found in the source code.
     Syntax {
         /// Description of the syntax error.
         message: String,
-        /// If available, the human-readable source range associated
-        /// with the error. End-of-input is represented as `None`.
-        range:   Option<Range>,
+        /// The human-readable source range associated with the error.
+        range: Range,
     },
     /// A semantic error was found in the source code.
     Semantic {
@@ -90,7 +89,7 @@ pub enum Error {
         message: String,
         /// If available, the human-readable source range associated
         /// with the error. End-of-input is represented as `None`.
-        range:   Option<Range>,
+        range: Option<Range>,
     },
 }
 
@@ -114,7 +113,7 @@ impl Error {
             Error::BorrowMut(_)           => None,
             Error::Strongify              => None,
             Error::Unreachable { .. }     => None,
-            Error::Syntax   { range, .. } => range,
+            Error::Syntax   { range, .. } => Some(range),
             Error::Semantic { range, .. } => range,
         };
 

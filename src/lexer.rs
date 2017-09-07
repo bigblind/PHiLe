@@ -207,10 +207,10 @@ impl<'a> Lexer<'a> {
 
         Err(Error::Syntax {
             message: "Invalid token".to_owned(),
-            range: Some(Range {
+            range: Range {
                 begin: self.location,
-                end:   self.location.advance_by(self.source),
-            }),
+                end: self.location.advance_by(self.source),
+            },
         })
     }
 }
