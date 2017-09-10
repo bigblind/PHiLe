@@ -14,9 +14,11 @@
         unused_import_braces, unused_qualifications)]
 
 #[macro_use]
-extern crate quickcheck;
+extern crate lazy_static;
+extern crate regex;
 extern crate phile;
 
+use regex::Regex;
 use phile::lexer::{ self, Token, TokenKind, Location, Range };
 use phile::ast::*;
 use phile::error::*;
@@ -55,6 +57,19 @@ fn oneline_range(src_idx: usize, char_range: std::ops::Range<usize>) -> Range {
         begin: Location { src_idx, line: 1, column: char_range.start },
         end:   Location { src_idx, line: 1, column: char_range.end   },
     }
+}
+
+#[allow(non_upper_case_globals)]
+fn error_marker_range(marker: &str) -> Range {
+    lazy_static! {
+        static ref regex: Regex = Regex::new(r"^ *(\^_*\^) *$").unwrap();
+    }
+
+    let m = regex.captures(marker).unwrap().get(1).unwrap();
+    let start_index = 1 + m.start();
+    let end_index = 1 + m.end() - 1;
+
+    oneline_range(0, start_index..end_index)
 }
 
 #[test]
@@ -233,91 +248,92 @@ fn valid_struct_or_class_decl() {
 
 #[test]
 fn invalid_struct_or_class_decl() {
-    // (source, expected error message, expected error range)
+    // (source, expected error range marker, expected error message)
     let test_cases: &[_] = &[
         (
             "struct",
+            "^_____^",
             "Expected identifier; found end of input",
-            oneline_range(0, 1..7),
         ),
         (
             "class",
+            "^____^",
             "Expected identifier; found end of input",
-            oneline_range(0, 1..6),
         ),
         (
             "struct if",
+            "       ^_^",
             "Expected identifier; found if",
-            oneline_range(0, 8..10),
         ),
         (
             "class match",
+            "      ^____^",
             "Expected identifier; found match",
-            oneline_range(0, 7..12),
         ),
         (
             "struct MyStruct",
+            "       ^_______^",
             "Expected {; found end of input",
-            oneline_range(0, 8..16),
         ),
         (
             "class Classy",
+            "      ^_____^",
             "Expected {; found end of input",
-            oneline_range(0, 7..13),
         ),
         (
             "struct Whatever {",
+            "                ^^",
             "Expected }; found end of input",
-            oneline_range(0, 17..18),
         ),
         (
             "class Error {",
+            "            ^^",
             "Expected }; found end of input",
-            oneline_range(0, 13..14),
         ),
         (
             "struct Struct { field ",
+            "                ^____^",
             "Expected :; found end of input",
-            oneline_range(0, 17..22),
         ),
         (
             "class Struct { field ",
+            "               ^____^",
             "Expected :; found end of input",
-            oneline_range(0, 16..21),
         ),
         (
             "struct Class { field: ",
+            "                    ^^",
             "Expected parenthesized, named, or array type; found end of input",
-            oneline_range(0, 21..22),
         ),
         (
             "class Class { field: ",
+            "                   ^^",
             "Expected parenthesized, named, or array type; found end of input",
-            oneline_range(0, 20..21),
         ),
         (
             "struct NoComma { field: int? }",
+            "                             ^^",
             "Expected ,; found }",
-            oneline_range(0, 30..31),
         ),
         (
             "class Chameleon { field: [Bogus] }",
+            "                                 ^^",
             "Expected ,; found }",
-            oneline_range(0, 34..35),
         ),
         (
             "struct NoCurly { name: String??,",
+            "                               ^^",
             "Expected }; found end of input",
-            oneline_range(0, 32..33),
         ),
         (
             "class NoBrace { field_name: &Loller, ",
+            "                                   ^^",
             "Expected }; found end of input",
-            oneline_range(0, 36..37),
         ),
     ];
 
-    for &(source, expected_message, expected_range) in test_cases {
+    for &(source, marker, expected_message) in test_cases {
+        let expected_range = error_marker_range(marker);
         let (actual_message, actual_range) = parse_invalid(source);
 
         assert_eq!(actual_message, expected_message);
