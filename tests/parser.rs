@@ -25,6 +25,13 @@ use phile::error::*;
 use phile::parser;
 
 
+#[derive(Debug)]
+struct InvalidTestCase {
+    source:  &'static str,
+    marker:  &'static str,
+    message: &'static str,
+}
+
 fn lex_filter_ws_comment<'a>(sources: &'a [&str]) -> Vec<Token<'a>> {
     let mut tokens = lexer::lex(sources).unwrap();
 
@@ -70,6 +77,17 @@ fn error_marker_range(marker: &str) -> Range {
     let end_index = 1 + m.end() - 1;
 
     oneline_range(0, start_index..end_index)
+}
+
+fn test_invalid_cases(test_cases: &[InvalidTestCase]) {
+    for &InvalidTestCase { source, marker, message } in test_cases {
+        let (actual_message, actual_range) = parse_invalid(source);
+        let expected_range = error_marker_range(marker);
+        let expected_message = message;
+
+        assert_eq!(actual_message, expected_message);
+        assert_eq!(actual_range, expected_range);
+    }
 }
 
 #[test]
@@ -248,95 +266,88 @@ fn valid_struct_or_class_decl() {
 
 #[test]
 fn invalid_struct_or_class_decl() {
-    // (source, expected error range marker, expected error message)
     let test_cases: &[_] = &[
-        (
-            "struct",
-            "^_____^",
-            "Expected identifier; found end of input",
-        ),
-        (
-            "class",
-            "^____^",
-            "Expected identifier; found end of input",
-        ),
-        (
-            "struct if",
-            "       ^_^",
-            "Expected identifier; found if",
-        ),
-        (
-            "class match",
-            "      ^____^",
-            "Expected identifier; found match",
-        ),
-        (
-            "struct MyStruct",
-            "       ^_______^",
-            "Expected {; found end of input",
-        ),
-        (
-            "class Classy",
-            "      ^_____^",
-            "Expected {; found end of input",
-        ),
-        (
-            "struct Whatever {",
-            "                ^^",
-            "Expected }; found end of input",
-        ),
-        (
-            "class Error {",
-            "            ^^",
-            "Expected }; found end of input",
-        ),
-        (
-            "struct Struct { field ",
-            "                ^____^",
-            "Expected :; found end of input",
-        ),
-        (
-            "class Struct { field ",
-            "               ^____^",
-            "Expected :; found end of input",
-        ),
-        (
-            "struct Class { field: ",
-            "                    ^^",
-            "Expected parenthesized, named, or array type; found end of input",
-        ),
-        (
-            "class Class { field: ",
-            "                   ^^",
-            "Expected parenthesized, named, or array type; found end of input",
-        ),
-        (
-            "struct NoComma { field: int? }",
-            "                             ^^",
-            "Expected ,; found }",
-        ),
-        (
-            "class Chameleon { field: [Bogus] }",
-            "                                 ^^",
-            "Expected ,; found }",
-        ),
-        (
-            "struct NoCurly { name: String??,",
-            "                               ^^",
-            "Expected }; found end of input",
-        ),
-        (
-            "class NoBrace { field_name: &Loller, ",
-            "                                   ^^",
-            "Expected }; found end of input",
-        ),
+        InvalidTestCase {
+            source:  "struct",
+            marker:  "^_____^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "class",
+            marker:  "^____^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "struct if",
+            marker:  "       ^_^",
+            message: "Expected identifier; found if",
+        },
+        InvalidTestCase {
+            source:  "class match",
+            marker:  "      ^____^",
+            message: "Expected identifier; found match",
+        },
+        InvalidTestCase {
+            source:  "struct MyStruct",
+            marker:  "       ^_______^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "class Classy",
+            marker:  "      ^_____^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "struct Whatever {",
+            marker:  "                ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "class Error {",
+            marker:  "            ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "struct Struct { field ",
+            marker:  "                ^____^",
+            message: "Expected :; found end of input",
+        },
+        InvalidTestCase {
+            source:  "class Struct { field ",
+            marker:  "               ^____^",
+            message: "Expected :; found end of input",
+        },
+        InvalidTestCase {
+            source:  "struct Class { field: ",
+            marker:  "                    ^^",
+            message: "Expected parenthesized, named, or array type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "class Class { field: ",
+            marker:  "                   ^^",
+            message: "Expected parenthesized, named, or array type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "struct NoComma { field: int? }",
+            marker:  "                             ^^",
+            message: "Expected ,; found }",
+        },
+        InvalidTestCase {
+            source:  "class Chameleon { field: [Bogus] }",
+            marker:  "                                 ^^",
+            message: "Expected ,; found }",
+        },
+        InvalidTestCase {
+            source:  "struct NoCurly { name: String??,",
+            marker:  "                               ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "class NoBrace { field_name: &Loller, ",
+            marker:  "                                   ^^",
+            message: "Expected }; found end of input",
+        },
     ];
 
-    for &(source, marker, expected_message) in test_cases {
-        let expected_range = error_marker_range(marker);
-        let (actual_message, actual_range) = parse_invalid(source);
-
-        assert_eq!(actual_message, expected_message);
-        assert_eq!(actual_range, expected_range);
-    }
+    test_invalid_cases(test_cases);
 }
