@@ -351,3 +351,110 @@ fn invalid_struct_or_class_decl() {
 
     test_invalid_cases(test_cases);
 }
+
+#[test]
+fn valid_enum_decl() {
+    let sources = [
+        // empty, no variants
+        "enum Never {}",
+        // one variant without associated data
+        "enum Unit { One, }",
+        // one variant with associated data
+        "enum NotQuiteUnit { Singleton(float?), }",
+        // multiple variants without associated data
+        "enum Bool { True, False, FileNotFound, }",
+        // multiple variants with associated data
+        "enum Goo { Lorem(String), Ipsum(()), }",
+    ];
+
+    let items = vec![
+        Item::EnumDecl(EnumDecl {
+            range: oneline_range(0, 1..14),
+            name: "Never",
+            variants: vec![],
+        }),
+        Item::EnumDecl(EnumDecl {
+            range: oneline_range(1, 1..19),
+            name: "Unit",
+            variants: vec![
+                Variant {
+                    range: oneline_range(1, 13..17),
+                    name: "One",
+                    ty: None,
+                },
+            ],
+        }),
+        Item::EnumDecl(EnumDecl {
+            range: oneline_range(2, 1..41),
+            name: "NotQuiteUnit",
+            variants: vec![
+                Variant {
+                    range: oneline_range(2, 21..39),
+                    name: "Singleton",
+                    ty: Some(Ty {
+                        kind: TyKind::Optional(
+                            Box::new(Ty {
+                                kind: TyKind::Named("float"),
+                                range: oneline_range(2, 31..36),
+                            })
+                        ),
+                        range: oneline_range(2, 31..37),
+                    }),
+                },
+            ],
+        }),
+        Item::EnumDecl(EnumDecl {
+            range: oneline_range(3, 1..41),
+            name: "Bool",
+            variants: vec![
+                Variant {
+                    range: oneline_range(3, 13..18),
+                    name: "True",
+                    ty: None,
+                },
+                Variant {
+                    range: oneline_range(3, 19..25),
+                    name: "False",
+                    ty: None,
+                },
+                Variant {
+                    range: oneline_range(3, 26..39),
+                    name: "FileNotFound",
+                    ty: None,
+                },
+            ],
+        }),
+        Item::EnumDecl(EnumDecl {
+            range: oneline_range(4, 1..39),
+            name: "Goo",
+            variants: vec![
+                Variant {
+                    range: oneline_range(4, 12..26),
+                    name: "Lorem",
+                    ty: Some(Ty {
+                        kind: TyKind::Named("String"),
+                        range: oneline_range(4, 18..24),
+                    }),
+                },
+                Variant {
+                    range: oneline_range(4, 27..37),
+                    name: "Ipsum",
+                    ty: Some(Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: oneline_range(4, 33..35),
+                    }),
+                },
+            ],
+        }),
+    ];
+
+    let expected_ast = Prog { items };
+    let tokens = lex_filter_ws_comment(&sources);
+    let actual_ast = parse_valid(&tokens);
+
+    assert_eq!(actual_ast, expected_ast);
+}
+
+#[test]
+fn invalid_enum_decl() {
+}
