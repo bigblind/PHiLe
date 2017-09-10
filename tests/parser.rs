@@ -265,6 +265,56 @@ fn invalid_struct_or_class_decl() {
             "Expected {; found end of input",
             oneline_range(0, 7..13),
         ),
+        (
+            "struct Whatever {",
+            "Expected }; found end of input",
+            oneline_range(0, 17..18),
+        ),
+        (
+            "class Error {",
+            "Expected }; found end of input",
+            oneline_range(0, 13..14),
+        ),
+        (
+            "struct Struct { field ",
+            "Expected :; found end of input",
+            oneline_range(0, 17..22),
+        ),
+        (
+            "class Struct { field ",
+            "Expected :; found end of input",
+            oneline_range(0, 16..21),
+        ),
+        (
+            "struct Class { field: ",
+            "Expected parenthesized, named, or array type; found end of input",
+            oneline_range(0, 21..22),
+        ),
+        (
+            "class Class { field: ",
+            "Expected parenthesized, named, or array type; found end of input",
+            oneline_range(0, 20..21),
+        ),
+        (
+            "struct NoComma { field: int? }",
+            "Expected ,; found }",
+            oneline_range(0, 30..31),
+        ),
+        (
+            "class Chameleon { field: [Bogus] }",
+            "Expected ,; found }",
+            oneline_range(0, 34..35),
+        ),
+        (
+            "struct NoCurly { name: String??,",
+            "Expected }; found end of input",
+            oneline_range(0, 32..33),
+        ),
+        (
+            "class NoBrace { field_name: &Loller, ",
+            "Expected }; found end of input",
+            oneline_range(0, 36..37),
+        ),
     ];
 
     for &(source, expected_message, expected_range) in test_cases {

@@ -141,7 +141,7 @@ fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
 }
 
 // Helper for parse_string_literal().
-// TODO(H2CO3): keep this is sync with the lexer.
+// TODO(H2CO3): keep this in sync with the lexer.
 fn unescape_hex(chars: &mut Chars, range: Range) -> Result<char> {
     // exactly 2 hex digits following the \x must have been picked up by the lexer
     const NUM_DIGITS: usize = 2;
@@ -159,7 +159,7 @@ fn unescape_hex(chars: &mut Chars, range: Range) -> Result<char> {
     // skip the hex characters
     chars.skip_n(NUM_DIGITS);
 
-    // the range, however, cannot/is not checked in the lexer
+    // the range, however, cannot be/is not checked in the lexer
     if code_point < MAX_ALLOWED {
         Ok(code_point as char)
     } else {
@@ -173,7 +173,7 @@ fn unescape_hex(chars: &mut Chars, range: Range) -> Result<char> {
 }
 
 // Helper for parse_string_literal().
-// TODO(H2CO3): keep this is sync with the lexer.
+// TODO(H2CO3): keep this in sync with the lexer.
 fn unescape_unicode(chars: &mut Chars, range: Range) -> Result<char> {
     if chars.next() != Some('{') {
         bug!("digits in \\u escape must be within {{}}s (string at {})", range)
@@ -184,7 +184,7 @@ fn unescape_unicode(chars: &mut Chars, range: Range) -> Result<char> {
         lazy_bug!("digits in \\u escape must be within {{}}s (string at {})", range)
     )?;
 
-    // The hex number fitting into an u32 can't/isn't checked by the lexer
+    // The hex number fitting into an u32 can't be/isn't checked by the lexer
     let code_point = u32::from_str_radix(&payload[..pos], 16).or_else(
         |err| sema_error!(range, "Invalid \\u escape: {}", err)
     )?;
@@ -208,7 +208,7 @@ fn parse_bool_literal(lexeme: &str, range: Range) -> Result<bool> {
 }
 
 // This returns a `Semantic` error and not a `[lazy_]bug!()`, because
-// overflowing floats can't/aren't validated in the lexer/parser.
+// overflowing floats can't be/aren't validated in the lexer/parser.
 fn parse_float_literal(lexeme: &str, range: Range) -> Result<f64> {
     lexeme.parse().or_else(
         |err| sema_error!(range, "Invalid float literal {}: {}", lexeme, err)
@@ -236,7 +236,7 @@ fn parse_int_literal(lexeme: &str, range: Range) -> Result<u64> {
 
 // Helper for parse_int_literal().
 // This returns a `Semantic` error and not a `[lazy_]bug!()`, because
-// overflowing integers can't/aren't validated in the lexer/parser.
+// overflowing integers can't be/aren't validated in the lexer/parser.
 fn parse_int_with_radix(lexeme: &str, radix: u32, range: Range) -> Result<u64> {
     u64::from_str_radix(lexeme, radix).or_else(
         |err| sema_error!(range, "Invalid base-{} integer {}: {}", radix, lexeme, err)
