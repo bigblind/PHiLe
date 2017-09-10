@@ -320,12 +320,12 @@ fn invalid_struct_or_class_decl() {
         InvalidTestCase {
             source:  "struct Class { field: ",
             marker:  "                    ^^",
-            message: "Expected parenthesized, named, or array type; found end of input",
+            message: "Expected a type; found end of input",
         },
         InvalidTestCase {
             source:  "class Class { field: ",
             marker:  "                   ^^",
-            message: "Expected parenthesized, named, or array type; found end of input",
+            message: "Expected a type; found end of input",
         },
         InvalidTestCase {
             source:  "struct NoComma { field: int? }",
@@ -457,4 +457,48 @@ fn valid_enum_decl() {
 
 #[test]
 fn invalid_enum_decl() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "enum",
+            marker:  "^___^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "enum true",
+            marker:  "     ^___^",
+            message: "Expected identifier; found true",
+        },
+        InvalidTestCase {
+            source:  "enum Summy",
+            marker:  "     ^____^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "enum Foo {",
+            marker:  "         ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "enum Bar { SomeVariant ",
+            marker:  "           ^__________^",
+            message: "Expected ,; found end of input",
+        },
+        InvalidTestCase {
+            source:  "enum Qux { Another } ",
+            marker:  "                   ^^",
+            message: "Expected ,; found }",
+        },
+        InvalidTestCase {
+            source:  "enum Cassos1 { Data( ",
+            marker:  "                   ^^",
+            message: "Expected a type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "enum Cassos1 { Data(), }",
+            marker:  "                    ^^",
+            message: "Expected a type; found )",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
 }

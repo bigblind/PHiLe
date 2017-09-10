@@ -834,13 +834,13 @@ impl<'a> Parser<'a> {
 
     fn parse_term_type(&mut self) -> TyResult<'a> {
         let token = self.next_token().ok_or_else(
-            || self.expectation_error("parenthesized, named, or array type")
+            || self.expectation_error("a type")
         )?;
 
         match token.value {
             "(" => self.parse_tuple_type(),
             "[" => self.parse_array_type(),
-            _   => self.parse_named_type(),
+            _   => self.parse_named_type().map_err(|_| self.expectation_error("a type")),
         }
     }
 
