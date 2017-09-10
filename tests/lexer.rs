@@ -71,17 +71,17 @@ impl ValidSource {
 
         for (i, file) in self.files.iter().enumerate() {
             let mut buf = String::with_capacity(file.len() * 16);
-            let mut begin = lexer::Location { src_idx: i, line: 1, column: 1 };
+            let mut start = lexer::Location { src_idx: i, line: 1, column: 1 };
 
             for token in file {
-                let mut end = begin;
+                let mut end = start;
                 let old_len = buf.len();
                 let kind = token.render(&mut buf, &mut end);
                 let new_len = buf.len();
                 let slice = old_len..new_len;
-                let range = lexer::Range { begin, end };
+                let range = lexer::Range { start, end };
                 tokens.push(TokenHeader { slice, range, kind });
-                begin = end;
+                start = end;
             }
 
             strings.push(buf);
@@ -1241,7 +1241,7 @@ fn ascii_digit_is_numeric() {
 
     for &lexeme in lexemes {
         let range = lexer::Range {
-            begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+            start: lexer::Location { src_idx: 0, line: 1, column: 1 },
             end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
         };
         let sources = &[lexeme];
@@ -1270,7 +1270,7 @@ fn unicode_digit_is_not_numeric() {
 
     // They all express a single grapheme cluster.
     let err_range = lexer::Range {
-        begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+        start: lexer::Location { src_idx: 0, line: 1, column: 1 },
         end:   lexer::Location { src_idx: 0, line: 1, column: 2 },
     };
 
@@ -1302,7 +1302,7 @@ fn identifier_with_inner_unicode_digit() {
 
     for &ident in identifiers {
         let range = lexer::Range {
-            begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+            start: lexer::Location { src_idx: 0, line: 1, column: 1 },
             end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(ident) },
         };
         let sources = &[ident];
@@ -1320,7 +1320,7 @@ fn identifier_with_inner_unicode_digit() {
 fn all_valid_punctuation() {
     for &punct in PUNCTUATION {
         let range = lexer::Range {
-            begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+            start: lexer::Location { src_idx: 0, line: 1, column: 1 },
             end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(punct) },
         };
         let sources = &[punct];
@@ -1542,7 +1542,7 @@ fn invalid_source() {
             Ok(tokens) => panic!("Invalid lexeme '{}' was unexpectedly recognized as {:?}", lexeme, tokens),
             Err(Error::Syntax { message, range }) => {
                 let expected_range = lexer::Range {
-                    begin: lexer::Location { src_idx: 0, line: 1, column: 1 },
+                    start: lexer::Location { src_idx: 0, line: 1, column: 1 },
                     end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
                 };
                 assert_eq!(message, "Invalid token");
@@ -1555,10 +1555,10 @@ fn invalid_source() {
 
 fn quickcheck_valid_lexeme<T: Lexeme>(lexeme: T) -> bool {
     let mut source = String::new();
-    let begin = lexer::Location { src_idx: 0, line: 1, column: 1 };
-    let mut end = begin;
+    let start = lexer::Location { src_idx: 0, line: 1, column: 1 };
+    let mut end = start;
     let expected_kind = lexeme.render(&mut source, &mut end);
-    let range = lexer::Range { begin, end };
+    let range = lexer::Range { start, end };
     let sources = [source];
     let tokens = lexer::lex(&sources).unwrap();
 
@@ -1576,7 +1576,7 @@ quickcheck! {
         match lexer::lex(&sources) {
             Err(Error::Syntax { message, range }) => {
                 assert_eq!(message, "Invalid token");
-                assert!(!sources[range.begin.src_idx].is_empty());
+                assert!(!sources[range.start.src_idx].is_empty());
                 true
             },
             Err(_) => false, // lexer must always produce a syntax error on failure
@@ -1634,7 +1634,7 @@ quickcheck! {
         assert_eq!(actual.len(), expected.len());
 
         for (act_tok, exp_tok) in actual.iter().zip(expected) {
-            let src_idx = exp_tok.range.begin.src_idx;
+            let src_idx = exp_tok.range.start.src_idx;
             let slice = exp_tok.slice.clone();
 
             assert_eq!(act_tok.kind, exp_tok.kind);

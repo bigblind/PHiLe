@@ -33,7 +33,7 @@ pub struct Location {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Range {
     /// Location at the beginning of the source range.
-    pub begin: Location,
+    pub start: Location,
     /// Location one past the end of the source range.
     pub end: Location,
 }
@@ -128,7 +128,7 @@ impl Display for Location {
 
 impl Display for Range {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}...{}", self.begin, self.end)
+        write!(f, "{}...{}", self.start, self.end)
     }
 }
 
@@ -193,9 +193,9 @@ impl<'a> Lexer<'a> {
         for &(kind, ref re) in &self.regexes {
             if let Some(m) = re.find(self.source) {
                 let value = m.as_str();
-                let begin = self.location;
+                let start = self.location;
                 let end   = self.location.advance_by(value);
-                let range = Range { begin, end };
+                let range = Range { start, end };
                 let token = Token { kind, value, range };
 
                 self.location = end;
@@ -208,7 +208,7 @@ impl<'a> Lexer<'a> {
         Err(Error::Syntax {
             message: "Invalid token".to_owned(),
             range: Range {
-                begin: self.location,
+                start: self.location,
                 end: self.location.advance_by(self.source),
             },
         })

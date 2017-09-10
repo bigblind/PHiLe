@@ -41,10 +41,10 @@ pub fn parse<'a>(tokens: &'a [Token]) -> ProgResult<'a> {
     Parser::new(tokens).parse()
 }
 
-fn make_range<F: Ranged, L: Ranged>(first: &F, last: &L) -> Range {
+fn make_range<S: Ranged, E: Ranged>(start: &S, end: &E) -> Range {
     Range {
-        begin: first.range().begin,
-        end:   last.range().end,
+        start: start.range().start,
+        end:   end.range().end,
     }
 }
 

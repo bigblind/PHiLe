@@ -121,7 +121,7 @@ impl Error {
             write!(
                 wr,
                 "\n\n    In file {}, near {}:\n",
-                Diagnostic::new(sources[r.begin.src_idx].as_ref(), DiagnosticKind::Highlight),
+                Diagnostic::new(sources[r.start.src_idx].as_ref(), DiagnosticKind::Highlight),
                 Diagnostic::new(r, DiagnosticKind::Highlight),
             )?;
         } else {
