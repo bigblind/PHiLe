@@ -494,9 +494,14 @@ fn invalid_enum_decl() {
             message: "Expected a type; found end of input",
         },
         InvalidTestCase {
-            source:  "enum Cassos1 { Data(), }",
+            source:  "enum Cassos2 { Data(), }",
             marker:  "                    ^^",
             message: "Expected a type; found )",
+        },
+        InvalidTestCase {
+            source:  "enum OnlyOneTypeAllowed { Data(int, Cassos3), }",
+            marker:  "                                  ^^           ",
+            message: "Expected ); found ,",
         },
     ];
 
