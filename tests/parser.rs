@@ -507,3 +507,134 @@ fn invalid_enum_decl() {
 
     test_invalid_cases(test_cases);
 }
+
+#[test]
+fn valid_fn_def() {
+}
+
+#[test]
+fn invalid_fn_def() {
+}
+
+#[test]
+fn valid_impl_def() {
+}
+
+#[test]
+fn invalid_impl_def() {
+}
+
+#[test]
+fn invalid_toplevel() {
+    // TODO(H2CO3): add more cases; could this be ~exhaustive using QuickCheck?
+    let sources: &[_] = &[
+        InvalidTestCase {
+            source:  "; ",
+            marker:  "^^",
+            message: "Expected struct, class, enum, fn or impl; found ;",
+        },
+        InvalidTestCase {
+            source:  "   ... ...",
+            marker:  "   ^__^   ",
+            message: "Expected struct, class, enum, fn or impl; found ...",
+        },
+        InvalidTestCase {
+            source:  "   ,   ",
+            marker:  "   ^^  ",
+            message: "Expected struct, class, enum, fn or impl; found ,",
+        },
+        InvalidTestCase {
+            source:  "   ::   ",
+            marker:  "   ^_^  ",
+            message: "Expected struct, class, enum, fn or impl; found ::",
+        },
+        InvalidTestCase {
+            source:  "~",
+            marker:  "^^",
+            message: "Expected struct, class, enum, fn or impl; found ~",
+        },
+        InvalidTestCase {
+            source:  "  (       )",
+            marker:  "  ^^       ",
+            message: "Expected struct, class, enum, fn or impl; found (",
+        },
+        InvalidTestCase {
+            source:  "]     [",
+            marker:  "^^     ",
+            message: "Expected struct, class, enum, fn or impl; found ]",
+        },
+        InvalidTestCase {
+            source:  "   {  }",
+            marker:  "   ^^  ",
+            message: "Expected struct, class, enum, fn or impl; found {",
+        },
+        InvalidTestCase {
+            source:  " >>  <<",
+            marker:  " ^^  ",
+            message: "Expected struct, class, enum, fn or impl; found >",
+        },
+        InvalidTestCase {
+            source:  "!= !<->+ ",
+            marker:  "^_^  ",
+            message: "Expected struct, class, enum, fn or impl; found !=",
+        },
+        InvalidTestCase {
+            source:  " 19 + 2.7182 * 314.15E-2",
+            marker:  " ^_^                    ",
+            message: "Expected struct, class, enum, fn or impl; found 19",
+        },
+        InvalidTestCase {
+            source:  "    0.83 / (9.0 % 24)",
+            marker:  "    ^___^            ",
+            message: "Expected struct, class, enum, fn or impl; found 0.83",
+        },
+        InvalidTestCase {
+            source:  "  if a + b < c { notATriangle } else { mayBeATriangle }",
+            marker:  "  ^_^                                                  ",
+            message: "Expected struct, class, enum, fn or impl; found if",
+        },
+        InvalidTestCase {
+            source:  "match 0 { _ => _ }",
+            marker:  "^____^            ",
+            message: "Expected struct, class, enum, fn or impl; found match",
+        },
+        InvalidTestCase {
+            source:  "else # this is not even valid *anywhere*...",
+            marker:  "^___^",
+            message: "Expected struct, class, enum, fn or impl; found else",
+        },
+        InvalidTestCase {
+            source:  "as    [ Foo ?   ] #\t...nor is this...",
+            marker:  "^_^                                   ",
+            message: "Expected struct, class, enum, fn or impl; found as",
+        },
+        InvalidTestCase {
+            source:  "  nil == 3   # ...or this one, for that matter",
+            marker:  "  ^__^                                        ",
+            message: "Expected struct, class, enum, fn or impl; found nil",
+        },
+        InvalidTestCase {
+            source:  "  Nope # doesn't work",
+            marker:  "  ^___^             ",
+            message: "Expected struct, class, enum, fn or impl; found Nope",
+        },
+    ];
+
+    test_invalid_cases(sources);
+}
+
+#[test]
+fn valid_expression() {
+}
+
+#[test]
+fn invalid_expression() {
+}
+
+#[test]
+fn valid_type() {
+}
+
+#[test]
+fn invalid_type() {
+}
