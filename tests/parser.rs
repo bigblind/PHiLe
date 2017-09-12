@@ -514,6 +514,80 @@ fn valid_fn_def() {
 
 #[test]
 fn invalid_fn_def() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn",
+            marker:  "^_^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  " fn class",
+            marker:  "    ^____^",
+            message: "Expected identifier; found class",
+        },
+        InvalidTestCase {
+            source:  "fn reir { }",
+            marker:  "        ^^ ",
+            message: "Expected (; found {",
+        },
+        InvalidTestCase {
+            source:  " fn foo_bar(",
+            marker:  "           ^^",
+            message: "Expected ); found end of input",
+        },
+        InvalidTestCase {
+            source:  " fn boo_far(arg0",
+            marker:  "            ^___^",
+            message: "Expected , or ); found end of input",
+        },
+        InvalidTestCase {
+            source:  " fn missing(qux:",
+            marker:  "               ^^",
+            message: "Expected a type; found end of input",
+        },
+        InvalidTestCase {
+            source:  " fn typeless(qux:)",
+            marker:  "                 ^^",
+            message: "Expected a type; found )",
+        },
+        InvalidTestCase {
+            source:  " fn bodyless(arrrg)",
+            marker:  "                  ^^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  " fn body_not_block() true | false & true",
+            marker:  "                     ^___^              ",
+            message: "Expected {; found true",
+        },
+        InvalidTestCase {
+            source:  " fn incomplete_body(wrong) {",
+            marker:  "                           ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  " fn incomplete_body_2(nope) { 29 <= nope ",
+            marker:  "                                    ^___^",
+            message: "Expected ; or }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn typy(arg1: [bool], arg2: Bazoo) -> ",
+            marker:  "                                   ^_^",
+            message: "Expected a type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn no_body(some_param: &Loller) -> [String?]?",
+            marker:  "                                            ^^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn still_no_block_body() -> &Huzzah + 1",
+            marker:  "                                    ^^ ",
+            message: "Expected {; found +",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
 }
 
 #[test]
@@ -527,7 +601,7 @@ fn invalid_impl_def() {
 #[test]
 fn invalid_toplevel() {
     // TODO(H2CO3): add more cases; could this be ~exhaustive using QuickCheck?
-    let sources: &[_] = &[
+    let test_cases: &[_] = &[
         InvalidTestCase {
             source:  "; ",
             marker:  "^^",
@@ -570,12 +644,12 @@ fn invalid_toplevel() {
         },
         InvalidTestCase {
             source:  " >>  <<",
-            marker:  " ^^  ",
+            marker:  " ^^    ",
             message: "Expected struct, class, enum, fn or impl; found >",
         },
         InvalidTestCase {
             source:  "!= !<->+ ",
-            marker:  "^_^  ",
+            marker:  "^_^      ",
             message: "Expected struct, class, enum, fn or impl; found !=",
         },
         InvalidTestCase {
@@ -615,12 +689,17 @@ fn invalid_toplevel() {
         },
         InvalidTestCase {
             source:  "  Nope # doesn't work",
-            marker:  "  ^___^             ",
+            marker:  "  ^___^              ",
             message: "Expected struct, class, enum, fn or impl; found Nope",
+        },
+        InvalidTestCase {
+            source:  r#"       "stringy stuff"   "#,
+            marker:  r#"       ^______________^  "#,
+            message: r#"Expected struct, class, enum, fn or impl; found "stringy stuff""#,
         },
     ];
 
-    test_invalid_cases(sources);
+    test_invalid_cases(test_cases);
 }
 
 #[test]

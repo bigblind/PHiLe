@@ -425,7 +425,7 @@ impl<'a> Parser<'a> {
             Ok(Exp { kind, range })
         } else if !self.is_at("}") {
             // no trailing semi but not the last statement of block
-            Err(self.expectation_error("} or ;"))
+            Err(self.expectation_error("; or }"))
         } else {
             Ok(expr)
         }
