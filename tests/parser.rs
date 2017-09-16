@@ -592,6 +592,96 @@ fn invalid_fn_def() {
 
 #[test]
 fn valid_impl_def() {
+    let sources = [
+        // Empty impl
+        "impl Empty {}",
+        // Impl with one function
+        "impl Singular { fn the_one() -> int { 42 } }",
+        // Impl with multiple functions
+        "impl Dual { fn x(x0: X) {} fn x_dagger(x0: XDagger) {} }",
+    ];
+
+    let items = vec![
+        Item::Impl(Impl {
+            range: oneline_range(0, 1..14),
+            name: "Empty",
+            functions: vec![],
+        }),
+        Item::Impl(Impl {
+            range: oneline_range(1, 1..45),
+            name: "Singular",
+            functions: vec![
+                Function {
+                    range: oneline_range(1, 17..43),
+                    name: Some("the_one"),
+                    arguments: vec![],
+                    ret_type: Some(Ty {
+                        kind: TyKind::Named("int"),
+                        range: oneline_range(1, 33..36),
+                    }),
+                    body: Exp {
+                        range: oneline_range(1, 37..43),
+                        kind: ExpKind::Block(vec![
+                            Exp {
+                                range: oneline_range(1, 39..41),
+                                kind: ExpKind::IntLiteral("42"),
+                            },
+                        ]),
+                    },
+                },
+            ],
+        }),
+        Item::Impl(Impl {
+            range: oneline_range(2, 1..57),
+            name: "Dual",
+            functions: vec![
+                Function {
+                    range: oneline_range(2, 13..27),
+                    name: Some("x"),
+                    arguments: vec![
+                        FuncArg {
+                            range: oneline_range(2, 18..23),
+                            name: "x0",
+                            ty: Some(Ty {
+                                kind: TyKind::Named("X"),
+                                range: oneline_range(2, 22..23),
+                            }),
+                        },
+                    ],
+                    ret_type: None,
+                    body: Exp {
+                        range: oneline_range(2, 25..27),
+                        kind: ExpKind::Block(vec![]),
+                    }
+                },
+                Function {
+                    range: oneline_range(2, 28..55),
+                    name: Some("x_dagger"),
+                    arguments: vec![
+                        FuncArg {
+                            range: oneline_range(2, 40..51),
+                            name: "x0",
+                            ty: Some(Ty {
+                                kind: TyKind::Named("XDagger"),
+                                range: oneline_range(2, 44..51),
+                            }),
+                        },
+                    ],
+                    ret_type: None,
+                    body: Exp {
+                        range: oneline_range(2, 53..55),
+                        kind: ExpKind::Block(vec![]),
+                    }
+                },
+            ],
+        }),
+    ];
+
+    let expected_ast = Prog { items };
+    let tokens = lex_filter_ws_comment(&sources);
+    let actual_ast = parse_valid(&tokens);
+
+    assert_eq!(actual_ast, expected_ast);
 }
 
 #[test]
@@ -641,6 +731,11 @@ fn invalid_impl_def() {
             source:  "impl NonFunction { struct Inner { } }",
             marker:  "                   ^_____^           ",
             message: "Expected fn; found struct",
+        },
+        InvalidTestCase {
+            source:  "impl Almost { fn whoo(x: float) {}",
+            marker:  "                                 ^^",
+            message: "Expected fn; found end of input",
         },
     ];
 
