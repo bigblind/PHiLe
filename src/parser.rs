@@ -353,7 +353,7 @@ impl<'a> Parser<'a> {
 
         self.expect("{")?;
 
-        while self.is_at("fn") {
+        while !self.is_at("}") {
             functions.push(self.parse_function()?);
         }
 

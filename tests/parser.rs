@@ -596,6 +596,55 @@ fn valid_impl_def() {
 
 #[test]
 fn invalid_impl_def() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "impl",
+            marker:  "^___^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "impl impl ",
+            marker:  "     ^___^",
+            message: "Expected identifier; found impl",
+        },
+        InvalidTestCase {
+            source:  "impl nil",
+            marker:  "     ^__^",
+            message: "Expected identifier; found nil",
+        },
+        InvalidTestCase {
+            source:  "impl Typy",
+            marker:  "     ^___^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "impl Imply { ",
+            marker:  "           ^^",
+            message: "Expected fn; found end of input",
+        },
+        InvalidTestCase {
+            source:  "impl Funcy { fn",
+            marker:  "             ^_^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "impl Funcy { fn }",
+            marker:  "                ^^",
+            message: "Expected identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "impl Recursive { impl Inner { } }",
+            marker:  "                 ^___^           ",
+            message: "Expected fn; found impl",
+        },
+        InvalidTestCase {
+            source:  "impl NonFunction { struct Inner { } }",
+            marker:  "                   ^_____^           ",
+            message: "Expected fn; found struct",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
 }
 
 #[test]
