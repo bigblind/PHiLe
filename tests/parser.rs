@@ -15,6 +15,8 @@
 
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate itertools;
 extern crate regex;
 extern crate phile;
 
@@ -32,7 +34,7 @@ struct InvalidTestCase {
     message: &'static str,
 }
 
-fn lex_filter_ws_comment<'a>(sources: &'a [&str]) -> Vec<Token<'a>> {
+fn lex_filter_ws_comment<'a, S: AsRef<str>>(sources: &'a [S]) -> Vec<Token<'a>> {
     let mut tokens = lexer::lex(sources).unwrap();
 
     tokens.retain(|token| match token.kind {
@@ -510,6 +512,119 @@ fn invalid_enum_decl() {
 
 #[test]
 fn valid_fn_def() {
+    let fn_name = "some_func";
+    let arg_names = ["foo", "bar"];
+    let arg_types = ["String", "float"];
+    let ret_type_str = "Quxy";
+    let body_str = "the_value";
+    let bools = &[false, true];
+
+    let it = iproduct!(0..arg_names.len() + 1, bools, bools, bools);
+
+    for (num_args, &arg_has_type, &ret_has_type, &has_body) in it {
+        let mut buf = String::new();
+        let mut arguments = Vec::with_capacity(num_args);
+
+        buf += "fn ";
+        buf += fn_name;
+        buf += "(";
+
+        for i in 0..num_args {
+            if i > 0 {
+                buf += ", ";
+            }
+
+            let start = buf.len() + 1;
+            buf += arg_names[i];
+
+            let arg_type = if arg_has_type {
+                buf += ": ";
+                let type_start = buf.len() + 1;
+                buf += arg_types[i];
+                let type_end = buf.len() + 1;
+
+                Some(
+                    Ty {
+                        range: oneline_range(0, type_start..type_end),
+                        kind: TyKind::Named(arg_types[i]),
+                    }
+                )
+            } else {
+                None
+            };
+
+            let end = buf.len() + 1;
+
+            arguments.push(
+                FuncArg {
+                    range: oneline_range(0, start..end),
+                    name: arg_names[i],
+                    ty: arg_type,
+                },
+            );
+        }
+
+        buf += ")";
+
+        let ret_type = if ret_has_type {
+            buf += " -> ";
+            let start = buf.len() + 1;
+            buf += ret_type_str;
+            let end = buf.len() + 1;
+
+            Some(
+                Ty {
+                    range: oneline_range(0, start..end),
+                    kind: TyKind::Named(ret_type_str),
+                }
+            )
+        } else {
+            None
+        };
+
+        let body = if has_body {
+            let block_start = buf.len() + 1;
+            buf += "{";
+            let inner_start = buf.len() + 1;
+            buf += body_str;
+            let inner_end = buf.len() + 1;
+            buf += "}";
+            let block_end = buf.len() + 1;
+
+            Exp {
+                range: oneline_range(0, block_start..block_end),
+                kind: ExpKind::Block(
+                    vec![
+                        Exp {
+                            range: oneline_range(0, inner_start..inner_end),
+                            kind: ExpKind::Identifier(body_str),
+                        },
+                    ]
+                ),
+            }
+        } else {
+            let start = buf.len() + 1;
+            buf += "{}";
+            let end = buf.len() + 1;
+
+            Exp {
+                range: oneline_range(0, start..end),
+                kind: ExpKind::Block(vec![]),
+            }
+        };
+
+        println!("{}", buf);
+
+        let range = oneline_range(0, 1..buf.len() + 1);
+        let name = Some(fn_name);
+        let func = Function { range, name, arguments, ret_type, body };
+        let sources = [buf];
+        let tokens = lex_filter_ws_comment(&sources);
+        let actual_ast = parse_valid(&tokens);
+        let expected_ast = Prog { items: vec![Item::FuncDef(func)] };
+
+        assert_eq!(actual_ast, expected_ast);
+    }
 }
 
 #[test]
