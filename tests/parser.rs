@@ -633,19 +633,19 @@ fn valid_fn_source_and_ast(
 
 #[test]
 fn valid_fn_def() {
-    let fn_name = "some_func";
+    let fn_names = &["some_func", "_", "noname", "nonIdiomaticFunction"];
     let args_name_type = [("foo", "String"), ("bar", "float")];
     let args = (0..args_name_type.len() + 1).map(|n| &args_name_type[..n]);
-    let ret_type_str = "Quxy";
-    let body_str = "the_value";
+    let ret_type_strs = vec!["Quxy", "weirdType"];
+    let body_strs = vec!["the_value", "AnotherValue", "_"];
     let arg_flags   = vec![false, true];
     let ret_flags   = vec![false, true];
     let body_flags  = vec![false, true];
     let comma_flags = vec![false, true];
 
-    let it = iproduct!(args, arg_flags, ret_flags, body_flags, comma_flags);
+    let it = iproduct!(args, fn_names, ret_type_strs, body_strs, arg_flags, comma_flags, ret_flags, body_flags);
 
-    for (args, has_arg_type, has_ret_type, has_body, trailing_comma) in it {
+    for (args, fn_name, ret_type_str, body_str, has_arg_type, trailing_comma, has_ret_type, has_body) in it {
         let (buf, func) = valid_fn_source_and_ast(
             fn_name,
             args,
