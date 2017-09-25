@@ -554,7 +554,7 @@ fn valid_fn_def() {
     for (num_args, has_arg_type, has_ret_type, has_body, trailing_comma) in it {
         let mut buf = String::new();
 
-        let ((arguments, ret_type, body) , range) = range_by_appending_with(&mut buf, |buf| {
+        let ((arguments, ret_type, body), range) = range_by_appending_with(&mut buf, |buf| {
             let mut arguments = Vec::with_capacity(num_args);
 
             *buf += "fn ";
@@ -567,26 +567,21 @@ fn valid_fn_def() {
 
                     if has_arg_type {
                         *buf += ": ";
-                        let arg_type_range = range_by_appending(buf, arg_types[i]);
 
-                        Some(
-                            Ty {
-                                range: arg_type_range,
-                                kind: TyKind::Named(arg_types[i]),
-                            }
-                        )
+                        Some(Ty {
+                            range: range_by_appending(buf, arg_types[i]),
+                            kind: TyKind::Named(arg_types[i]),
+                        })
                     } else {
                         None
                     }
                 });
 
-                arguments.push(
-                    FuncArg {
-                        range: arg_range,
-                        name: arg_names[i],
-                        ty: arg_type,
-                    },
-                );
+                arguments.push(FuncArg {
+                    range: arg_range,
+                    name: arg_names[i],
+                    ty: arg_type,
+                });
 
                 if trailing_comma || i < num_args - 1 {
                     *buf += ", ";
@@ -597,14 +592,11 @@ fn valid_fn_def() {
 
             let ret_type = if has_ret_type {
                 *buf += " -> ";
-                let ret_type_range = range_by_appending(buf, ret_type_str);
 
-                Some(
-                    Ty {
-                        range: ret_type_range,
-                        kind: TyKind::Named(ret_type_str),
-                    }
-                )
+                Some(Ty {
+                    range: range_by_appending(buf, ret_type_str),
+                    kind: TyKind::Named(ret_type_str),
+                })
             } else {
                 None
             };
@@ -619,20 +611,16 @@ fn valid_fn_def() {
 
                 Exp {
                     range: block_range,
-                    kind: ExpKind::Block(
-                        vec![
-                            Exp {
-                                range: inner_range,
-                                kind: ExpKind::Identifier(body_str),
-                            },
-                        ]
-                    ),
+                    kind: ExpKind::Block(vec![
+                        Exp {
+                            range: inner_range,
+                            kind: ExpKind::Identifier(body_str),
+                        },
+                    ]),
                 }
             } else {
-                let block_range = range_by_appending(buf, "{}");
-
                 Exp {
-                    range: block_range,
+                    range: range_by_appending(buf, "{}"),
                     kind: ExpKind::Block(vec![]),
                 }
             };
