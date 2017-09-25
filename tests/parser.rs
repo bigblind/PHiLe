@@ -536,100 +536,126 @@ fn range_by_appending(buf: &mut String, s: &str) -> Range {
     range
 }
 
+// Helper for `valid_fn_def()`.
+fn valid_fn_source_and_ast(
+    fn_name: &'static str,
+    args: &[(&'static str, &'static str)],
+    ret_type_str: &'static str,
+    body_str: &'static str,
+    has_arg_type: bool,
+    has_ret_type: bool,
+    has_body: bool,
+    trailing_comma: bool,
+) -> (String, Function<'static>) {
+    let mut buf = String::new();
+
+    let ((arguments, ret_type, body), range) = range_by_appending_with(&mut buf, |buf| {
+        let mut arguments = Vec::with_capacity(args.len());
+
+        *buf += "fn ";
+        *buf += fn_name;
+        *buf += "(";
+
+        for i in 0..args.len() {
+            let (arg_name, arg_type_name) = args[i];
+
+            let (arg_type, arg_range) = range_by_appending_with(buf, |buf| {
+                *buf += arg_name;
+
+                if has_arg_type {
+                    *buf += ": ";
+
+                    Some(Ty {
+                        range: range_by_appending(buf, arg_type_name),
+                        kind: TyKind::Named(arg_type_name),
+                    })
+                } else {
+                    None
+                }
+            });
+
+            arguments.push(FuncArg {
+                range: arg_range,
+                name: arg_name,
+                ty: arg_type,
+            });
+
+            if trailing_comma || i < args.len() - 1 {
+                *buf += ", ";
+            }
+        }
+
+        *buf += ")";
+
+        let ret_type = if has_ret_type {
+            *buf += " -> ";
+
+            Some(Ty {
+                range: range_by_appending(buf, ret_type_str),
+                kind: TyKind::Named(ret_type_str),
+            })
+        } else {
+            None
+        };
+
+        let body = if has_body {
+            let (inner_range, block_range) = range_by_appending_with(buf, |buf| {
+                *buf += "{";
+                let inner_range = range_by_appending(buf, body_str);
+                *buf += "}";
+                inner_range
+            });
+
+            Exp {
+                range: block_range,
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        range: inner_range,
+                        kind: ExpKind::Identifier(body_str),
+                    },
+                ]),
+            }
+        } else {
+            Exp {
+                range: range_by_appending(buf, "{}"),
+                kind: ExpKind::Block(vec![]),
+            }
+        };
+
+        (arguments, ret_type, body)
+    });
+
+    let name = Some(fn_name);
+    let func = Function { range, name, arguments, ret_type, body };
+
+    (buf, func)
+}
+
 #[test]
 fn valid_fn_def() {
     let fn_name = "some_func";
-    let arg_names = ["foo", "bar"];
-    let arg_types = ["String", "float"];
+    let args_name_type = [("foo", "String"), ("bar", "float")];
+    let args = (0..args_name_type.len() + 1).map(|n| &args_name_type[..n]);
     let ret_type_str = "Quxy";
     let body_str = "the_value";
-    let arg_range = 0..arg_names.len() + 1;
     let arg_flags   = vec![false, true];
     let ret_flags   = vec![false, true];
     let body_flags  = vec![false, true];
     let comma_flags = vec![false, true];
 
-    let it = iproduct!(arg_range, arg_flags, ret_flags, body_flags, comma_flags);
+    let it = iproduct!(args, arg_flags, ret_flags, body_flags, comma_flags);
 
-    for (num_args, has_arg_type, has_ret_type, has_body, trailing_comma) in it {
-        let mut buf = String::new();
-
-        let ((arguments, ret_type, body), range) = range_by_appending_with(&mut buf, |buf| {
-            let mut arguments = Vec::with_capacity(num_args);
-
-            *buf += "fn ";
-            *buf += fn_name;
-            *buf += "(";
-
-            for i in 0..num_args {
-                let (arg_type, arg_range) = range_by_appending_with(buf, |buf| {
-                    *buf += arg_names[i];
-
-                    if has_arg_type {
-                        *buf += ": ";
-
-                        Some(Ty {
-                            range: range_by_appending(buf, arg_types[i]),
-                            kind: TyKind::Named(arg_types[i]),
-                        })
-                    } else {
-                        None
-                    }
-                });
-
-                arguments.push(FuncArg {
-                    range: arg_range,
-                    name: arg_names[i],
-                    ty: arg_type,
-                });
-
-                if trailing_comma || i < num_args - 1 {
-                    *buf += ", ";
-                }
-            }
-
-            *buf += ")";
-
-            let ret_type = if has_ret_type {
-                *buf += " -> ";
-
-                Some(Ty {
-                    range: range_by_appending(buf, ret_type_str),
-                    kind: TyKind::Named(ret_type_str),
-                })
-            } else {
-                None
-            };
-
-            let body = if has_body {
-                let (inner_range, block_range) = range_by_appending_with(buf, |buf| {
-                    *buf += "{";
-                    let inner_range = range_by_appending(buf, body_str);
-                    *buf += "}";
-                    inner_range
-                });
-
-                Exp {
-                    range: block_range,
-                    kind: ExpKind::Block(vec![
-                        Exp {
-                            range: inner_range,
-                            kind: ExpKind::Identifier(body_str),
-                        },
-                    ]),
-                }
-            } else {
-                Exp {
-                    range: range_by_appending(buf, "{}"),
-                    kind: ExpKind::Block(vec![]),
-                }
-            };
-
-            (arguments, ret_type, body)
-        });
-
-        let name = Some(fn_name);
-        let func = Function { range, name, arguments, ret_type, body };
+    for (args, has_arg_type, has_ret_type, has_body, trailing_comma) in it {
+        let (buf, func) = valid_fn_source_and_ast(
+            fn_name,
+            args,
+            ret_type_str,
+            body_str,
+            has_arg_type,
+            has_ret_type,
+            has_body,
+            trailing_comma,
+        );
         let sources = [buf];
         let tokens = lex_filter_ws_comment(&sources);
         let actual_ast = parse_valid(&tokens);
