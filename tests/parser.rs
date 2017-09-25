@@ -538,14 +538,25 @@ fn range_by_appending(buf: &mut String, s: &str) -> Range {
 
 // Helper for `valid_fn_def()`.
 fn valid_fn_source_and_ast(
-    fn_name: &'static str,
-    args: &[(&'static str, &'static str)],
-    ret_type_str: &'static str,
-    body_str: &'static str,
-    has_arg_type: bool,
-    has_ret_type: bool,
-    has_body: bool,
-    trailing_comma: bool,
+    (
+        args,
+        fn_name,
+        ret_type_str,
+        body_str,
+        has_arg_type,
+        has_ret_type,
+        has_body,
+        trailing_comma,
+    ): (
+        &[(&'static str, &'static str)],
+        &'static str,
+        &'static str,
+        &'static str,
+        bool,
+        bool,
+        bool,
+        bool,
+    )
 ) -> (String, Function<'static>) {
     let mut buf = String::new();
 
@@ -633,9 +644,9 @@ fn valid_fn_source_and_ast(
 
 #[test]
 fn valid_fn_def() {
-    let fn_names = &["some_func", "_", "noname", "nonIdiomaticFunction"];
     let args_name_type = [("foo", "String"), ("bar", "float")];
     let args = (0..args_name_type.len() + 1).map(|n| &args_name_type[..n]);
+    let fn_names = vec!["some_func", "_", "noname", "nonIdiomaticFunction"];
     let ret_type_strs = vec!["Quxy", "weirdType"];
     let body_strs = vec!["the_value", "AnotherValue", "_"];
     let arg_flags   = vec![false, true];
@@ -645,17 +656,8 @@ fn valid_fn_def() {
 
     let it = iproduct!(args, fn_names, ret_type_strs, body_strs, arg_flags, comma_flags, ret_flags, body_flags);
 
-    for (args, fn_name, ret_type_str, body_str, has_arg_type, trailing_comma, has_ret_type, has_body) in it {
-        let (buf, func) = valid_fn_source_and_ast(
-            fn_name,
-            args,
-            ret_type_str,
-            body_str,
-            has_arg_type,
-            has_ret_type,
-            has_body,
-            trailing_comma,
-        );
+    for params in it {
+        let (buf, func) = valid_fn_source_and_ast(params);
         let sources = [buf];
         let tokens = lex_filter_ws_comment(&sources);
         let actual_ast = parse_valid(&tokens);
