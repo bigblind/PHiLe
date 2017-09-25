@@ -510,6 +510,32 @@ fn invalid_enum_decl() {
     test_invalid_cases(test_cases);
 }
 
+// Helpers for `valid_fn_def()`.
+
+// Calls the function `f` so that it can append to the end
+// of the buffer `buf`. Returns the return value of the function
+// and the range of the suffix which has been appended onto `buf`.
+// Assumes that `buf` is a single line (no newlines allowed).
+// The `src_idx`es of the locations of the returned range are 0.
+fn range_by_appending_with<T, F>(buf: &mut String, f: F) -> (T, Range)
+    where F: FnOnce(&mut String) -> T {
+
+    let start = buf.len() + 1;
+    let value = f(buf);
+    let end = buf.len() + 1;
+    let range = oneline_range(0, start..end);
+    (value, range)
+}
+
+// Appends the string `s` to the end of the buffer `buf`,
+// and returns the range of this new suffix.
+// Assumes that `buf` is a single line (no newlines allowed).
+// The `src_idx`es of the locations of the returned range are 0.
+fn range_by_appending(buf: &mut String, s: &str) -> Range {
+    let (_, range) = range_by_appending_with(buf, |buf| *buf += s);
+    range
+}
+
 #[test]
 fn valid_fn_def() {
     let fn_name = "some_func";
@@ -517,105 +543,103 @@ fn valid_fn_def() {
     let arg_types = ["String", "float"];
     let ret_type_str = "Quxy";
     let body_str = "the_value";
-    let bools = &[false, true];
+    let arg_range = 0..arg_names.len() + 1;
+    let arg_flags   = vec![false, true];
+    let ret_flags   = vec![false, true];
+    let body_flags  = vec![false, true];
+    let comma_flags = vec![false, true];
 
-    let it = iproduct!(0..arg_names.len() + 1, bools, bools, bools);
+    let it = iproduct!(arg_range, arg_flags, ret_flags, body_flags, comma_flags);
 
-    for (num_args, &arg_has_type, &ret_has_type, &has_body) in it {
+    for (num_args, has_arg_type, has_ret_type, has_body, trailing_comma) in it {
         let mut buf = String::new();
-        let mut arguments = Vec::with_capacity(num_args);
 
-        buf += "fn ";
-        buf += fn_name;
-        buf += "(";
+        let ((arguments, ret_type, body) , range) = range_by_appending_with(&mut buf, |buf| {
+            let mut arguments = Vec::with_capacity(num_args);
 
-        for i in 0..num_args {
-            if i > 0 {
-                buf += ", ";
+            *buf += "fn ";
+            *buf += fn_name;
+            *buf += "(";
+
+            for i in 0..num_args {
+                let (arg_type, arg_range) = range_by_appending_with(buf, |buf| {
+                    *buf += arg_names[i];
+
+                    if has_arg_type {
+                        *buf += ": ";
+                        let arg_type_range = range_by_appending(buf, arg_types[i]);
+
+                        Some(
+                            Ty {
+                                range: arg_type_range,
+                                kind: TyKind::Named(arg_types[i]),
+                            }
+                        )
+                    } else {
+                        None
+                    }
+                });
+
+                arguments.push(
+                    FuncArg {
+                        range: arg_range,
+                        name: arg_names[i],
+                        ty: arg_type,
+                    },
+                );
+
+                if trailing_comma || i < num_args - 1 {
+                    *buf += ", ";
+                }
             }
 
-            let start = buf.len() + 1;
-            buf += arg_names[i];
+            *buf += ")";
 
-            let arg_type = if arg_has_type {
-                buf += ": ";
-                let type_start = buf.len() + 1;
-                buf += arg_types[i];
-                let type_end = buf.len() + 1;
+            let ret_type = if has_ret_type {
+                *buf += " -> ";
+                let ret_type_range = range_by_appending(buf, ret_type_str);
 
                 Some(
                     Ty {
-                        range: oneline_range(0, type_start..type_end),
-                        kind: TyKind::Named(arg_types[i]),
+                        range: ret_type_range,
+                        kind: TyKind::Named(ret_type_str),
                     }
                 )
             } else {
                 None
             };
 
-            let end = buf.len() + 1;
+            let body = if has_body {
+                let (inner_range, block_range) = range_by_appending_with(buf, |buf| {
+                    *buf += "{";
+                    let inner_range = range_by_appending(buf, body_str);
+                    *buf += "}";
+                    inner_range
+                });
 
-            arguments.push(
-                FuncArg {
-                    range: oneline_range(0, start..end),
-                    name: arg_names[i],
-                    ty: arg_type,
-                },
-            );
-        }
-
-        buf += ")";
-
-        let ret_type = if ret_has_type {
-            buf += " -> ";
-            let start = buf.len() + 1;
-            buf += ret_type_str;
-            let end = buf.len() + 1;
-
-            Some(
-                Ty {
-                    range: oneline_range(0, start..end),
-                    kind: TyKind::Named(ret_type_str),
+                Exp {
+                    range: block_range,
+                    kind: ExpKind::Block(
+                        vec![
+                            Exp {
+                                range: inner_range,
+                                kind: ExpKind::Identifier(body_str),
+                            },
+                        ]
+                    ),
                 }
-            )
-        } else {
-            None
-        };
+            } else {
+                let block_range = range_by_appending(buf, "{}");
 
-        let body = if has_body {
-            let block_start = buf.len() + 1;
-            buf += "{";
-            let inner_start = buf.len() + 1;
-            buf += body_str;
-            let inner_end = buf.len() + 1;
-            buf += "}";
-            let block_end = buf.len() + 1;
+                Exp {
+                    range: block_range,
+                    kind: ExpKind::Block(vec![]),
+                }
+            };
 
-            Exp {
-                range: oneline_range(0, block_start..block_end),
-                kind: ExpKind::Block(
-                    vec![
-                        Exp {
-                            range: oneline_range(0, inner_start..inner_end),
-                            kind: ExpKind::Identifier(body_str),
-                        },
-                    ]
-                ),
-            }
-        } else {
-            let start = buf.len() + 1;
-            buf += "{}";
-            let end = buf.len() + 1;
+            (arguments, ret_type, body)
+        });
 
-            Exp {
-                range: oneline_range(0, start..end),
-                kind: ExpKind::Block(vec![]),
-            }
-        };
-
-        println!("{}", buf);
-
-        let range = oneline_range(0, 1..buf.len() + 1);
         let name = Some(fn_name);
         let func = Function { range, name, arguments, ret_type, body };
         let sources = [buf];
