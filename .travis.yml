@@ -12,7 +12,7 @@ env:
 script:
   - cargo build --all
   - cargo test --release --all
-  - cargo test --no-run
+  - cargo test --no-run --all
 
 after_success: |
   if [ "$TRAVIS_OS_NAME" = "osx" ]; then exit 0; fi
