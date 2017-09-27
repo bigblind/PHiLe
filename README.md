@@ -21,11 +21,18 @@ PHiLe also supports a wide spectrum of different languages and databases, theref
 
 ### Where can I download it?
 
-* PHiLe is on [crates.io](https://crates.io/crates/phile). You can install it by issuing the following command:
+* PHiLe is on [crates.io](https://crates.io/crates/phile). You can install the compiler by issuing the following command:
 
     ```
-    cargo install phile
+    cargo install philec
     ```
+
+If you want to use the `libphile` library programmatically, add this to your `Cargo.toml`, under `[dependencies]`:
+
+   ```
+   [dependencies]
+   phile = "0.1.2"
+   ```
 
 * You can clone the source at [the official GitHub page](https://github.com/H2CO3/PHiLe/) of the project using:
 
@@ -47,7 +54,7 @@ Sure! Depending on how you are willing to use PHiLe, you may be looking for…
    and you are now looking for the details of a specific feature.
  * [API documentation](https://docs.rs/phile/) for the `phile` library,
    useful when you want to embed PHiLe into your own Rust programs.
- * [Manpage-style docs for `philec`](https://h2co3.github.io/phile/docs/philec/),
+ * [Manpage-style docs for `philec`](https://docs.rs/philec/),
    if you want to deep dive into the invocation of the PHiLe CLI compiler.
 
 ### How does it work?

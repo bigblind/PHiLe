@@ -1,5 +1,5 @@
 //
-// philec.rs
+// main.rs
 // The PHiLe Compiler
 //
 // Created by Arpad Goretity (H2CO3)
@@ -99,7 +99,9 @@
 //! * [API documentation](https://docs.rs/phile/) for the `phile` library,
 //!   useful when you want to embed PHiLe into your own Rust programs.
 
-#![doc(html_root_url = "https://docs.rs/phile/0.1.2")]
+#![crate_name="philec"]
+#![crate_type="bin"]
+#![doc(html_root_url = "https://docs.rs/philec/0.1.2")]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,

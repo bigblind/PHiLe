@@ -7,6 +7,11 @@ os:
 env:
   global:
     - RUSTFLAGS="-C link-dead-code"
+    - RUST_BACKTRACE=1
+
+script:
+  - cargo build --all
+  - cargo test --release --all
 
 after_success: |
   if [ "$TRAVIS_OS_NAME" = "osx" ]; then exit 0; fi
