@@ -101,7 +101,7 @@
 
 #![crate_name="philec"]
 #![crate_type="bin"]
-#![doc(html_root_url = "https://docs.rs/philec/0.1.3")]
+#![doc(html_root_url = "https://docs.rs/crate/philec/0.1.3")]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,

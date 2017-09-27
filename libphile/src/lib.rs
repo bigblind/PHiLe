@@ -32,7 +32,7 @@
 //! * [The Reference](https://h2co3.github.io/phile/reference).
 //!   Search through this document if you are already familiar with the basics
 //!   and you are now looking for the details of a specific feature.
-//! * [Manpage-style docs for `philec`](https://docs.rs/philec/),
+//! * [Manpage-style docs for `philec`](https://docs.rs/crate/philec/),
 //!   if you want to deep dive into the invocation of the PHiLe CLI compiler.
 
 

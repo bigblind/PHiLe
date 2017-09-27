@@ -54,7 +54,7 @@ Sure! Depending on how you are willing to use PHiLe, you may be looking for…
    and you are now looking for the details of a specific feature.
  * [API documentation](https://docs.rs/phile/) for the `phile` library,
    useful when you want to embed PHiLe into your own Rust programs.
- * [Manpage-style docs for `philec`](https://docs.rs/philec/),
+ * [Manpage-style docs for `philec`](https://docs.rs/crate/philec/),
    if you want to deep dive into the invocation of the PHiLe CLI compiler.
 
 ### How does it work?
