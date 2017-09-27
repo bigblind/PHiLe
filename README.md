@@ -31,7 +31,7 @@ PHiLe also supports a wide spectrum of different languages and databases, theref
 
    ```
    [dependencies]
-   phile = "0.1.2"
+   phile = "0.1.3"
    ```
 
 * You can clone the source at [the official GitHub page](https://github.com/H2CO3/PHiLe/) of the project using:
