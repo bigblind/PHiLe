@@ -25,6 +25,7 @@ use phile::lexer::{ self, Token, TokenKind, Location, Range };
 use phile::ast::*;
 use phile::error::*;
 use phile::parser;
+use phile::util::grapheme_count;
 
 
 #[derive(Debug)]
@@ -517,12 +518,16 @@ fn invalid_enum_decl() {
 // and the range of the suffix which has been appended onto `buf`.
 // Assumes that `buf` is a single line (no newlines allowed).
 // The `src_idx`es of the locations of the returned range are 0.
+// TODO(H2CO3): this is linear in the final length of `buf`,
+// because it uses `grapheme_count()` to compute the range.
+// This should not be a problem as long as it's being called
+// infrequently (i.e. a low, constant number of times).
 fn range_by_appending_with<T, F>(buf: &mut String, f: F) -> (T, Range)
     where F: FnOnce(&mut String) -> T {
 
-    let start = buf.len() + 1;
+    let start = 1 + grapheme_count(buf);
     let value = f(buf);
-    let end = buf.len() + 1;
+    let end = 1 + grapheme_count(buf);
     let range = oneline_range(0, start..end);
     (value, range)
 }
@@ -1003,6 +1008,97 @@ fn invalid_toplevel() {
 
 #[test]
 fn valid_expression() {
+    // Wrap up every expression in the body of a minimal function.
+    // `make_range()` is a small helper that translates the ranges
+    // as visually perceived by inspection of the `exprs` array
+    // to the actual ranges in the AST. These will just be shifted
+    // by the length of the header of the wrapping fn, `prefix`.
+    let prefix = "fn _() { ";
+    let suffix = " }";
+    let make_range = |i, r: std::ops::Range<usize>| {
+        let shift = grapheme_count(prefix);
+        oneline_range(i, r.start + shift..r.end + shift)
+    };
+
+    // Test cases -- the expressions to be parsed.
+    let exprs = vec![
+        "nil",
+        "{}",
+        "true",
+        "42",
+        "13.37",
+    ];
+
+    // Expected AST nodes: each of them should correspond to a
+    // string in `exprs`. These will be the only element of the
+    // body block of the array of wrapping functions.
+    let nodes = vec![
+        Exp {
+            kind: ExpKind::NilLiteral,
+            range: make_range(0, 1..4),
+        },
+        Exp {
+            kind: ExpKind::Block(vec![]),
+            range: make_range(1, 1..3),
+        },
+        Exp {
+            kind: ExpKind::BoolLiteral("true"),
+            range: make_range(2, 1..5),
+        },
+        Exp {
+            kind: ExpKind::IntLiteral("42"),
+            range: make_range(3, 1..3),
+        },
+        Exp {
+            kind: ExpKind::FloatLiteral("13.37"),
+            range: make_range(4, 1..6),
+        },
+    ];
+
+    // The actual sources to be parsed are formed by concatenating
+    // the header of the function (including the opening '{' of
+    // its body block), the test case expression, and the closing
+    // '}' of the body block.
+    let sources: Vec<_> = exprs
+        .iter()
+        .map(|expr| [prefix, expr, suffix].join(""))
+        .collect();
+
+    assert_eq!(sources.len(), nodes.len());
+
+    // Actually form the top-level items, which are function
+    // definitions, by using the expected AST fragments.
+    let iter = sources.iter().zip(nodes).enumerate().map(|(i, (src, node))| {
+        // The body of the function is not the `node` expression
+        // itself, but a block that contains `node` as its only
+        // element. This top-level body block thus also has a
+        // source range; that is what we are calculating below.
+        let start_byte_index = src.find('{').unwrap();
+        let end_byte_index = src.rfind('}').unwrap() + 1;
+        let start = 1 + grapheme_count(&src[..start_byte_index]);
+        let end = 1 + grapheme_count(&src[..end_byte_index]);
+        let exp_range = oneline_range(i, start..end);
+
+        Item::FuncDef(Function {
+            range: oneline_range(i, 1..1 + grapheme_count(src)),
+            name: Some("_"),
+            arguments: vec![],
+            ret_type: None,
+            body: Exp {
+                kind: ExpKind::Block(vec![node]),
+                range: exp_range,
+            },
+        })
+    });
+
+    // Finally, parse the array of sources, and compare the resulting
+    // (actual) items to the expected ones constructed above.
+    let items: Vec<_> = iter.collect();
+    let expected_ast = Prog { items };
+    let tokens = lex_filter_ws_comment(&sources);
+    let actual_ast = parse_valid(&tokens);
+
+    assert_eq!(actual_ast, expected_ast);
 }
 
 #[test]
