@@ -1020,67 +1020,135 @@ fn valid_expression() {
         oneline_range(i, r.start + shift..r.end + shift)
     };
 
-    // Test cases -- the expressions to be parsed.
-    let exprs = vec![
-        "nil",
-        "{}",
-        "true",
-        "42",
-        "13.37",
-    ];
-
-    // Expected AST nodes: each of them should correspond to a
-    // string in `exprs`. These will be the only element of the
+    // Expressions to be parsed and the expected AST node
+    // fragments that will be the only element of the
     // body block of the array of wrapping functions.
-    let nodes = vec![
-        Exp {
-            kind: ExpKind::NilLiteral,
-            range: make_range(0, 1..4),
-        },
-        Exp {
-            kind: ExpKind::Block(vec![]),
-            range: make_range(1, 1..3),
-        },
-        Exp {
-            kind: ExpKind::BoolLiteral("true"),
-            range: make_range(2, 1..5),
-        },
-        Exp {
-            kind: ExpKind::IntLiteral("42"),
-            range: make_range(3, 1..3),
-        },
-        Exp {
-            kind: ExpKind::FloatLiteral("13.37"),
-            range: make_range(4, 1..6),
-        },
+    let cases = vec![
+        // Atomic expressions
+        (
+            "nil",
+            Exp {
+                kind: ExpKind::NilLiteral,
+                range: make_range(0, 1..4),
+            },
+        ),
+        (
+            "true",
+            Exp {
+                kind: ExpKind::BoolLiteral("true"),
+                range: make_range(1, 1..5),
+            },
+        ),
+        (
+            "false",
+            Exp {
+                kind: ExpKind::BoolLiteral("false"),
+                range: make_range(2, 1..6),
+            },
+        ),
+        (
+            "42",
+            Exp {
+                kind: ExpKind::IntLiteral("42"),
+                range: make_range(3, 1..3),
+            },
+        ),
+        (
+            "13.37",
+            Exp {
+                kind: ExpKind::FloatLiteral("13.37"),
+                range: make_range(4, 1..6),
+            },
+        ),
+/*        (
+            "\"\"", // empty string
+        ),
+        (
+            "\"not empty\"", // non-empty string
+        ),
+        (
+            "\"\\\"\\\\\"", // \"\\ (escaped escape char and quote)
+        ),
+        (
+            "\u{6F22}", // Unicode (CJK) character
+        ),
+        (
+            "_", // identifier
+        ),
+        (
+            "lower_snake_case",
+        ),
+        (
+            "UPPER_SNAKE_CASE",
+        ),
+        (
+            "lowerCamelCase",
+        ),
+        (
+            "UpperCamelCase",
+        ),
+
+        // Non-atomic terms
+        (
+            "()",
+        ),
+        (
+            "(())",
+        ),
+        (
+            "((),())",
+        ),
+        (
+            "(foo)",
+        ),
+        (
+            "((nil))",
+        ),
+        (
+            "(1, 2.3, 45.99)",
+        ),
+        (
+            "[]",
+        ),
+        (
+            "[[]]",
+        ),
+        (
+            "[[],[]]",
+        ),
+        (
+            "[[true, false]]",
+        ),
+*/        (
+            "{}",
+            Exp {
+                kind: ExpKind::Block(vec![]),
+                range: make_range(5, 1..3),
+            },
+        ),
     ];
 
     // The actual sources to be parsed are formed by concatenating
     // the header of the function (including the opening '{' of
     // its body block), the test case expression, and the closing
     // '}' of the body block.
-    let sources: Vec<_> = exprs
-        .iter()
-        .map(|expr| [prefix, expr, suffix].join(""))
-        .collect();
-
-    assert_eq!(sources.len(), nodes.len());
-
-    // Actually form the top-level items, which are function
+    // Also form the actual top-level items, which are function
     // definitions, by using the expected AST fragments.
-    let iter = sources.iter().zip(nodes).enumerate().map(|(i, (src, node))| {
-        // The body of the function is not the `node` expression
-        // itself, but a block that contains `node` as its only
-        // element. This top-level body block thus also has a
-        // source range; that is what we are calculating below.
+    // The body of the function is not the `node` expression
+    // itself, but a block that contains `node` as its only
+    // element. This top-level body block thus also has a
+    // source range; that is what we are calculating below.
+    let iter = cases.into_iter().enumerate().map(|(i, (src, node))| {
+        let src = [prefix, src, suffix].join("");
         let start_byte_index = src.find('{').unwrap();
         let end_byte_index = src.rfind('}').unwrap() + 1;
         let start = 1 + grapheme_count(&src[..start_byte_index]);
         let end = 1 + grapheme_count(&src[..end_byte_index]);
+        let func_range = oneline_range(i, 1..end);
         let exp_range = oneline_range(i, start..end);
 
-        Item::FuncDef(Function {
-            range: oneline_range(i, 1..1 + grapheme_count(src)),
+        let item = Item::FuncDef(Function {
+            range: func_range,
             name: Some("_"),
             arguments: vec![],
             ret_type: None,
@@ -1088,12 +1156,14 @@ fn valid_expression() {
                 kind: ExpKind::Block(vec![node]),
                 range: exp_range,
             },
-        })
+        });
+
+        (src, item)
     });
 
     // Finally, parse the array of sources, and compare the resulting
     // (actual) items to the expected ones constructed above.
-    let items: Vec<_> = iter.collect();
+    let (sources, items): (Vec<_>, Vec<_>) = iter.unzip();
     let expected_ast = Prog { items };
     let tokens = lex_filter_ws_comment(&sources);
     let actual_ast = parse_valid(&tokens);
