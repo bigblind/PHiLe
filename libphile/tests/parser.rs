@@ -1095,58 +1095,266 @@ fn valid_expression() {
                 range: make_range(9, 1..11),
             },
         ),
-/*        (
+        (
             "_", // identifier
+            Exp {
+                kind: ExpKind::Identifier("_"),
+                range: make_range(10, 1..2),
+            },
         ),
         (
             "lower_snake_case",
+            Exp {
+                kind: ExpKind::Identifier("lower_snake_case"),
+                range: make_range(11, 1..17),
+            },
         ),
         (
             "UPPER_SNAKE_CASE",
+            Exp {
+                kind: ExpKind::Identifier("UPPER_SNAKE_CASE"),
+                range: make_range(12, 1..17),
+            },
         ),
         (
             "lowerCamelCase",
+            Exp {
+                kind: ExpKind::Identifier("lowerCamelCase"),
+                range: make_range(13, 1..15),
+            },
         ),
         (
             "UpperCamelCase",
+            Exp {
+                kind: ExpKind::Identifier("UpperCamelCase"),
+                range: make_range(14, 1..15),
+            },
         ),
 
         // Non-atomic terms
         (
             "()",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![]),
+                range: make_range(15, 1..3),
+            },
         ),
         (
             "(())",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![
+                    Exp {
+                        kind: ExpKind::TupleLiteral(vec![]),
+                        range: make_range(16, 2..4),
+                    },
+                ]),
+                range: make_range(16, 1..5),
+            },
         ),
         (
             "((),())",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![
+                    Exp {
+                        kind: ExpKind::TupleLiteral(vec![]),
+                        range: make_range(17, 2..4),
+                    },
+                    Exp {
+                        kind: ExpKind::TupleLiteral(vec![]),
+                        range: make_range(17, 5..7),
+                    },
+                ]),
+                range: make_range(17, 1..8),
+            },
         ),
         (
             "(foo)",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![
+                    Exp {
+                        kind: ExpKind::Identifier("foo"),
+                        range: make_range(18, 2..5),
+                    },
+                ]),
+                range: make_range(18, 1..6),
+            },
         ),
         (
-            "((nil))",
+            "((nil),)",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![
+                    Exp {
+                        kind: ExpKind::TupleLiteral(vec![
+                            Exp {
+                                kind: ExpKind::NilLiteral,
+                                range: make_range(19, 3..6),
+                            },
+                        ]),
+                        range: make_range(19, 2..7),
+                    },
+                ]),
+                range: make_range(19, 1..9),
+            },
         ),
         (
-            "(1, 2.3, 45.99)",
+            "(1, 0, 0.0, 99.56)",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![
+                    Exp {
+                        kind: ExpKind::IntLiteral("1"),
+                        range: make_range(20, 2..3),
+                    },
+                    Exp {
+                        kind: ExpKind::IntLiteral("0"),
+                        range: make_range(20, 5..6),
+                    },
+                    Exp {
+                        kind: ExpKind::FloatLiteral("0.0"),
+                        range: make_range(20, 8..11),
+                    },
+                    Exp {
+                        kind: ExpKind::FloatLiteral("99.56"),
+                        range: make_range(20, 13..18),
+                    },
+                ]),
+                range: make_range(20, 1..19),
+            },
         ),
         (
             "[]",
+            Exp {
+                kind: ExpKind::ArrayLiteral(vec![]),
+                range: make_range(21, 1..3),
+            },
         ),
         (
             "[[]]",
+            Exp {
+                kind: ExpKind::ArrayLiteral(vec![
+                    Exp {
+                        kind: ExpKind::ArrayLiteral(vec![]),
+                        range: make_range(22, 2..4),
+                    },
+                ]),
+                range: make_range(22, 1..5),
+            },
         ),
         (
             "[[],[]]",
+            Exp {
+                kind: ExpKind::ArrayLiteral(vec![
+                    Exp {
+                        kind: ExpKind::ArrayLiteral(vec![]),
+                        range: make_range(23, 2..4),
+                    },
+                    Exp {
+                        kind: ExpKind::ArrayLiteral(vec![]),
+                        range: make_range(23, 5..7),
+                    },
+                ]),
+                range: make_range(23, 1..8),
+            },
         ),
         (
-            "[[true, false]]",
+            "[[true, false, ]]",
+            Exp {
+                kind: ExpKind::ArrayLiteral(vec![
+                    Exp {
+                        kind: ExpKind::ArrayLiteral(vec![
+                            Exp {
+                                kind: ExpKind::BoolLiteral("true"),
+                                range: make_range(24, 3..7),
+                            },
+                            Exp {
+                                kind: ExpKind::BoolLiteral("false"),
+                                range: make_range(24, 9..14),
+                            },
+                        ]),
+                        range: make_range(24, 2..17),
+                    },
+                ]),
+                range: make_range(24, 1..18),
+            },
         ),
-*/        (
+        (
             "{}",
             Exp {
                 kind: ExpKind::Block(vec![]),
-                range: make_range(10, 1..3),
+                range: make_range(25, 1..3),
+            },
+        ),
+        (
+            "{{}}",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::Block(vec![]),
+                        range: make_range(26, 2..4),
+                    },
+                ]),
+                range: make_range(26, 1..5),
+            },
+        ),
+        (
+            "{{}{}}",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::Block(vec![]),
+                        range: make_range(27, 2..4),
+                    },
+                    Exp {
+                        kind: ExpKind::Block(vec![]),
+                        range: make_range(27, 4..6),
+                    },
+                ]),
+                range: make_range(27, 1..7),
+            },
+        ),
+        (
+            "{{};{}}",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::Block(vec![]),
+                        range: make_range(28, 2..4),
+                    },
+                    Exp {
+                        kind: ExpKind::Empty,
+                        range: make_range(28, 4..5),
+                    },
+                    Exp {
+                        kind: ExpKind::Block(vec![]),
+                        range: make_range(28, 5..7),
+                    },
+                ]),
+                range: make_range(28, 1..8),
+            },
+        ),
+        (
+            "{3.1415927; {()}}",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::Semi(
+                            Box::new(Exp {
+                                kind: ExpKind::FloatLiteral("3.1415927"),
+                                range: make_range(29, 2..11),
+                            })
+                        ),
+                        range: make_range(29, 2..11),
+                    },
+                    Exp {
+                        kind: ExpKind::Block(vec![
+                            Exp {
+                                kind: ExpKind::TupleLiteral(vec![]),
+                                range: make_range(29, 14..16),
+                            },
+                        ]),
+                        range: make_range(29, 13..17),
+                    },
+                ]),
+                range: make_range(29, 1..18),
             },
         ),
     ];
