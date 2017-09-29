@@ -1020,9 +1020,9 @@ fn valid_expression() {
         oneline_range(i, r.start + shift..r.end + shift)
     };
 
-    // Expressions to be parsed and the expected AST node
-    // fragments that will be the only element of the
-    // body block of the array of wrapping functions.
+    // Expressions to be parsed and the corresponding expected AST
+    // node fragments. Each node fragment will be the only element
+    // in the body block of one of the array of wrapping functions.
     let cases = vec![
         // Atomic expressions
         (
@@ -1060,19 +1060,42 @@ fn valid_expression() {
                 range: make_range(4, 1..6),
             },
         ),
+        (
+            r#""""#, // empty string
+            Exp {
+                kind: ExpKind::StringLiteral(r#""""#),
+                range: make_range(5, 1..3),
+            },
+        ),
+        (
+            r#""not empty""#, // non-empty string
+            Exp {
+                kind: ExpKind::StringLiteral(r#""not empty""#),
+                range: make_range(6, 1..12),
+            },
+        ),
+        (
+            r#""\"\\""#, // \"\\ (escaped escape char and quote)
+            Exp {
+                kind: ExpKind::StringLiteral(r#""\"\\""#),
+                range: make_range(7, 1..7),
+            },
+        ),
+        (
+            "\"\u{6F22}\"", // Unicode (CJK) character
+            Exp {
+                kind: ExpKind::StringLiteral("\"\u{6F22}\""),
+                range: make_range(8, 1..4),
+            },
+        ),
+        (
+            r#""\u{6F22}""#, // Unicode (CJK) character, escaped
+            Exp {
+                kind: ExpKind::StringLiteral(r#""\u{6F22}""#),
+                range: make_range(9, 1..11),
+            },
+        ),
 /*        (
-            "\"\"", // empty string
-        ),
-        (
-            "\"not empty\"", // non-empty string
-        ),
-        (
-            "\"\\\"\\\\\"", // \"\\ (escaped escape char and quote)
-        ),
-        (
-            "\u{6F22}", // Unicode (CJK) character
-        ),
-        (
             "_", // identifier
         ),
         (
@@ -1123,7 +1146,7 @@ fn valid_expression() {
             "{}",
             Exp {
                 kind: ExpKind::Block(vec![]),
-                range: make_range(5, 1..3),
+                range: make_range(10, 1..3),
             },
         ),
     ];
