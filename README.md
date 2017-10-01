@@ -27,7 +27,7 @@ PHiLe also supports a wide spectrum of different languages and databases, theref
     cargo install philec
     ```
 
-  If you want to use the `libphile` library programmatically, add this to your `Cargo.toml`, under `[dependencies]`:
+  If you want to use the `libphile` library programmatically, add this to your `Cargo.toml`:
 
    ```
    [dependencies]

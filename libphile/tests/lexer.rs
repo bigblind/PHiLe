@@ -651,7 +651,7 @@ impl Arbitrary for ValidString {
                 .iter()
                 .enumerate()
                 .filter(|&(j, _)| j != i)
-                .map(|(_, c)| *c)
+                .map(|(_, &c)| c)
                 .collect();
 
             ValidString { chars }

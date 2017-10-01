@@ -883,7 +883,7 @@ impl<'a> Parser<'a> {
             Some(token) => {
                 let child = self.parse_prefix(tokens, nodes, subexpr)?;
                 let range = make_range(token, &child);
-                let index = tokens.iter().position(|v| *v == token.value).unwrap();
+                let index = tokens.iter().position(|&v| v == token.value).unwrap();
                 let kind = nodes[index](Box::new(child));
 
                 Ok(Node { kind, range })

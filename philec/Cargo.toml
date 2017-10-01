@@ -14,3 +14,8 @@ categories    = ["command-line-interface", "command-line-utilities", "database",
 [dependencies]
 phile = { version = "0.1.3", path = "../libphile" }
 clap  = "2.26.2"
+
+[badges]
+travis-ci = { repository = "H2CO3/PHiLe" }
+codecov = { repository = "H2CO3/PHiLe", service = "github" }
+maintenance = { status = "actively-developed" }
