@@ -83,9 +83,12 @@ PHiLe will support the following database flavors and programming languages:
 * Go
 * JavaScript
 * Python
+* Ruby
 * Java
+* C#
+* Haskell
 
-Support for other popular storage engines (e.g. Postgres, MS/SQL, Redis, …) and programming languages (e.g. Haskell, Ruby, C#, …) would be nice and is planned.
+Support for other popular storage engines (e.g. Postgres, MS/SQL, Redis, …) and programming languages would be nice and is planned.
 
 ### I want to yell at you because it's crap!
 

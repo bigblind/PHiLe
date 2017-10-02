@@ -18,7 +18,10 @@ mod swift;
 mod go;
 mod js;
 mod python;
+mod ruby;
 mod java;
+mod csharp;
+mod haskell;
 
 use std::io;
 use std::rc::Rc;
@@ -58,8 +61,14 @@ pub enum Language {
     JavaScript,
     /// Python. 2 or 3? I don't know yet.
     Python,
+    /// Ruby.
+    Ruby,
     /// Java. Yeah, seriously.
     Java,
+    /// C#
+    CSharp,
+    /// Haskell. Unicorns!
+    Haskell,
 }
 
 /// The strategy with which the generated DAL will query the DB.
@@ -153,15 +162,18 @@ pub fn generate_dal(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider
     use self::Language::*;
 
     match params.language {
-        Rust       => rust  ::generate_dal(sqir, params, wp),
-        C          => c     ::generate_dal(sqir, params, wp),
-        CXX        => cxx   ::generate_dal(sqir, params, wp),
-        ObjectiveC => objc  ::generate_dal(sqir, params, wp),
-        Swift      => swift ::generate_dal(sqir, params, wp),
-        Go         => go    ::generate_dal(sqir, params, wp),
-        JavaScript => js    ::generate_dal(sqir, params, wp),
-        Python     => python::generate_dal(sqir, params, wp),
-        Java       => java  ::generate_dal(sqir, params, wp),
+        Rust       => rust   ::generate_dal(sqir, params, wp),
+        C          => c      ::generate_dal(sqir, params, wp),
+        CXX        => cxx    ::generate_dal(sqir, params, wp),
+        ObjectiveC => objc   ::generate_dal(sqir, params, wp),
+        Swift      => swift  ::generate_dal(sqir, params, wp),
+        Go         => go     ::generate_dal(sqir, params, wp),
+        JavaScript => js     ::generate_dal(sqir, params, wp),
+        Python     => python ::generate_dal(sqir, params, wp),
+        Ruby       => ruby   ::generate_dal(sqir, params, wp),
+        Java       => java   ::generate_dal(sqir, params, wp),
+        CSharp     => csharp ::generate_dal(sqir, params, wp),
+        Haskell    => haskell::generate_dal(sqir, params, wp),
     }
 }
 
@@ -246,7 +258,10 @@ fn default_type_name_transform(lang: Language) -> NameTransform {
         Go         => UpperCamelCase,
         JavaScript => UpperCamelCase,
         Python     => UpperCamelCase,
+        Ruby       => UpperCamelCase,
         Java       => UpperCamelCase,
+        CSharp     => UpperCamelCase,
+        Haskell    => UpperCamelCase,
     }
 }
 
@@ -263,7 +278,10 @@ fn default_field_name_transform(lang: Language) -> NameTransform {
         Go         => UpperCamelCase,
         JavaScript => LowerCamelCase,
         Python     => LowerSnakeCase,
+        Ruby       => LowerSnakeCase,
         Java       => LowerCamelCase,
+        CSharp     => UpperCamelCase,
+        Haskell    => LowerCamelCase,
     }
 }
 
@@ -279,8 +297,11 @@ fn default_variant_name_transform(lang: Language) -> NameTransform {
         Swift      => LowerCamelCase, // new Swift enums suck :-(
         Go         => UpperCamelCase,
         JavaScript => UpperCamelCase,
-        Python     => UpperCamelCase, // I'm _not_ doing ALL_CAPS.
-        Java       => UpperCamelCase, // Not even for Java.
+        Python     => UpperSnakeCase,
+        Ruby       => UpperSnakeCase,
+        Java       => UpperSnakeCase,
+        CSharp     => UpperCamelCase,
+        Haskell    => UpperCamelCase,
     }
 }
 
@@ -297,7 +318,10 @@ fn default_func_name_transform(lang: Language) -> NameTransform {
         Go         => UpperCamelCase,
         JavaScript => LowerCamelCase,
         Python     => LowerSnakeCase,
+        Ruby       => LowerSnakeCase,
         Java       => LowerCamelCase,
+        CSharp     => UpperCamelCase,
+        Haskell    => LowerCamelCase,
     }
 }
 
@@ -305,6 +329,7 @@ fn default_namespace_transform(lang: Language) -> NameTransform {
     use self::Language::*;
     use self::NameTransform::*;
 
+    // TODO(H2CO3): adjust these according to idiomatic use in each language
     match lang {
         Rust       => Identity,
         C          => Identity,
@@ -314,6 +339,9 @@ fn default_namespace_transform(lang: Language) -> NameTransform {
         Go         => Identity,
         JavaScript => Identity,
         Python     => Identity,
+        Ruby       => Identity,
         Java       => Identity,
+        CSharp     => Identity,
+        Haskell    => Identity,
     }
 }
