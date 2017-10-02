@@ -43,10 +43,21 @@ static NAMING_CONVENTION: NamingConvention = NamingConvention {
 };
 
 //
-// Public generators
+// Public generator
 //
 
-pub fn generate_pod(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+pub fn generate_dal(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+    match params.database_access_mode.unwrap_or_default() {
+        DatabaseAccessMode::Pod          => generate_pod(sqir, params, wp),
+        DatabaseAccessMode::ActiveRecord => generate_active_record(sqir, params, wp),
+    }
+}
+
+//
+// Top-level generators: POD and ActiveRecord
+//
+
+fn generate_pod(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
     // First, generate POD type definitions
     PodUdTypeGen { sqir, params, wp }.generate()?;
 
@@ -61,7 +72,7 @@ pub fn generate_pod(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider
     generate_query_pod(sqir, params, wp)
 }
 
-pub fn generate_active_record(_sqir: &Sqir, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
+fn generate_active_record(_sqir: &Sqir, _params: &CodegenParams, _wp: &mut WriterProvider) -> Result<()> {
     unimplemented!()
 }
 

@@ -223,7 +223,7 @@ pub enum Cardinality {
 }
 
 /// An entity relationship is an **unordered** pair of relation sides.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Relation {
     /// One side of the relationship.
     pub lhs: RelationSide,
@@ -547,7 +547,7 @@ pub struct Group {
 /// `globals` stores all global values (e.g. top-level functions);
 /// keys are namespaces/`impl` names: `None` for no namespace,
 /// `Some("Name")` for `impl Name`.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sqir {
     /// Stores named builtins and user-defined types.
     pub named_types: BTreeMap<String, RcType>,

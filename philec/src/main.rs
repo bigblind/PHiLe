@@ -266,15 +266,12 @@ fn validate_language(langname: &str) -> Language {
     }
 }
 
-fn validate_access(mode: Option<&str>) -> DatabaseAccessMode {
-    mode.map_or(
-        DatabaseAccessMode::Pod,
-        |name| match name {
-            "pod" => DatabaseAccessMode::Pod,
-            "acr" => DatabaseAccessMode::ActiveRecord,
-            _     => handle_argument_error("DB access mode", name),
-        }
-    )
+fn validate_access(mode: Option<&str>) -> Option<DatabaseAccessMode> {
+    mode.map(|name| match name {
+        "pod" => DatabaseAccessMode::Pod,
+        "acr" => DatabaseAccessMode::ActiveRecord,
+        _     => handle_argument_error("DB access mode", name),
+    })
 }
 
 fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {

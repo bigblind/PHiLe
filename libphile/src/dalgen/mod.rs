@@ -73,6 +73,13 @@ pub enum DatabaseAccessMode {
     ActiveRecord,
 }
 
+/// The `default()` database access mode is POD.
+impl Default for DatabaseAccessMode {
+    fn default() -> Self {
+        DatabaseAccessMode::Pod
+    }
+}
+
 /// The rewriting strategy applied to various kinds of named program elements,
 /// such as function, variable, and type names.
 /// In the `CodegenParams` struct, optional instances of this transform are
@@ -99,7 +106,7 @@ pub struct CodegenParams {
     /// The programming language to be targeted. See the docs of `Language`.
     pub language: Language,
     /// Database access strategy. See the docs for `DatabaseAccessMode`.
-    pub database_access_mode: DatabaseAccessMode,
+    pub database_access_mode: Option<DatabaseAccessMode>,
     /// Namespace name. This will be used in different ways for different
     /// programming languages. For example, in Go, it will be the package
     /// name, and is thus **mandatory**.
@@ -127,15 +134,6 @@ pub struct CodegenParams {
 pub type WriterProvider = FnMut(&str) -> Result<Rc<RefCell<io::Write>>>;
 
 
-macro_rules! call_dalgen {
-    ($module: ident, $sqir: expr, $params: expr, $wp: expr) => {
-        match $params.database_access_mode {
-            DatabaseAccessMode::Pod          => $module::generate_pod($sqir, $params, $wp),
-            DatabaseAccessMode::ActiveRecord => $module::generate_active_record($sqir, $params, $wp),
-        }
-    }
-}
-
 /// Given the SQIR representation of a program, and some configuration parameters,
 /// generates a Database Abstraction Layer and writes the code into `io::Write`s.
 ///
@@ -152,16 +150,18 @@ macro_rules! call_dalgen {
 ///   or an `Error::Semantic` induced by some special requirement of the backend
 ///   (e.g. a missing namespace when generating Go code).
 pub fn generate_dal(sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProvider) -> Result<()> {
+    use self::Language::*;
+
     match params.language {
-        Language::Rust       => call_dalgen!(rust,   sqir, params, wp),
-        Language::C          => call_dalgen!(c,      sqir, params, wp),
-        Language::CXX        => call_dalgen!(cxx,    sqir, params, wp),
-        Language::ObjectiveC => call_dalgen!(objc,   sqir, params, wp),
-        Language::Swift      => call_dalgen!(swift,  sqir, params, wp),
-        Language::Go         => call_dalgen!(go,     sqir, params, wp),
-        Language::JavaScript => call_dalgen!(js,     sqir, params, wp),
-        Language::Python     => call_dalgen!(python, sqir, params, wp),
-        Language::Java       => call_dalgen!(java,   sqir, params, wp),
+        Rust       => rust  ::generate_dal(sqir, params, wp),
+        C          => c     ::generate_dal(sqir, params, wp),
+        CXX        => cxx   ::generate_dal(sqir, params, wp),
+        ObjectiveC => objc  ::generate_dal(sqir, params, wp),
+        Swift      => swift ::generate_dal(sqir, params, wp),
+        Go         => go    ::generate_dal(sqir, params, wp),
+        JavaScript => js    ::generate_dal(sqir, params, wp),
+        Python     => python::generate_dal(sqir, params, wp),
+        Java       => java  ::generate_dal(sqir, params, wp),
     }
 }
 
@@ -174,7 +174,7 @@ fn transform_type_name(name: &str, params: &CodegenParams) -> String {
         name,
         params.type_name_transform,
         params.language,
-        default_type_name_transform
+        default_type_name_transform,
     )
 }
 
@@ -183,7 +183,7 @@ fn transform_field_name(name: &str, params: &CodegenParams) -> String {
         name,
         params.field_name_transform,
         params.language,
-        default_field_name_transform
+        default_field_name_transform,
     )
 }
 
@@ -192,7 +192,7 @@ fn transform_variant_name(name: &str, params: &CodegenParams) -> String {
         name,
         params.variant_name_transform,
         params.language,
-        default_variant_name_transform
+        default_variant_name_transform,
     )
 }
 
@@ -201,7 +201,7 @@ fn transform_func_name(name: &str, params: &CodegenParams) -> String {
         name,
         params.func_name_transform,
         params.language,
-        default_func_name_transform
+        default_func_name_transform,
     )
 }
 
@@ -210,7 +210,7 @@ fn transform_namespace(name: &str, params: &CodegenParams) -> String {
         name,
         params.namespace_transform,
         params.language,
-        default_namespace_transform
+        default_namespace_transform,
     )
 }
 
@@ -218,85 +218,102 @@ fn transform_name<D>(
     name: &str,
     transform: Option<NameTransform>,
     lang: Language,
-    default: D
+    default: D,
 ) -> String
     where D: FnOnce(Language) -> NameTransform {
 
+    use self::NameTransform::*;
+
     match transform.unwrap_or(default(lang)) {
-        NameTransform::Identity       => name.to_owned(),
-        NameTransform::LowerSnakeCase => name.to_snake_case(),
-        NameTransform::UpperSnakeCase => name.to_shouty_snake_case(),
-        NameTransform::LowerCamelCase => name.to_mixed_case(),
-        NameTransform::UpperCamelCase => name.to_camel_case(),
+        Identity       => name.to_owned(),
+        LowerSnakeCase => name.to_snake_case(),
+        UpperSnakeCase => name.to_shouty_snake_case(),
+        LowerCamelCase => name.to_mixed_case(),
+        UpperCamelCase => name.to_camel_case(),
     }
 }
 
 fn default_type_name_transform(lang: Language) -> NameTransform {
+    use self::Language::*;
+    use self::NameTransform::*;
+
     match lang {
-        Language::Rust       => NameTransform::UpperCamelCase,
-        Language::C          => NameTransform::UpperCamelCase,
-        Language::CXX        => NameTransform::UpperCamelCase,
-        Language::ObjectiveC => NameTransform::UpperCamelCase,
-        Language::Swift      => NameTransform::UpperCamelCase,
-        Language::Go         => NameTransform::UpperCamelCase,
-        Language::JavaScript => NameTransform::UpperCamelCase,
-        Language::Python     => NameTransform::UpperCamelCase,
-        Language::Java       => NameTransform::UpperCamelCase,
+        Rust       => UpperCamelCase,
+        C          => UpperCamelCase,
+        CXX        => UpperCamelCase,
+        ObjectiveC => UpperCamelCase,
+        Swift      => UpperCamelCase,
+        Go         => UpperCamelCase,
+        JavaScript => UpperCamelCase,
+        Python     => UpperCamelCase,
+        Java       => UpperCamelCase,
     }
 }
 
 fn default_field_name_transform(lang: Language) -> NameTransform {
+    use self::Language::*;
+    use self::NameTransform::*;
+
     match lang {
-        Language::Rust       => NameTransform::LowerSnakeCase,
-        Language::C          => NameTransform::LowerSnakeCase,
-        Language::CXX        => NameTransform::LowerSnakeCase,
-        Language::ObjectiveC => NameTransform::LowerCamelCase,
-        Language::Swift      => NameTransform::LowerCamelCase,
-        Language::Go         => NameTransform::UpperCamelCase,
-        Language::JavaScript => NameTransform::LowerCamelCase,
-        Language::Python     => NameTransform::LowerSnakeCase,
-        Language::Java       => NameTransform::LowerCamelCase,
+        Rust       => LowerSnakeCase,
+        C          => LowerSnakeCase,
+        CXX        => LowerSnakeCase,
+        ObjectiveC => LowerCamelCase,
+        Swift      => LowerCamelCase,
+        Go         => UpperCamelCase,
+        JavaScript => LowerCamelCase,
+        Python     => LowerSnakeCase,
+        Java       => LowerCamelCase,
     }
 }
 
 fn default_variant_name_transform(lang: Language) -> NameTransform {
+    use self::Language::*;
+    use self::NameTransform::*;
+
     match lang {
-        Language::Rust       => NameTransform::UpperCamelCase,
-        Language::C          => NameTransform::UpperCamelCase,
-        Language::CXX        => NameTransform::UpperCamelCase,
-        Language::ObjectiveC => NameTransform::UpperCamelCase,
-        Language::Swift      => NameTransform::LowerCamelCase, // new Swift enums suck :-(
-        Language::Go         => NameTransform::UpperCamelCase,
-        Language::JavaScript => NameTransform::UpperCamelCase,
-        Language::Python     => NameTransform::UpperCamelCase, // I'm _not_ doing ALL_CAPS.
-        Language::Java       => NameTransform::UpperCamelCase, // Not even for Java.
+        Rust       => UpperCamelCase,
+        C          => UpperCamelCase,
+        CXX        => UpperCamelCase,
+        ObjectiveC => UpperCamelCase,
+        Swift      => LowerCamelCase, // new Swift enums suck :-(
+        Go         => UpperCamelCase,
+        JavaScript => UpperCamelCase,
+        Python     => UpperCamelCase, // I'm _not_ doing ALL_CAPS.
+        Java       => UpperCamelCase, // Not even for Java.
     }
 }
 
 fn default_func_name_transform(lang: Language) -> NameTransform {
+    use self::Language::*;
+    use self::NameTransform::*;
+
     match lang {
-        Language::Rust       => NameTransform::LowerSnakeCase,
-        Language::C          => NameTransform::LowerSnakeCase,
-        Language::CXX        => NameTransform::LowerSnakeCase,
-        Language::ObjectiveC => NameTransform::LowerCamelCase,
-        Language::Swift      => NameTransform::LowerCamelCase,
-        Language::Go         => NameTransform::UpperCamelCase,
-        Language::JavaScript => NameTransform::LowerCamelCase,
-        Language::Python     => NameTransform::LowerSnakeCase,
-        Language::Java       => NameTransform::LowerCamelCase,
+        Rust       => LowerSnakeCase,
+        C          => LowerSnakeCase,
+        CXX        => LowerSnakeCase,
+        ObjectiveC => LowerCamelCase,
+        Swift      => LowerCamelCase,
+        Go         => UpperCamelCase,
+        JavaScript => LowerCamelCase,
+        Python     => LowerSnakeCase,
+        Java       => LowerCamelCase,
     }
 }
 
 fn default_namespace_transform(lang: Language) -> NameTransform {
+    use self::Language::*;
+    use self::NameTransform::*;
+
     match lang {
-        Language::Rust       => NameTransform::Identity,
-        Language::C          => NameTransform::Identity,
-        Language::CXX        => NameTransform::Identity,
-        Language::ObjectiveC => NameTransform::Identity,
-        Language::Swift      => NameTransform::Identity,
-        Language::Go         => NameTransform::Identity,
-        Language::JavaScript => NameTransform::Identity,
-        Language::Python     => NameTransform::Identity,
-        Language::Java       => NameTransform::Identity,
+        Rust       => Identity,
+        C          => Identity,
+        CXX        => Identity,
+        ObjectiveC => Identity,
+        Swift      => Identity,
+        Go         => Identity,
+        JavaScript => Identity,
+        Python     => Identity,
+        Java       => Identity,
     }
 }
