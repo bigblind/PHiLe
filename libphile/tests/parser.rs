@@ -1357,6 +1357,72 @@ fn valid_expression() {
                 range: make_range(29, 1..18),
             },
         ),
+        (
+            "{0;;}",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::Semi(
+                            Box::new(Exp {
+                                kind: ExpKind::IntLiteral("0"),
+                                range: make_range(30, 2..3),
+                            })
+                        ),
+                        range: make_range(30, 2..3),
+                    },
+                    Exp {
+                        kind: ExpKind::Empty,
+                        range: make_range(30, 4..5),
+                    },
+                ]),
+                range: make_range(30, 1..6),
+            },
+        ),
+        (
+            "{ let var_name = stuff; }",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::VarDecl(
+                            Box::new(VarDecl {
+                                name: "var_name",
+                                ty: None,
+                                expr: Exp {
+                                    kind: ExpKind::Identifier("stuff"),
+                                    range: make_range(31, 18..23),
+                                },
+                            })
+                        ),
+                        range: make_range(31, 3..24),
+                    },
+                ]),
+                range: make_range(31, 1..26),
+            },
+        ),
+        (
+            "{ let x: T = 999; }",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::VarDecl(
+                            Box::new(VarDecl {
+                                name: "x",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("T"),
+                                    range: make_range(32, 10..11),
+                                }),
+                                expr: Exp {
+                                    kind: ExpKind::IntLiteral("999"),
+                                    range: make_range(32, 14..17),
+                                },
+                            })
+                        ),
+                        range: make_range(32, 3..18),
+                    },
+                ]),
+                range: make_range(32, 1..20),
+            },
+        ),
     ];
 
     // The actual sources to be parsed are formed by concatenating
