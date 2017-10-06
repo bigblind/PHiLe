@@ -1332,6 +1332,18 @@ fn valid_expression() {
             },
         ),
         (
+            "{;}",
+            Exp {
+                kind: ExpKind::Block(vec![
+                    Exp {
+                        kind: ExpKind::Empty,
+                        range: exp_range(29, 2..3),
+                    },
+                ]),
+                range: exp_range(29, 1..4),
+            },
+        ),
+        (
             "{3.1415927; {()}}",
             Exp {
                 kind: ExpKind::Block(vec![
@@ -1339,22 +1351,22 @@ fn valid_expression() {
                         kind: ExpKind::Semi(
                             Box::new(Exp {
                                 kind: ExpKind::FloatLiteral("3.1415927"),
-                                range: exp_range(29, 2..11),
+                                range: exp_range(30, 2..11),
                             })
                         ),
-                        range: exp_range(29, 2..11),
+                        range: exp_range(30, 2..11),
                     },
                     Exp {
                         kind: ExpKind::Block(vec![
                             Exp {
                                 kind: ExpKind::TupleLiteral(vec![]),
-                                range: exp_range(29, 14..16),
+                                range: exp_range(30, 14..16),
                             },
                         ]),
-                        range: exp_range(29, 13..17),
+                        range: exp_range(30, 13..17),
                     },
                 ]),
-                range: exp_range(29, 1..18),
+                range: exp_range(30, 1..18),
             },
         ),
         (
@@ -1365,17 +1377,17 @@ fn valid_expression() {
                         kind: ExpKind::Semi(
                             Box::new(Exp {
                                 kind: ExpKind::IntLiteral("0"),
-                                range: exp_range(30, 2..3),
+                                range: exp_range(31, 2..3),
                             })
                         ),
-                        range: exp_range(30, 2..3),
+                        range: exp_range(31, 2..3),
                     },
                     Exp {
                         kind: ExpKind::Empty,
-                        range: exp_range(30, 4..5),
+                        range: exp_range(31, 4..5),
                     },
                 ]),
-                range: exp_range(30, 1..6),
+                range: exp_range(31, 1..6),
             },
         ),
         (
@@ -1389,14 +1401,14 @@ fn valid_expression() {
                                 ty: None,
                                 expr: Exp {
                                     kind: ExpKind::Identifier("stuff"),
-                                    range: exp_range(31, 18..23),
+                                    range: exp_range(32, 18..23),
                                 },
                             })
                         ),
-                        range: exp_range(31, 3..24),
+                        range: exp_range(32, 3..24),
                     },
                 ]),
-                range: exp_range(31, 1..26),
+                range: exp_range(32, 1..26),
             },
         ),
         (
@@ -1409,18 +1421,96 @@ fn valid_expression() {
                                 name: "x",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("T"),
-                                    range: exp_range(32, 10..11),
+                                    range: exp_range(33, 10..11),
                                 }),
                                 expr: Exp {
                                     kind: ExpKind::IntLiteral("999"),
-                                    range: exp_range(32, 14..17),
+                                    range: exp_range(33, 14..17),
                                 },
                             })
                         ),
-                        range: exp_range(32, 3..18),
+                        range: exp_range(33, 3..18),
                     },
                 ]),
-                range: exp_range(32, 1..20),
+                range: exp_range(33, 1..20),
+            },
+        ),
+        (
+            "if cond { }", // 'if' without else branch
+            Exp {
+                kind: ExpKind::If(
+                    Box::new(If {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("cond"),
+                            range: exp_range(34, 4..8),
+                        },
+                        then_arm: Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(34, 9..12),
+                        },
+                        else_arm: None,
+                    })
+                ),
+                range: exp_range(34, 1..12),
+            },
+        ),
+        (
+            "if true {} else {}", // if with else block
+            Exp {
+                kind: ExpKind::If(
+                    Box::new(If {
+                        condition: Exp {
+                            kind: ExpKind::BoolLiteral("true"),
+                            range: exp_range(35, 4..8),
+                        },
+                        then_arm: Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(35, 9..11),
+                        },
+                        else_arm: Some(Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(35, 17..19),
+                        }),
+                    })
+                ),
+                range: exp_range(35, 1..19),
+            },
+        ),
+        (
+            "if false {} else if true {} else {}",
+            Exp {
+                kind: ExpKind::If(
+                    Box::new(If {
+                        condition: Exp {
+                            kind: ExpKind::BoolLiteral("false"),
+                            range: exp_range(36, 4..9),
+                        },
+                        then_arm: Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(36, 10..12),
+                        },
+                        else_arm: Some(Exp {
+                            kind: ExpKind::If(
+                                Box::new(If {
+                                    condition: Exp {
+                                        kind: ExpKind::BoolLiteral("true"),
+                                        range: exp_range(36, 21..25),
+                                    },
+                                    then_arm: Exp {
+                                        kind: ExpKind::Block(vec![]),
+                                        range: exp_range(36, 26..28),
+                                    },
+                                    else_arm: Some(Exp {
+                                        kind: ExpKind::Block(vec![]),
+                                        range: exp_range(36, 34..36),
+                                    }),
+                                })
+                            ),
+                            range: exp_range(36, 18..36),
+                        }),
+                    })
+                ),
+                range: exp_range(36, 1..36),
             },
         ),
     ];
