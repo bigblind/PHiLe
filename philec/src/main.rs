@@ -31,7 +31,10 @@
 //!   * `go`
 //!   * `js`
 //!   * `python`
+//!   * `ruby`
 //!   * `java`
+//!   * `csharp`
+//!   * `haskell`
 //!
 //! * At least one PHiLe source file, typically with extension `.phi`.
 //!
@@ -253,16 +256,19 @@ fn validate_database(dbname: &str) -> DatabaseEngine {
 
 fn validate_language(langname: &str) -> Language {
     match langname {
-        "rust"   => Language::Rust,
-        "c"      => Language::C,
-        "cxx"    => Language::CXX,
-        "objc"   => Language::ObjectiveC,
-        "swift"  => Language::Swift,
-        "go"     => Language::Go,
-        "js"     => Language::JavaScript,
-        "python" => Language::Python,
-        "java"   => Language::Java,
-        _        => handle_argument_error("language", langname),
+        "rust"    => Language::Rust,
+        "c"       => Language::C,
+        "cxx"     => Language::CXX,
+        "objc"    => Language::ObjectiveC,
+        "swift"   => Language::Swift,
+        "go"      => Language::Go,
+        "js"      => Language::JavaScript,
+        "python"  => Language::Python,
+        "ruby"    => Language::Ruby,
+        "java"    => Language::Java,
+        "csharp"  => Language::CSharp,
+        "haskell" => Language::Haskell,
+        _         => handle_argument_error("language", langname),
     }
 }
 
