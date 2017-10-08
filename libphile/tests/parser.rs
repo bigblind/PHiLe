@@ -1513,6 +1513,399 @@ fn valid_expression() {
                 range: exp_range(36, 1..36),
             },
         ),
+        (
+            "|| _", // function expression with no arguments
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(37, 1..5),
+                        name: None,
+                        arguments: vec![],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(37, 4..5),
+                        },
+                    })
+                ),
+                range: exp_range(37, 1..5),
+            },
+        ),
+        (
+            "|a| _", // one argument, no type annotations
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(38, 1..6),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(38, 2..3),
+                                name: "a",
+                                ty: None,
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(38, 5..6),
+                        },
+                    })
+                ),
+                range: exp_range(38, 1..6),
+            },
+        ),
+        (
+            "|foo,| {}", // one argument without type annotation and a trailing comma
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(39, 1..10),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(39, 2..5),
+                                name: "foo",
+                                ty: None,
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(39, 8..10),
+                        },
+                    })
+                ),
+                range: exp_range(39, 1..10),
+            },
+        ),
+        (
+            "|a, b| _", // multiple arguments, no type annotations
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(40, 1..9),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(40, 2..3),
+                                name: "a",
+                                ty: None,
+                            },
+                            FuncArg {
+                                range: exp_range(40, 5..6),
+                                name: "b",
+                                ty: None,
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(40, 8..9),
+                        },
+                    })
+                ),
+                range: exp_range(40, 1..9),
+            },
+        ),
+        (
+            "|a, b,| _", // multiple arguments and a trailing comma, no type annotations
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(41, 1..10),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(41, 2..3),
+                                name: "a",
+                                ty: None,
+                            },
+                            FuncArg {
+                                range: exp_range(41, 5..6),
+                                name: "b",
+                                ty: None,
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(41, 9..10),
+                        },
+                    })
+                ),
+                range: exp_range(41, 1..10),
+            },
+        ),
+        (
+            "|a: T| _", // one argument with type annotations
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(42, 1..9),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(42, 2..6),
+                                name: "a",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("T"),
+                                    range: exp_range(42, 5..6),
+                                }),
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(42, 8..9),
+                        },
+                    })
+                ),
+                range: exp_range(42, 1..9),
+            },
+        ),
+        (
+            "|b: U,| _", // one argument with type annotations and a trailing comma
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(43, 1..10),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(43, 2..6),
+                                name: "b",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("U"),
+                                    range: exp_range(43, 5..6),
+                                }),
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(43, 9..10),
+                        },
+                    })
+                ),
+                range: exp_range(43, 1..10),
+            },
+        ),
+        (
+            "|a: T, b: U| _", // many arguments with type annotations
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(44, 1..15),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(44, 2..6),
+                                name: "a",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("T"),
+                                    range: exp_range(44, 5..6),
+                                }),
+                            },
+                            FuncArg {
+                                range: exp_range(44, 8..12),
+                                name: "b",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("U"),
+                                    range: exp_range(44, 11..12),
+                                }),
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(44, 14..15),
+                        },
+                    })
+                ),
+                range: exp_range(44, 1..15),
+            },
+        ),
+        (
+            "|a: T, b: U,| _", // many arguments with type annotations and trailing comma
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(45, 1..16),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(45, 2..6),
+                                name: "a",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("T"),
+                                    range: exp_range(45, 5..6),
+                                }),
+                            },
+                            FuncArg {
+                                range: exp_range(45, 8..12),
+                                name: "b",
+                                ty: Some(Ty {
+                                    kind: TyKind::Named("U"),
+                                    range: exp_range(45, 11..12),
+                                }),
+                            },
+                        ],
+                        ret_type: None,
+                        body: Exp {
+                            kind: ExpKind::Identifier("_"),
+                            range: exp_range(45, 15..16),
+                        },
+                    })
+                ),
+                range: exp_range(45, 1..16),
+            },
+        ),
+        (
+            "|| -> [Z] {}", // no argument and an explicit return type
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(46, 1..13),
+                        name: None,
+                        arguments: vec![],
+                        ret_type: Some(Ty {
+                            kind: TyKind::Array(
+                                Box::new(Ty {
+                                    kind: TyKind::Named("Z"),
+                                    range: exp_range(46, 8..9),
+                                })
+                            ),
+                            range: exp_range(46, 7..10),
+                        }),
+                        body: Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(46, 11..13),
+                        },
+                    })
+                ),
+                range: exp_range(46, 1..13),
+            },
+        ),
+        (
+            "|arg_name| -> Meh? { body }", // one argument and an explicit return type
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(47, 1..28),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(47, 2..10),
+                                name: "arg_name",
+                                ty: None,
+                            },
+                        ],
+                        ret_type: Some(Ty {
+                            kind: TyKind::Optional(
+                                Box::new(Ty {
+                                    kind: TyKind::Named("Meh"),
+                                    range: exp_range(47, 15..18),
+                                })
+                            ),
+                            range: exp_range(47, 15..19),
+                        }),
+                        body: Exp {
+                            kind: ExpKind::Block(vec![
+                                Exp {
+                                    kind: ExpKind::Identifier("body"),
+                                    range: exp_range(47, 22..26),
+                                },
+                            ]),
+                            range: exp_range(47, 20..28),
+                        },
+                    })
+                ),
+                range: exp_range(47, 1..28),
+            },
+        ),
+        (
+            "|x: &ABC| -> (_) { _ }", // explicit argument type and return type
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(48, 1..23),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(48, 2..9),
+                                name: "x",
+                                ty: Some(Ty {
+                                    kind: TyKind::Pointer(
+                                        Box::new(Ty {
+                                            kind: TyKind::Named("ABC"),
+                                            range: exp_range(48, 6..9),
+                                        }),
+                                    ),
+                                    range: exp_range(48, 5..9),
+                                }),
+                            },
+                        ],
+                        ret_type: Some(Ty {
+                            kind: TyKind::Tuple(vec![
+                                Ty {
+                                    kind: TyKind::Named("_"),
+                                    range: exp_range(48, 15..16),
+                                },
+                            ]),
+                            range: exp_range(48, 14..17),
+                        }),
+                        body: Exp {
+                            kind: ExpKind::Block(vec![
+                                Exp {
+                                    kind: ExpKind::Identifier("_"),
+                                    range: exp_range(48, 20..21),
+                                },
+                            ]),
+                            range: exp_range(48, 18..23),
+                        },
+                    })
+                ),
+                range: exp_range(48, 1..23),
+            },
+        ),
+        (
+            "|_0, _1| -> _2 { _3 }", // multiple arguments and an explicit return type
+            Exp {
+                kind: ExpKind::FuncExp(
+                    Box::new(Function {
+                        range: exp_range(49, 1..22),
+                        name: None,
+                        arguments: vec![
+                            FuncArg {
+                                range: exp_range(49, 2..4),
+                                name: "_0",
+                                ty: None,
+                            },
+                            FuncArg {
+                                range: exp_range(49, 6..8),
+                                name: "_1",
+                                ty: None,
+                            },
+                        ],
+                        ret_type: Some(Ty {
+                            kind: TyKind::Named("_2"),
+                            range: exp_range(49, 13..15),
+                        }),
+                        body: Exp {
+                            kind: ExpKind::Block(vec![
+                                Exp {
+                                    kind: ExpKind::Identifier("_3"),
+                                    range: exp_range(49, 18..20),
+                                },
+                            ]),
+                            range: exp_range(49, 16..22),
+                        },
+                    })
+                ),
+                range: exp_range(49, 1..22),
+            },
+        ),
     ];
 
     // The actual sources to be parsed are formed by concatenating
