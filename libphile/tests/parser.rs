@@ -1391,7 +1391,7 @@ fn valid_expression() {
             },
         ),
         (
-            "{ let var_name = stuff; }",
+            "{ let var_name = stuff; }", // variable declaration without explicit types
             Exp {
                 kind: ExpKind::Block(vec![
                     Exp {
@@ -1412,7 +1412,7 @@ fn valid_expression() {
             },
         ),
         (
-            "{ let x: T = 999; }",
+            "{ let x: T = 999; }", // variable declaration with type annotation
             Exp {
                 kind: ExpKind::Block(vec![
                     Exp {
@@ -1477,7 +1477,7 @@ fn valid_expression() {
             },
         ),
         (
-            "if false {} else if true {} else {}",
+            "if false {} else if true {} else {}", // else if
             Exp {
                 kind: ExpKind::If(
                     Box::new(If {
