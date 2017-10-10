@@ -1371,15 +1371,29 @@ fn interesting_valid_sources() {
         ("struct",  vec!["struct"]),
         ("class",   vec!["class"]),
         ("enum",    vec!["enum"]),
+        ("fn",      vec!["fn"]),
         ("impl",    vec!["impl"]),
         ("let",     vec!["let"]),
 
         // line comments without a trailing newline
         ("#", vec!["#"]),
         ("# baz", vec!["# baz"]),
+        ("#\t", vec!["#\t"]),
 
         // without a decimal point, it's not a floating-point literal
         ("123e456", vec!["123", "e456"]),
+
+        // numbers followed directly by a letter are allowed _for now_. Soon they won't be.
+        ("99foo",       vec!["99", "foo"]),
+        ("03.14barqux", vec!["03.14", "barqux"]),
+
+        // Lonely 0[bBoOxX] prefixes are _currently_ recognized as a zero and a letter. Soon they won't be.
+        ("0b", vec!["0", "b"]),
+        ("0B", vec!["0", "B"]),
+        ("0o", vec!["0", "o"]),
+        ("0O", vec!["0", "O"]),
+        ("0x", vec!["0", "x"]),
+        ("0X", vec!["0", "X"]),
 
         // .. and ... after a number is a range, not a floating-point literal
         ("10..99", vec!["10", "..", "99"]),
