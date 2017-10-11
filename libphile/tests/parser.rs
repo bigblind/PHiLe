@@ -1906,6 +1906,201 @@ fn valid_expression() {
                 range: exp_range(49, 1..22),
             },
         ),
+
+        // Postfix operators
+        (
+            "base.member",
+            Exp {
+                kind: ExpKind::MemberAccess(MemberAccess {
+                    base: Box::new(Exp {
+                        kind: ExpKind::Identifier("base"),
+                        range: exp_range(50, 1..5),
+                    }),
+                    member: "member",
+                }),
+                range: exp_range(50, 1..12),
+            },
+        ),
+        (
+            "(base_expr,).member_name.multi",
+            Exp {
+                kind: ExpKind::MemberAccess(MemberAccess {
+                    base: Box::new(Exp {
+                        kind: ExpKind::MemberAccess(MemberAccess {
+                            base: Box::new(Exp {
+                                kind: ExpKind::TupleLiteral(vec![
+                                    Exp {
+                                        kind: ExpKind::Identifier("base_expr"),
+                                        range: exp_range(51, 2..11),
+                                    },
+                                ]),
+                                range: exp_range(51, 1..13),
+                            }),
+                            member: "member_name",
+                        }),
+                        range: exp_range(51, 1..25),
+                    }),
+                    member: "multi",
+                }),
+                range: exp_range(51, 1..31),
+            },
+        ),
+        (
+            "namespace::Item",
+            Exp {
+                kind: ExpKind::QualAccess(QualAccess {
+                    base: Box::new(Exp {
+                        kind: ExpKind::Identifier("namespace"),
+                        range: exp_range(52, 1..10),
+                    }),
+                    member: "Item",
+                }),
+                range: exp_range(52, 1..16),
+            },
+        ),
+        (
+            "[other_namespace]::Deeper::OtherItem",
+            Exp {
+                kind: ExpKind::QualAccess(QualAccess {
+                    base: Box::new(Exp {
+                        kind: ExpKind::QualAccess(QualAccess {
+                            base: Box::new(Exp {
+                                kind: ExpKind::ArrayLiteral(vec![
+                                    Exp {
+                                        kind: ExpKind::Identifier("other_namespace"),
+                                        range: exp_range(53, 2..17),
+                                    },
+                                ]),
+                                range: exp_range(53, 1..18),
+                            }),
+                            member: "Deeper",
+                        }),
+                        range: exp_range(53, 1..26),
+                    }),
+                    member: "OtherItem",
+                }),
+                range: exp_range(53, 1..37),
+            },
+        ),
+        (
+            "mixed.foo::bar.expr",
+            Exp {
+                kind: ExpKind::MemberAccess(MemberAccess {
+                    base: Box::new(Exp {
+                        kind: ExpKind::QualAccess(QualAccess {
+                            base: Box::new(Exp {
+                                kind: ExpKind::MemberAccess(MemberAccess {
+                                    base: Box::new(Exp {
+                                        kind: ExpKind::Identifier("mixed"),
+                                        range: exp_range(54, 1..6),
+                                    }),
+                                    member: "foo",
+                                }),
+                                range: exp_range(54, 1..10),
+                            }),
+                            member: "bar",
+                        }),
+                        range: exp_range(54, 1..15),
+                    }),
+                    member: "expr",
+                }),
+                range: exp_range(54, 1..20),
+            },
+        ),
+        (
+            "sub[script]",
+            Exp {
+                kind: ExpKind::Subscript(
+                    Box::new(Subscript {
+                        base: Exp {
+                            kind: ExpKind::Identifier("sub"),
+                            range: exp_range(55, 1..4),
+                        },
+                        index: Exp {
+                            kind: ExpKind::Identifier("script"),
+                            range: exp_range(55, 5..11),
+                        },
+                    })
+                ),
+                range: exp_range(55, 1..12),
+            },
+        ),
+        (
+            r#"more[77]["subscripting"]"#,
+            Exp {
+                kind: ExpKind::Subscript(
+                    Box::new(Subscript {
+                        base: Exp {
+                            kind: ExpKind::Subscript(
+                                Box::new(Subscript {
+                                    base: Exp {
+                                        kind: ExpKind::Identifier("more"),
+                                        range: exp_range(56, 1..5),
+                                    },
+                                    index: Exp {
+                                        kind: ExpKind::IntLiteral("77"),
+                                        range: exp_range(56, 6..8),
+                                    },
+                                })
+                            ),
+                            range: exp_range(56, 1..9),
+                        },
+                        index: Exp {
+                            kind: ExpKind::StringLiteral(r#""subscripting""#),
+                            range: exp_range(56, 10..24),
+                        },
+                    })
+                ),
+                range: exp_range(56, 1..25),
+            },
+        ),
+        (
+            "sub[script[ception]]",
+            Exp {
+                kind: ExpKind::Subscript(
+                    Box::new(Subscript {
+                        base: Exp {
+                            kind: ExpKind::Identifier("sub"),
+                            range: exp_range(57, 1..4),
+                        },
+                        index: Exp {
+                            kind: ExpKind::Subscript(
+                                Box::new(Subscript {
+                                    base: Exp {
+                                        kind: ExpKind::Identifier("script"),
+                                        range: exp_range(57, 5..11),
+                                    },
+                                    index: Exp {
+                                        kind: ExpKind::Identifier("ception"),
+                                        range: exp_range(57, 12..19),
+                                    },
+                                }),
+                            ),
+                            range: exp_range(57, 5..20),
+                        },
+                    })
+                ),
+                range: exp_range(57, 1..21),
+            },
+        ),
+        (
+            "[][[]]",
+            Exp {
+                kind: ExpKind::Subscript(
+                    Box::new(Subscript {
+                        base: Exp {
+                            kind: ExpKind::ArrayLiteral(vec![]),
+                            range: exp_range(58, 1..3),
+                        },
+                        index: Exp {
+                            kind: ExpKind::ArrayLiteral(vec![]),
+                            range: exp_range(58, 4..6),
+                        },
+                    })
+                ),
+                range: exp_range(58, 1..7),
+            },
+        ),
     ];
 
     // The actual sources to be parsed are formed by concatenating

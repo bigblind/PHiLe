@@ -694,8 +694,10 @@ impl<'a> Parser<'a> {
         let else_arm = if self.accept("else").is_some() {
             let expr = if self.is_at("if") {
                 self.parse_if()?
-            } else {
+            } else if self.is_at("{") {
                 self.parse_block()?
+            } else {
+                Err(self.expectation_error("if or block after else"))?
             };
             Some(expr)
         } else {
