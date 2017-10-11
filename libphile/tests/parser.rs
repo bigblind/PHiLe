@@ -2138,12 +2138,15 @@ fn valid_expression() {
 
     // Finally, parse the array of sources, and compare the resulting
     // (actual) items to the expected ones constructed above.
-    let (sources, items): (Vec<_>, Vec<_>) = iter.unzip();
-    let expected_ast = Prog { items };
+    let (sources, expected): (Vec<_>, Vec<_>) = iter.unzip();
     let tokens = lex_filter_ws_comment(&sources);
-    let actual_ast = parse_valid(&tokens);
+    let actual = parse_valid(&tokens).items;
 
-    assert_eq!(actual_ast, expected_ast);
+    assert_eq!(actual.len(), expected.len());
+
+    for (actual, expected) in actual.into_iter().zip(expected) {
+        assert_eq!(actual, expected);
+    }
 }
 
 #[test]
