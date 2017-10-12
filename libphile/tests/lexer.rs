@@ -1031,13 +1031,13 @@ fn shrink_valid_number_items() {
 
 #[test]
 fn shrink_valid_punctuation() {
-    for value in PUNCTUATION {
+    for &value in PUNCTUATION {
         let it = iter::once(ValidPunct { value });
         let items: Vec<_> = shrunk_transitive_closure(it)
             .map(|lexeme| lexeme.value)
             .collect();
 
-        assert_eq!(items, [*value]);
+        assert_eq!(items, [value]);
     }
 }
 

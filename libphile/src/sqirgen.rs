@@ -48,12 +48,12 @@ macro_rules! implement_wrapping_type_getter {
 macro_rules! sema_error {
     ($cause: expr, $msg: expr) => ({
         let message = $msg.to_owned();
-        let range = Some($cause.range());
+        let range = $cause.range().into();
         Err(Error::Semantic { message, range })
     });
     ($cause: expr, $fmt: expr, $($arg: tt)+) => ({
         let message = format!($fmt, $($arg)+);
-        let range = Some($cause.range());
+        let range = $cause.range().into();
         Err(Error::Semantic { message, range })
     });
 }
@@ -1145,12 +1145,12 @@ impl SqirGen {
         // they'll be discarded anyway, so this is harmless.
         let lhs = RelationSide {
             entity:      lhs_class_type.clone(),
-            field:       Some(lhs_field_name.to_owned()),
+            field:       lhs_field_name.to_owned().into(),
             cardinality: lhs_card,
         };
         let rhs = RelationSide {
             entity:      rhs_class_type.clone(),
-            field:       Some(rhs_field_name.to_owned()),
+            field:       rhs_field_name.to_owned().into(),
             cardinality: rhs_card,
         };
 
@@ -1182,7 +1182,7 @@ impl SqirGen {
     ) -> Result<()> {
         let lhs = RelationSide {
             entity:      lhs_type.clone(),
-            field:       Some(lhs_field_name.to_owned()),
+            field:       lhs_field_name.to_owned().into(),
             cardinality: lhs_cardinality,
         };
         let rhs = RelationSide {
@@ -1272,7 +1272,7 @@ impl SqirGen {
         // Make the relation
         let lhs = RelationSide {
             entity:      class_type.clone(),
-            field:       Some(field_name.to_owned()),
+            field:       field_name.to_owned().into(),
             cardinality: Cardinality::ZeroOrMore,
         };
         let rhs = RelationSide {
@@ -1341,7 +1341,7 @@ impl SqirGen {
             |func_node| self.compute_type_of_function(func_node)
         ).collect::<Result<_>>()?;
 
-        let impl_name = Some(decl.name.to_owned());
+        let impl_name = decl.name.to_owned().into();
 
         match self.sqir.globals.entry(impl_name) {
             Vacant(ve) => {
@@ -1419,7 +1419,7 @@ impl SqirGen {
             None => return sema_error!(ns, "Unknown type: '{}'", ns.name),
         }
 
-        let namespace = Some(ns.name.to_owned());
+        let namespace = ns.name.to_owned().into();
 
         for func in &ns.functions {
             self.generate_global_function(func, &namespace)?
@@ -1947,14 +1947,14 @@ impl SqirGen {
         func:      &ast::Function,
     ) -> Result<Option<RcType>> {
         let ret_type_hint = match (type_hint, &func.ret_type) {
-            (&Some(ref t), &None) => Some(t.ret_type.to_rc()?),
-            (&None, &Some(ref rt_decl)) => Some(self.type_from_decl(rt_decl)?),
+            (&Some(ref t), &None) => t.ret_type.to_rc()?.into(),
+            (&None, &Some(ref rt_decl)) => self.type_from_decl(rt_decl)?.into(),
             (&Some(ref t), &Some(ref rt_decl)) => {
                 let expected_ret_type = t.ret_type.to_rc()?;
                 let actual_ret_type = self.type_from_decl(rt_decl)?;
 
                 if actual_ret_type == expected_ret_type {
-                    Some(actual_ret_type)
+                    actual_ret_type.into()
                 } else {
                     return sema_error!(
                         rt_decl,
@@ -1982,6 +1982,6 @@ impl SqirGen {
             None              => self.get_unit_type()?,
         };
 
-        Ok(Some(ret_type))
+        Ok(ret_type.into())
     }
 }

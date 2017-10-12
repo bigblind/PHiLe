@@ -113,7 +113,7 @@ impl Error {
             Error::BorrowMut(_)           => None,
             Error::Strongify              => None,
             Error::Unreachable { .. }     => None,
-            Error::Syntax   { range, .. } => Some(range),
+            Error::Syntax   { range, .. } => range.into(),
             Error::Semantic { range, .. } => range,
         };
 

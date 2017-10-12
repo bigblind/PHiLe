@@ -408,7 +408,7 @@ fn generate_global(
 ) -> Result<()> {
     match (&expr.value, &*expr.ty.borrow()?) {
         (&Value::Function(ref func), &Type::Function(ref ty)) => {
-            generate_function(wr, ns, Some(name), func, ty, params)
+            generate_function(wr, ns, name.into(), func, ty, params)
         },
         (val, ty) => bug!("Non-Function global?! {} ({:#?})", ty, val),
     }

@@ -316,7 +316,7 @@ impl<'a> Parser<'a> {
     fn parse_function(&mut self) -> Result<Function<'a>> {
         let fn_keyword = self.expect("fn")?;
         let name_tok = self.expect_identifier()?;
-        let name = Some(name_tok.value);
+        let name = name_tok.value.into();
         let (arguments, _) = self.parse_paren_delim(
             "(", Self::parse_decl_arg, ",", ")"
         )?;

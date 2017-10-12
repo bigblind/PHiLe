@@ -657,7 +657,7 @@ impl Display for Cardinality {
 
 impl PartialOrd for RelationSide {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        self.cmp(other).into()
     }
 }
 
@@ -698,7 +698,7 @@ impl Eq for Relation {}
 
 impl PartialOrd for Relation {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+        self.cmp(other).into()
     }
 }
 
