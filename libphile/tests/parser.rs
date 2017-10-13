@@ -1033,6 +1033,9 @@ fn valid_expression_tester() -> (RangeGen, EvalTest) {
     // itself, but a block that contains `node` as its only
     // element. This top-level body block thus also has a
     // source range; that is what we are calculating below.
+    // Cases are expressions to be parsed and the corresponding expected
+    // AST node fragments. Each node fragment will be the only element
+    // in the body block of one of the array of wrapping functions.
     let evaluate = move |cases: Vec<(&str, Exp)>| {
         let decorate_case = |(i, (src, node))| {
             let src = [prefix, src, suffix].join("");
@@ -1075,14 +1078,10 @@ fn valid_expression_tester() -> (RangeGen, EvalTest) {
 }
 
 #[test]
-fn valid_expression() {
-	let (exp_range, evaluate) = valid_expression_tester();
+fn valid_atomic_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
 
-    // Expressions to be parsed and the corresponding expected AST
-    // node fragments. Each node fragment will be the only element
-    // in the body block of one of the array of wrapping functions.
     let cases = vec![
-        // Atomic expressions
         (
             "nil",
             Exp {
@@ -1188,13 +1187,21 @@ fn valid_expression() {
                 range: exp_range(14, 1..15),
             },
         ),
+    ];
 
-        // Non-atomic terms
+    evaluate(cases);
+}
+
+#[test]
+fn valid_non_atomic_term() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
         (
             "()",
             Exp {
                 kind: ExpKind::TupleLiteral(vec![]),
-                range: exp_range(15, 1..3),
+                range: exp_range(0, 1..3),
             },
         ),
         (
@@ -1203,10 +1210,10 @@ fn valid_expression() {
                 kind: ExpKind::TupleLiteral(vec![
                     Exp {
                         kind: ExpKind::TupleLiteral(vec![]),
-                        range: exp_range(16, 2..4),
+                        range: exp_range(1, 2..4),
                     },
                 ]),
-                range: exp_range(16, 1..5),
+                range: exp_range(1, 1..5),
             },
         ),
         (
@@ -1215,14 +1222,14 @@ fn valid_expression() {
                 kind: ExpKind::TupleLiteral(vec![
                     Exp {
                         kind: ExpKind::TupleLiteral(vec![]),
-                        range: exp_range(17, 2..4),
+                        range: exp_range(2, 2..4),
                     },
                     Exp {
                         kind: ExpKind::TupleLiteral(vec![]),
-                        range: exp_range(17, 5..7),
+                        range: exp_range(2, 5..7),
                     },
                 ]),
-                range: exp_range(17, 1..8),
+                range: exp_range(2, 1..8),
             },
         ),
         (
@@ -1231,10 +1238,10 @@ fn valid_expression() {
                 kind: ExpKind::TupleLiteral(vec![
                     Exp {
                         kind: ExpKind::Identifier("foo"),
-                        range: exp_range(18, 2..5),
+                        range: exp_range(3, 2..5),
                     },
                 ]),
-                range: exp_range(18, 1..6),
+                range: exp_range(3, 1..6),
             },
         ),
         (
@@ -1245,13 +1252,13 @@ fn valid_expression() {
                         kind: ExpKind::TupleLiteral(vec![
                             Exp {
                                 kind: ExpKind::NilLiteral,
-                                range: exp_range(19, 3..6),
+                                range: exp_range(4, 3..6),
                             },
                         ]),
-                        range: exp_range(19, 2..7),
+                        range: exp_range(4, 2..7),
                     },
                 ]),
-                range: exp_range(19, 1..9),
+                range: exp_range(4, 1..9),
             },
         ),
         (
@@ -1260,29 +1267,29 @@ fn valid_expression() {
                 kind: ExpKind::TupleLiteral(vec![
                     Exp {
                         kind: ExpKind::IntLiteral("1"),
-                        range: exp_range(20, 2..3),
+                        range: exp_range(5, 2..3),
                     },
                     Exp {
                         kind: ExpKind::IntLiteral("0"),
-                        range: exp_range(20, 5..6),
+                        range: exp_range(5, 5..6),
                     },
                     Exp {
                         kind: ExpKind::FloatLiteral("0.0"),
-                        range: exp_range(20, 8..11),
+                        range: exp_range(5, 8..11),
                     },
                     Exp {
                         kind: ExpKind::FloatLiteral("99.56"),
-                        range: exp_range(20, 13..18),
+                        range: exp_range(5, 13..18),
                     },
                 ]),
-                range: exp_range(20, 1..19),
+                range: exp_range(5, 1..19),
             },
         ),
         (
             "[]",
             Exp {
                 kind: ExpKind::ArrayLiteral(vec![]),
-                range: exp_range(21, 1..3),
+                range: exp_range(6, 1..3),
             },
         ),
         (
@@ -1291,10 +1298,10 @@ fn valid_expression() {
                 kind: ExpKind::ArrayLiteral(vec![
                     Exp {
                         kind: ExpKind::ArrayLiteral(vec![]),
-                        range: exp_range(22, 2..4),
+                        range: exp_range(7, 2..4),
                     },
                 ]),
-                range: exp_range(22, 1..5),
+                range: exp_range(7, 1..5),
             },
         ),
         (
@@ -1303,14 +1310,14 @@ fn valid_expression() {
                 kind: ExpKind::ArrayLiteral(vec![
                     Exp {
                         kind: ExpKind::ArrayLiteral(vec![]),
-                        range: exp_range(23, 2..4),
+                        range: exp_range(8, 2..4),
                     },
                     Exp {
                         kind: ExpKind::ArrayLiteral(vec![]),
-                        range: exp_range(23, 5..7),
+                        range: exp_range(8, 5..7),
                     },
                 ]),
-                range: exp_range(23, 1..8),
+                range: exp_range(8, 1..8),
             },
         ),
         (
@@ -1321,24 +1328,24 @@ fn valid_expression() {
                         kind: ExpKind::ArrayLiteral(vec![
                             Exp {
                                 kind: ExpKind::BoolLiteral("true"),
-                                range: exp_range(24, 3..7),
+                                range: exp_range(9, 3..7),
                             },
                             Exp {
                                 kind: ExpKind::BoolLiteral("false"),
-                                range: exp_range(24, 9..14),
+                                range: exp_range(9, 9..14),
                             },
                         ]),
-                        range: exp_range(24, 2..17),
+                        range: exp_range(9, 2..17),
                     },
                 ]),
-                range: exp_range(24, 1..18),
+                range: exp_range(9, 1..18),
             },
         ),
         (
             "{}",
             Exp {
                 kind: ExpKind::Block(vec![]),
-                range: exp_range(25, 1..3),
+                range: exp_range(10, 1..3),
             },
         ),
         (
@@ -1347,10 +1354,10 @@ fn valid_expression() {
                 kind: ExpKind::Block(vec![
                     Exp {
                         kind: ExpKind::Block(vec![]),
-                        range: exp_range(26, 2..4),
+                        range: exp_range(11, 2..4),
                     },
                 ]),
-                range: exp_range(26, 1..5),
+                range: exp_range(11, 1..5),
             },
         ),
         (
@@ -1359,14 +1366,14 @@ fn valid_expression() {
                 kind: ExpKind::Block(vec![
                     Exp {
                         kind: ExpKind::Block(vec![]),
-                        range: exp_range(27, 2..4),
+                        range: exp_range(12, 2..4),
                     },
                     Exp {
                         kind: ExpKind::Block(vec![]),
-                        range: exp_range(27, 4..6),
+                        range: exp_range(12, 4..6),
                     },
                 ]),
-                range: exp_range(27, 1..7),
+                range: exp_range(12, 1..7),
             },
         ),
         (
@@ -1375,18 +1382,18 @@ fn valid_expression() {
                 kind: ExpKind::Block(vec![
                     Exp {
                         kind: ExpKind::Block(vec![]),
-                        range: exp_range(28, 2..4),
+                        range: exp_range(13, 2..4),
                     },
                     Exp {
                         kind: ExpKind::Empty,
-                        range: exp_range(28, 4..5),
+                        range: exp_range(13, 4..5),
                     },
                     Exp {
                         kind: ExpKind::Block(vec![]),
-                        range: exp_range(28, 5..7),
+                        range: exp_range(13, 5..7),
                     },
                 ]),
-                range: exp_range(28, 1..8),
+                range: exp_range(13, 1..8),
             },
         ),
         (
@@ -1395,10 +1402,10 @@ fn valid_expression() {
                 kind: ExpKind::Block(vec![
                     Exp {
                         kind: ExpKind::Empty,
-                        range: exp_range(29, 2..3),
+                        range: exp_range(14, 2..3),
                     },
                 ]),
-                range: exp_range(29, 1..4),
+                range: exp_range(14, 1..4),
             },
         ),
         (
@@ -1409,22 +1416,22 @@ fn valid_expression() {
                         kind: ExpKind::Semi(
                             Box::new(Exp {
                                 kind: ExpKind::FloatLiteral("3.1415927"),
-                                range: exp_range(30, 2..11),
+                                range: exp_range(15, 2..11),
                             })
                         ),
-                        range: exp_range(30, 2..11),
+                        range: exp_range(15, 2..11),
                     },
                     Exp {
                         kind: ExpKind::Block(vec![
                             Exp {
                                 kind: ExpKind::TupleLiteral(vec![]),
-                                range: exp_range(30, 14..16),
+                                range: exp_range(15, 14..16),
                             },
                         ]),
-                        range: exp_range(30, 13..17),
+                        range: exp_range(15, 13..17),
                     },
                 ]),
-                range: exp_range(30, 1..18),
+                range: exp_range(15, 1..18),
             },
         ),
         (
@@ -1435,19 +1442,29 @@ fn valid_expression() {
                         kind: ExpKind::Semi(
                             Box::new(Exp {
                                 kind: ExpKind::IntLiteral("0"),
-                                range: exp_range(31, 2..3),
+                                range: exp_range(16, 2..3),
                             })
                         ),
-                        range: exp_range(31, 2..3),
+                        range: exp_range(16, 2..3),
                     },
                     Exp {
                         kind: ExpKind::Empty,
-                        range: exp_range(31, 4..5),
+                        range: exp_range(16, 4..5),
                     },
                 ]),
-                range: exp_range(31, 1..6),
+                range: exp_range(16, 1..6),
             },
         ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_variable_decl() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
         (
             "{ let var_name = stuff; }", // variable declaration without explicit types
             Exp {
@@ -1459,14 +1476,14 @@ fn valid_expression() {
                                 ty: None,
                                 expr: Exp {
                                     kind: ExpKind::Identifier("stuff"),
-                                    range: exp_range(32, 18..23),
+                                    range: exp_range(0, 18..23),
                                 },
                             })
                         ),
-                        range: exp_range(32, 3..24),
+                        range: exp_range(0, 3..24),
                     },
                 ]),
-                range: exp_range(32, 1..26),
+                range: exp_range(0, 1..26),
             },
         ),
         (
@@ -1479,20 +1496,30 @@ fn valid_expression() {
                                 name: "x",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("T"),
-                                    range: exp_range(33, 10..11),
+                                    range: exp_range(1, 10..11),
                                 }),
                                 expr: Exp {
                                     kind: ExpKind::IntLiteral("999"),
-                                    range: exp_range(33, 14..17),
+                                    range: exp_range(1, 14..17),
                                 },
                             })
                         ),
-                        range: exp_range(33, 3..18),
+                        range: exp_range(1, 3..18),
                     },
                 ]),
-                range: exp_range(33, 1..20),
+                range: exp_range(1, 1..20),
             },
         ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_if_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
         (
             "if cond { }", // 'if' without else branch
             Exp {
@@ -1500,16 +1527,16 @@ fn valid_expression() {
                     Box::new(If {
                         condition: Exp {
                             kind: ExpKind::Identifier("cond"),
-                            range: exp_range(34, 4..8),
+                            range: exp_range(0, 4..8),
                         },
                         then_arm: Exp {
                             kind: ExpKind::Block(vec![]),
-                            range: exp_range(34, 9..12),
+                            range: exp_range(0, 9..12),
                         },
                         else_arm: None,
                     })
                 ),
-                range: exp_range(34, 1..12),
+                range: exp_range(0, 1..12),
             },
         ),
         (
@@ -1519,19 +1546,19 @@ fn valid_expression() {
                     Box::new(If {
                         condition: Exp {
                             kind: ExpKind::BoolLiteral("true"),
-                            range: exp_range(35, 4..8),
+                            range: exp_range(1, 4..8),
                         },
                         then_arm: Exp {
                             kind: ExpKind::Block(vec![]),
-                            range: exp_range(35, 9..11),
+                            range: exp_range(1, 9..11),
                         },
                         else_arm: Some(Exp {
                             kind: ExpKind::Block(vec![]),
-                            range: exp_range(35, 17..19),
+                            range: exp_range(1, 17..19),
                         }),
                     })
                 ),
-                range: exp_range(35, 1..19),
+                range: exp_range(1, 1..19),
             },
         ),
         (
@@ -1541,52 +1568,62 @@ fn valid_expression() {
                     Box::new(If {
                         condition: Exp {
                             kind: ExpKind::BoolLiteral("false"),
-                            range: exp_range(36, 4..9),
+                            range: exp_range(2, 4..9),
                         },
                         then_arm: Exp {
                             kind: ExpKind::Block(vec![]),
-                            range: exp_range(36, 10..12),
+                            range: exp_range(2, 10..12),
                         },
                         else_arm: Some(Exp {
                             kind: ExpKind::If(
                                 Box::new(If {
                                     condition: Exp {
                                         kind: ExpKind::BoolLiteral("true"),
-                                        range: exp_range(36, 21..25),
+                                        range: exp_range(2, 21..25),
                                     },
                                     then_arm: Exp {
                                         kind: ExpKind::Block(vec![]),
-                                        range: exp_range(36, 26..28),
+                                        range: exp_range(2, 26..28),
                                     },
                                     else_arm: Some(Exp {
                                         kind: ExpKind::Block(vec![]),
-                                        range: exp_range(36, 34..36),
+                                        range: exp_range(2, 34..36),
                                     }),
                                 })
                             ),
-                            range: exp_range(36, 18..36),
+                            range: exp_range(2, 18..36),
                         }),
                     })
                 ),
-                range: exp_range(36, 1..36),
+                range: exp_range(2, 1..36),
             },
         ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_closure() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
         (
             "|| _", // function expression with no arguments
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(37, 1..5),
+                        range: exp_range(0, 1..5),
                         name: None,
                         arguments: vec![],
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(37, 4..5),
+                            range: exp_range(0, 4..5),
                         },
                     })
                 ),
-                range: exp_range(37, 1..5),
+                range: exp_range(0, 1..5),
             },
         ),
         (
@@ -1594,11 +1631,11 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(38, 1..6),
+                        range: exp_range(1, 1..6),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(38, 2..3),
+                                range: exp_range(1, 2..3),
                                 name: "a",
                                 ty: None,
                             },
@@ -1606,11 +1643,11 @@ fn valid_expression() {
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(38, 5..6),
+                            range: exp_range(1, 5..6),
                         },
                     })
                 ),
-                range: exp_range(38, 1..6),
+                range: exp_range(1, 1..6),
             },
         ),
         (
@@ -1618,11 +1655,11 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(39, 1..10),
+                        range: exp_range(2, 1..10),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(39, 2..5),
+                                range: exp_range(2, 2..5),
                                 name: "foo",
                                 ty: None,
                             },
@@ -1630,11 +1667,11 @@ fn valid_expression() {
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Block(vec![]),
-                            range: exp_range(39, 8..10),
+                            range: exp_range(2, 8..10),
                         },
                     })
                 ),
-                range: exp_range(39, 1..10),
+                range: exp_range(2, 1..10),
             },
         ),
         (
@@ -1642,16 +1679,16 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(40, 1..9),
+                        range: exp_range(3, 1..9),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(40, 2..3),
+                                range: exp_range(3, 2..3),
                                 name: "a",
                                 ty: None,
                             },
                             FuncArg {
-                                range: exp_range(40, 5..6),
+                                range: exp_range(3, 5..6),
                                 name: "b",
                                 ty: None,
                             },
@@ -1659,11 +1696,11 @@ fn valid_expression() {
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(40, 8..9),
+                            range: exp_range(3, 8..9),
                         },
                     })
                 ),
-                range: exp_range(40, 1..9),
+                range: exp_range(3, 1..9),
             },
         ),
         (
@@ -1671,16 +1708,16 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(41, 1..10),
+                        range: exp_range(4, 1..10),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(41, 2..3),
+                                range: exp_range(4, 2..3),
                                 name: "a",
                                 ty: None,
                             },
                             FuncArg {
-                                range: exp_range(41, 5..6),
+                                range: exp_range(4, 5..6),
                                 name: "b",
                                 ty: None,
                             },
@@ -1688,11 +1725,11 @@ fn valid_expression() {
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(41, 9..10),
+                            range: exp_range(4, 9..10),
                         },
                     })
                 ),
-                range: exp_range(41, 1..10),
+                range: exp_range(4, 1..10),
             },
         ),
         (
@@ -1700,26 +1737,26 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(42, 1..9),
+                        range: exp_range(5, 1..9),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(42, 2..6),
+                                range: exp_range(5, 2..6),
                                 name: "a",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("T"),
-                                    range: exp_range(42, 5..6),
+                                    range: exp_range(5, 5..6),
                                 }),
                             },
                         ],
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(42, 8..9),
+                            range: exp_range(5, 8..9),
                         },
                     })
                 ),
-                range: exp_range(42, 1..9),
+                range: exp_range(5, 1..9),
             },
         ),
         (
@@ -1727,26 +1764,26 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(43, 1..10),
+                        range: exp_range(6, 1..10),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(43, 2..6),
+                                range: exp_range(6, 2..6),
                                 name: "b",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("U"),
-                                    range: exp_range(43, 5..6),
+                                    range: exp_range(6, 5..6),
                                 }),
                             },
                         ],
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(43, 9..10),
+                            range: exp_range(6, 9..10),
                         },
                     })
                 ),
-                range: exp_range(43, 1..10),
+                range: exp_range(6, 1..10),
             },
         ),
         (
@@ -1754,34 +1791,34 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(44, 1..15),
+                        range: exp_range(7, 1..15),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(44, 2..6),
+                                range: exp_range(7, 2..6),
                                 name: "a",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("T"),
-                                    range: exp_range(44, 5..6),
+                                    range: exp_range(7, 5..6),
                                 }),
                             },
                             FuncArg {
-                                range: exp_range(44, 8..12),
+                                range: exp_range(7, 8..12),
                                 name: "b",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("U"),
-                                    range: exp_range(44, 11..12),
+                                    range: exp_range(7, 11..12),
                                 }),
                             },
                         ],
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(44, 14..15),
+                            range: exp_range(7, 14..15),
                         },
                     })
                 ),
-                range: exp_range(44, 1..15),
+                range: exp_range(7, 1..15),
             },
         ),
         (
@@ -1789,34 +1826,34 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(45, 1..16),
+                        range: exp_range(8, 1..16),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(45, 2..6),
+                                range: exp_range(8, 2..6),
                                 name: "a",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("T"),
-                                    range: exp_range(45, 5..6),
+                                    range: exp_range(8, 5..6),
                                 }),
                             },
                             FuncArg {
-                                range: exp_range(45, 8..12),
+                                range: exp_range(8, 8..12),
                                 name: "b",
                                 ty: Some(Ty {
                                     kind: TyKind::Named("U"),
-                                    range: exp_range(45, 11..12),
+                                    range: exp_range(8, 11..12),
                                 }),
                             },
                         ],
                         ret_type: None,
                         body: Exp {
                             kind: ExpKind::Identifier("_"),
-                            range: exp_range(45, 15..16),
+                            range: exp_range(8, 15..16),
                         },
                     })
                 ),
-                range: exp_range(45, 1..16),
+                range: exp_range(8, 1..16),
             },
         ),
         (
@@ -1824,25 +1861,25 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(46, 1..13),
+                        range: exp_range(9, 1..13),
                         name: None,
                         arguments: vec![],
                         ret_type: Some(Ty {
                             kind: TyKind::Array(
                                 Box::new(Ty {
                                     kind: TyKind::Named("Z"),
-                                    range: exp_range(46, 8..9),
+                                    range: exp_range(9, 8..9),
                                 })
                             ),
-                            range: exp_range(46, 7..10),
+                            range: exp_range(9, 7..10),
                         }),
                         body: Exp {
                             kind: ExpKind::Block(vec![]),
-                            range: exp_range(46, 11..13),
+                            range: exp_range(9, 11..13),
                         },
                     })
                 ),
-                range: exp_range(46, 1..13),
+                range: exp_range(9, 1..13),
             },
         ),
         (
@@ -1850,11 +1887,11 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(47, 1..28),
+                        range: exp_range(10, 1..28),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(47, 2..10),
+                                range: exp_range(10, 2..10),
                                 name: "arg_name",
                                 ty: None,
                             },
@@ -1863,23 +1900,23 @@ fn valid_expression() {
                             kind: TyKind::Optional(
                                 Box::new(Ty {
                                     kind: TyKind::Named("Meh"),
-                                    range: exp_range(47, 15..18),
+                                    range: exp_range(10, 15..18),
                                 })
                             ),
-                            range: exp_range(47, 15..19),
+                            range: exp_range(10, 15..19),
                         }),
                         body: Exp {
                             kind: ExpKind::Block(vec![
                                 Exp {
                                     kind: ExpKind::Identifier("body"),
-                                    range: exp_range(47, 22..26),
+                                    range: exp_range(10, 22..26),
                                 },
                             ]),
-                            range: exp_range(47, 20..28),
+                            range: exp_range(10, 20..28),
                         },
                     })
                 ),
-                range: exp_range(47, 1..28),
+                range: exp_range(10, 1..28),
             },
         ),
         (
@@ -1887,20 +1924,20 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(48, 1..23),
+                        range: exp_range(11, 1..23),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(48, 2..9),
+                                range: exp_range(11, 2..9),
                                 name: "x",
                                 ty: Some(Ty {
                                     kind: TyKind::Pointer(
                                         Box::new(Ty {
                                             kind: TyKind::Named("ABC"),
-                                            range: exp_range(48, 6..9),
+                                            range: exp_range(11, 6..9),
                                         }),
                                     ),
-                                    range: exp_range(48, 5..9),
+                                    range: exp_range(11, 5..9),
                                 }),
                             },
                         ],
@@ -1908,23 +1945,23 @@ fn valid_expression() {
                             kind: TyKind::Tuple(vec![
                                 Ty {
                                     kind: TyKind::Named("_"),
-                                    range: exp_range(48, 15..16),
+                                    range: exp_range(11, 15..16),
                                 },
                             ]),
-                            range: exp_range(48, 14..17),
+                            range: exp_range(11, 14..17),
                         }),
                         body: Exp {
                             kind: ExpKind::Block(vec![
                                 Exp {
                                     kind: ExpKind::Identifier("_"),
-                                    range: exp_range(48, 20..21),
+                                    range: exp_range(11, 20..21),
                                 },
                             ]),
-                            range: exp_range(48, 18..23),
+                            range: exp_range(11, 18..23),
                         },
                     })
                 ),
-                range: exp_range(48, 1..23),
+                range: exp_range(11, 1..23),
             },
         ),
         (
@@ -1932,51 +1969,59 @@ fn valid_expression() {
             Exp {
                 kind: ExpKind::FuncExp(
                     Box::new(Function {
-                        range: exp_range(49, 1..22),
+                        range: exp_range(12, 1..22),
                         name: None,
                         arguments: vec![
                             FuncArg {
-                                range: exp_range(49, 2..4),
+                                range: exp_range(12, 2..4),
                                 name: "_0",
                                 ty: None,
                             },
                             FuncArg {
-                                range: exp_range(49, 6..8),
+                                range: exp_range(12, 6..8),
                                 name: "_1",
                                 ty: None,
                             },
                         ],
                         ret_type: Some(Ty {
                             kind: TyKind::Named("_2"),
-                            range: exp_range(49, 13..15),
+                            range: exp_range(12, 13..15),
                         }),
                         body: Exp {
                             kind: ExpKind::Block(vec![
                                 Exp {
                                     kind: ExpKind::Identifier("_3"),
-                                    range: exp_range(49, 18..20),
+                                    range: exp_range(12, 18..20),
                                 },
                             ]),
-                            range: exp_range(49, 16..22),
+                            range: exp_range(12, 16..22),
                         },
                     })
                 ),
-                range: exp_range(49, 1..22),
+                range: exp_range(12, 1..22),
             },
         ),
+    ];
 
-        // Postfix operators
+    evaluate(cases);
+}
+
+#[test]
+fn valid_member_access() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
         (
             "base.member",
             Exp {
                 kind: ExpKind::MemberAccess(MemberAccess {
                     base: Box::new(Exp {
                         kind: ExpKind::Identifier("base"),
-                        range: exp_range(50, 1..5),
+                        range: exp_range(0, 1..5),
                     }),
                     member: "member",
                 }),
-                range: exp_range(50, 1..12),
+                range: exp_range(0, 1..12),
             },
         ),
         (
@@ -1989,18 +2034,18 @@ fn valid_expression() {
                                 kind: ExpKind::TupleLiteral(vec![
                                     Exp {
                                         kind: ExpKind::Identifier("base_expr"),
-                                        range: exp_range(51, 2..11),
+                                        range: exp_range(1, 2..11),
                                     },
                                 ]),
-                                range: exp_range(51, 1..13),
+                                range: exp_range(1, 1..13),
                             }),
                             member: "member_name",
                         }),
-                        range: exp_range(51, 1..25),
+                        range: exp_range(1, 1..25),
                     }),
                     member: "multi",
                 }),
-                range: exp_range(51, 1..31),
+                range: exp_range(1, 1..31),
             },
         ),
         (
@@ -2009,11 +2054,11 @@ fn valid_expression() {
                 kind: ExpKind::QualAccess(QualAccess {
                     base: Box::new(Exp {
                         kind: ExpKind::Identifier("namespace"),
-                        range: exp_range(52, 1..10),
+                        range: exp_range(2, 1..10),
                     }),
                     member: "Item",
                 }),
-                range: exp_range(52, 1..16),
+                range: exp_range(2, 1..16),
             },
         ),
         (
@@ -2026,18 +2071,18 @@ fn valid_expression() {
                                 kind: ExpKind::ArrayLiteral(vec![
                                     Exp {
                                         kind: ExpKind::Identifier("other_namespace"),
-                                        range: exp_range(53, 2..17),
+                                        range: exp_range(3, 2..17),
                                     },
                                 ]),
-                                range: exp_range(53, 1..18),
+                                range: exp_range(3, 1..18),
                             }),
                             member: "Deeper",
                         }),
-                        range: exp_range(53, 1..26),
+                        range: exp_range(3, 1..26),
                     }),
                     member: "OtherItem",
                 }),
-                range: exp_range(53, 1..37),
+                range: exp_range(3, 1..37),
             },
         ),
         (
@@ -2050,21 +2095,31 @@ fn valid_expression() {
                                 kind: ExpKind::MemberAccess(MemberAccess {
                                     base: Box::new(Exp {
                                         kind: ExpKind::Identifier("mixed"),
-                                        range: exp_range(54, 1..6),
+                                        range: exp_range(4, 1..6),
                                     }),
                                     member: "foo",
                                 }),
-                                range: exp_range(54, 1..10),
+                                range: exp_range(4, 1..10),
                             }),
                             member: "bar",
                         }),
-                        range: exp_range(54, 1..15),
+                        range: exp_range(4, 1..15),
                     }),
                     member: "expr",
                 }),
-                range: exp_range(54, 1..20),
+                range: exp_range(4, 1..20),
             },
         ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_subscript() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
         (
             "sub[script]",
             Exp {
@@ -2072,15 +2127,15 @@ fn valid_expression() {
                     Box::new(Subscript {
                         base: Exp {
                             kind: ExpKind::Identifier("sub"),
-                            range: exp_range(55, 1..4),
+                            range: exp_range(0, 1..4),
                         },
                         index: Exp {
                             kind: ExpKind::Identifier("script"),
-                            range: exp_range(55, 5..11),
+                            range: exp_range(0, 5..11),
                         },
                     })
                 ),
-                range: exp_range(55, 1..12),
+                range: exp_range(0, 1..12),
             },
         ),
         (
@@ -2093,23 +2148,23 @@ fn valid_expression() {
                                 Box::new(Subscript {
                                     base: Exp {
                                         kind: ExpKind::Identifier("more"),
-                                        range: exp_range(56, 1..5),
+                                        range: exp_range(1, 1..5),
                                     },
                                     index: Exp {
                                         kind: ExpKind::IntLiteral("77"),
-                                        range: exp_range(56, 6..8),
+                                        range: exp_range(1, 6..8),
                                     },
                                 })
                             ),
-                            range: exp_range(56, 1..9),
+                            range: exp_range(1, 1..9),
                         },
                         index: Exp {
                             kind: ExpKind::StringLiteral(r#""subscripting""#),
-                            range: exp_range(56, 10..24),
+                            range: exp_range(1, 10..24),
                         },
                     })
                 ),
-                range: exp_range(56, 1..25),
+                range: exp_range(1, 1..25),
             },
         ),
         (
@@ -2119,26 +2174,26 @@ fn valid_expression() {
                     Box::new(Subscript {
                         base: Exp {
                             kind: ExpKind::Identifier("sub"),
-                            range: exp_range(57, 1..4),
+                            range: exp_range(2, 1..4),
                         },
                         index: Exp {
                             kind: ExpKind::Subscript(
                                 Box::new(Subscript {
                                     base: Exp {
                                         kind: ExpKind::Identifier("script"),
-                                        range: exp_range(57, 5..11),
+                                        range: exp_range(2, 5..11),
                                     },
                                     index: Exp {
                                         kind: ExpKind::Identifier("ception"),
-                                        range: exp_range(57, 12..19),
+                                        range: exp_range(2, 12..19),
                                     },
                                 }),
                             ),
-                            range: exp_range(57, 5..20),
+                            range: exp_range(2, 5..20),
                         },
                     })
                 ),
-                range: exp_range(57, 1..21),
+                range: exp_range(2, 1..21),
             },
         ),
         (
@@ -2148,15 +2203,15 @@ fn valid_expression() {
                     Box::new(Subscript {
                         base: Exp {
                             kind: ExpKind::ArrayLiteral(vec![]),
-                            range: exp_range(58, 1..3),
+                            range: exp_range(3, 1..3),
                         },
                         index: Exp {
                             kind: ExpKind::ArrayLiteral(vec![]),
-                            range: exp_range(58, 4..6),
+                            range: exp_range(3, 4..6),
                         },
                     })
                 ),
-                range: exp_range(58, 1..7),
+                range: exp_range(3, 1..7),
             },
         ),
     ];
