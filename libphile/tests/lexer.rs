@@ -1383,6 +1383,11 @@ fn interesting_valid_sources() {
         // without a decimal point, it's not a floating-point literal
         ("123e456", vec!["123", "e456"]),
 
+        // <digits>.<letters>() can be a method call;
+        // <letters>.digits can be a tuple field access
+        ("850.method()", vec!["850", ".", "method", "(", ")"]),
+        ("thing.01",     vec!["thing", ".", "01"]),
+
         // numbers followed directly by a letter are allowed _for now_. Soon they won't be.
         ("99foo",       vec!["99", "foo"]),
         ("03.14barqux", vec!["03.14", "barqux"]),

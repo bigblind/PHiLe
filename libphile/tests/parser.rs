@@ -1006,8 +1006,10 @@ fn invalid_toplevel() {
     test_invalid_cases(test_cases);
 }
 
-#[test]
-fn valid_expression() {
+type RangeGen = Box<Fn(usize, std::ops::Range<usize>) -> Range>;
+type EvalTest = Box<Fn(Vec<(&str, Exp)>) -> ()>;
+
+fn valid_expression_tester() -> (RangeGen, EvalTest) {
     // Wrap up every expression in the body of a minimal function.
     // `exp_range()` is a small helper that translates the ranges
     // as visually perceived by inspection of the `exprs` array
@@ -1015,10 +1017,66 @@ fn valid_expression() {
     // by the length of the header of the wrapping fn, `prefix`.
     let prefix = "fn _() { ";
     let suffix = " }";
-    let exp_range = |i, r: std::ops::Range<usize>| {
+
+    let exp_range = move |i, r: std::ops::Range<usize>| {
         let shift = grapheme_count(prefix);
         oneline_range(i, r.start + shift..r.end + shift)
     };
+
+    // The actual sources to be parsed are formed by concatenating
+    // the header of the function (including the opening '{' of
+    // its body block), the test case expression, and the closing
+    // '}' of the body block.
+    // Also form the actual top-level items, which are function
+    // definitions, by using the expected AST fragments.
+    // The body of the function is not the `node` expression
+    // itself, but a block that contains `node` as its only
+    // element. This top-level body block thus also has a
+    // source range; that is what we are calculating below.
+    let evaluate = move |cases: Vec<(&str, Exp)>| {
+        let decorate_case = |(i, (src, node))| {
+            let src = [prefix, src, suffix].join("");
+            let start_byte_index = src.find('{').unwrap();
+            let end_byte_index = src.rfind('}').unwrap() + 1;
+            let start = 1 + grapheme_count(&src[..start_byte_index]);
+            let end = 1 + grapheme_count(&src[..end_byte_index]);
+            let func_range = oneline_range(i, 1..end);
+            let exp_range = oneline_range(i, start..end);
+
+            let item = Item::FuncDef(Function {
+                range: func_range,
+                name: Some("_"),
+                arguments: vec![],
+                ret_type: None,
+                body: Exp {
+                    kind: ExpKind::Block(vec![node]),
+                    range: exp_range,
+                },
+            });
+
+            (src, item)
+        };
+
+        // Finally, parse the array of sources, and compare the resulting
+        // (actual) items to the expected ones constructed above.
+        let iter = cases.into_iter().enumerate().map(decorate_case);
+        let (sources, expected): (Vec<_>, Vec<_>) = iter.unzip();
+        let tokens = lex_filter_ws_comment(&sources);
+        let actual = parse_valid(&tokens).items;
+
+        assert_eq!(actual.len(), expected.len());
+
+        for (actual, expected) in actual.into_iter().zip(expected) {
+            assert_eq!(actual, expected);
+        }
+    };
+
+    (Box::new(exp_range), Box::new(evaluate))
+}
+
+#[test]
+fn valid_expression() {
+	let (exp_range, evaluate) = valid_expression_tester();
 
     // Expressions to be parsed and the corresponding expected AST
     // node fragments. Each node fragment will be the only element
@@ -2103,50 +2161,7 @@ fn valid_expression() {
         ),
     ];
 
-    // The actual sources to be parsed are formed by concatenating
-    // the header of the function (including the opening '{' of
-    // its body block), the test case expression, and the closing
-    // '}' of the body block.
-    // Also form the actual top-level items, which are function
-    // definitions, by using the expected AST fragments.
-    // The body of the function is not the `node` expression
-    // itself, but a block that contains `node` as its only
-    // element. This top-level body block thus also has a
-    // source range; that is what we are calculating below.
-    let iter = cases.into_iter().enumerate().map(|(i, (src, node))| {
-        let src = [prefix, src, suffix].join("");
-        let start_byte_index = src.find('{').unwrap();
-        let end_byte_index = src.rfind('}').unwrap() + 1;
-        let start = 1 + grapheme_count(&src[..start_byte_index]);
-        let end = 1 + grapheme_count(&src[..end_byte_index]);
-        let func_range = oneline_range(i, 1..end);
-        let exp_range = oneline_range(i, start..end);
-
-        let item = Item::FuncDef(Function {
-            range: func_range,
-            name: Some("_"),
-            arguments: vec![],
-            ret_type: None,
-            body: Exp {
-                kind: ExpKind::Block(vec![node]),
-                range: exp_range,
-            },
-        });
-
-        (src, item)
-    });
-
-    // Finally, parse the array of sources, and compare the resulting
-    // (actual) items to the expected ones constructed above.
-    let (sources, expected): (Vec<_>, Vec<_>) = iter.unzip();
-    let tokens = lex_filter_ws_comment(&sources);
-    let actual = parse_valid(&tokens).items;
-
-    assert_eq!(actual.len(), expected.len());
-
-    for (actual, expected) in actual.into_iter().zip(expected) {
-        assert_eq!(actual, expected);
-    }
+    evaluate(cases);
 }
 
 #[test]
