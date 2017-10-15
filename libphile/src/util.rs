@@ -194,7 +194,7 @@ pub fn grapheme_count(string: &str) -> usize {
 /// The number of extended grapheme clusters in `string`
 /// for which `pred` returned `true`.
 pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
-    string.graphemes(true).filter(|g| pred(*g)).count()
+    string.graphemes(true).filter(|&g| pred(g)).count()
 }
 
 /// Extends iterators with the `skip_n()` function.

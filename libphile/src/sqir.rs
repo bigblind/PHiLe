@@ -258,7 +258,7 @@ pub struct Expr {
 /// specialized, frequently-encountered database operations.
 /// These are only emitted by `SqirOpt`, as the result of
 /// collapsing more general SQIR, so that the resulting code
-/// is easier to map to actualy database queries efficiently.
+/// is easier to map to actual database queries efficiently.
 #[derive(Debug)]
 pub enum Value {
     /// Value of a forward-declared function
@@ -477,7 +477,7 @@ pub struct Branch {
 pub struct BranchArm {
     /// The pattern that may match the discriminant.
     pub pattern: RcExpr,
-    /// The expression to evaluated when `pattern` matches.
+    /// The expression to evaluate when `pattern` matches.
     pub value: RcExpr,
 }
 

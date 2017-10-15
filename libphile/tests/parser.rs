@@ -1006,6 +1006,7 @@ fn invalid_toplevel() {
     test_invalid_cases(test_cases);
 }
 
+// TODO(H2CO3): rewrite boxes usign impl trait once stable
 type RangeGen = Box<Fn(usize, std::ops::Range<usize>) -> Range>;
 type EvalTest = Box<Fn(Vec<(&str, Exp)>) -> ()>;
 
