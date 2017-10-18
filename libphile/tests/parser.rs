@@ -2221,6 +2221,224 @@ fn valid_subscript() {
 }
 
 #[test]
+fn valid_function_call() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
+        (
+            "no_arg()",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::Identifier("no_arg"),
+                        range: exp_range(0, 1..7),
+                    }),
+                    arguments: vec![],
+                }),
+                range: exp_range(0, 1..9),
+            },
+        ),
+        (
+            "single_arg(nil)",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::Identifier("single_arg"),
+                        range: exp_range(1, 1..11),
+                    }),
+                    arguments: vec![
+                        Exp {
+                            kind: ExpKind::NilLiteral,
+                            range: exp_range(1, 12..15),
+                        },
+                    ],
+                }),
+                range: exp_range(1, 1..16),
+            },
+        ),
+        (
+            "single_arg(welp,)",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::Identifier("single_arg"),
+                        range: exp_range(2, 1..11),
+                    }),
+                    arguments: vec![
+                        Exp {
+                            kind: ExpKind::Identifier("welp"),
+                            range: exp_range(2, 12..16),
+                        },
+                    ],
+                }),
+                range: exp_range(2, 1..18),
+            },
+        ),
+        (
+            "multi_arg_1(0.5, true)",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::Identifier("multi_arg_1"),
+                        range: exp_range(3, 1..12),
+                    }),
+                    arguments: vec![
+                        Exp {
+                            kind: ExpKind::FloatLiteral("0.5"),
+                            range: exp_range(3, 13..16),
+                        },
+                        Exp {
+                            kind: ExpKind::BoolLiteral("true"),
+                            range: exp_range(3, 18..22),
+                        },
+                    ],
+                }),
+                range: exp_range(3, 1..23),
+            },
+        ),
+        (
+            "multi_arg_2(nil, null,)",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::Identifier("multi_arg_2"),
+                        range: exp_range(4, 1..12),
+                    }),
+                    arguments: vec![
+                        Exp {
+                            kind: ExpKind::NilLiteral,
+                            range: exp_range(4, 13..16),
+                        },
+                        Exp {
+                            kind: ExpKind::Identifier("null"),
+                            range: exp_range(4, 18..22),
+                        },
+                    ],
+                }),
+                range: exp_range(4, 1..24),
+            },
+        ),
+        (
+            "call_call()()",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::FuncCall(FuncCall {
+                            function: Box::new(Exp {
+                                kind: ExpKind::Identifier("call_call"),
+                                range: exp_range(5, 1..10),
+                            }),
+                            arguments: vec![],
+                        }),
+                        range: exp_range(5, 1..12),
+                    }),
+                    arguments: vec![],
+                }),
+                range: exp_range(5, 1..14),
+            },
+        ),
+        (
+            "nested(call())",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::Identifier("nested"),
+                        range: exp_range(6, 1..7),
+                    }),
+                    arguments: vec![
+                        Exp {
+                            kind: ExpKind::FuncCall(FuncCall {
+                                function: Box::new(Exp {
+                                    kind: ExpKind::Identifier("call"),
+                                    range: exp_range(6, 8..12),
+                                }),
+                                arguments: vec![],
+                            }),
+                            range: exp_range(6, 8..14),
+                        },
+                    ],
+                }),
+                range: exp_range(6, 1..15),
+            },
+        ),
+        (
+            "(parenthesized_call())",
+            Exp {
+                kind: ExpKind::TupleLiteral(vec![
+                    Exp {
+                        kind: ExpKind::FuncCall(FuncCall {
+                            function: Box::new(Exp {
+                                kind: ExpKind::Identifier("parenthesized_call"),
+                                range: exp_range(7, 2..20),
+                            }),
+                            arguments: vec![],
+                        }),
+                        range: exp_range(7, 2..22),
+                    },
+                ]),
+                range: exp_range(7, 1..23),
+            },
+        ),
+        (
+            "(parenthesized_callee)()",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::TupleLiteral(vec![
+                            Exp {
+                                kind: ExpKind::Identifier("parenthesized_callee"),
+                                range: exp_range(8, 2..22),
+                            },
+                        ]),
+                        range: exp_range(8, 1..23),
+                    }),
+                    arguments: vec![],
+                }),
+                range: exp_range(8, 1..25),
+            },
+        ),
+        (
+            "((callception)())()()",
+            Exp {
+                kind: ExpKind::FuncCall(FuncCall {
+                    function: Box::new(Exp {
+                        kind: ExpKind::FuncCall(FuncCall {
+                            function: Box::new(Exp {
+                                kind: ExpKind::TupleLiteral(vec![
+                                    Exp {
+                                        kind: ExpKind::FuncCall(FuncCall {
+                                            function: Box::new(Exp {
+                                                kind: ExpKind::TupleLiteral(vec![
+                                                    Exp {
+                                                        kind: ExpKind::Identifier("callception"),
+                                                        range: exp_range(9, 3..14),
+                                                    },
+                                                ]),
+                                                range: exp_range(9, 2..15),
+                                            }),
+                                            arguments: vec![],
+                                        }),
+                                        range: exp_range(9, 2..17),
+                                    },
+
+                                ]),
+                                range: exp_range(9, 1..18),
+                            }),
+                            arguments: vec![],
+                        }),
+                        range: exp_range(9, 1..20),
+                    }),
+                    arguments: vec![],
+                }),
+                range: exp_range(9, 1..22),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_expression() {
 }
 
