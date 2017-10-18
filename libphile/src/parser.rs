@@ -49,8 +49,7 @@ fn make_range<S: Ranged, E: Ranged>(start: &S, end: &E) -> Range {
 }
 
 fn is_keyword(lexeme: &str) -> bool {
-    #[allow(non_upper_case_globals)]
-    static keywords: &[&str] = &[
+    let keywords: &[_] = &[
         "struct",
         "class",
         "enum",
@@ -244,8 +243,7 @@ impl<'a> Parser<'a> {
     }
 
     fn maybe_parse_relation(&mut self) -> Result<Option<RelDecl<'a>>> {
-        #[allow(non_upper_case_globals)]
-        static relation_operators: &[&str] = &[
+        let relation_operators: &[_] = &[
             // I just couldn't make up my mind as to how to denote
             // "exactly one": by nothing or by an exclamation mark
              "<->",   "<->?",  "<->*",  "<->+",
