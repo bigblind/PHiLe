@@ -32,7 +32,7 @@ macro_rules! implement_wrapping_type_getter {
 
             // look up corresponding wrapping type in cache; insert if not found
             let wrapping = self.sqir.$cache.entry(wrapped.clone()).or_insert_with(
-                || RcCell::new(Type::$variant(wrapped.to_weak()))
+                || Type::$variant(wrapped.to_weak()).into()
             );
 
             // return the wrapping type
@@ -922,7 +922,7 @@ impl SqirGen {
         }).collect::<Result<_>>()?;
 
         let tuple = self.sqir.tuple_types.entry(types).or_insert_with(
-            || RcCell::new(Type::Tuple(weak_types))
+            || Type::Tuple(weak_types).into()
         );
 
         Ok(tuple.clone())
@@ -967,7 +967,7 @@ impl SqirGen {
         let key = (arg_types_rc.clone(), ret_type_rc.clone());
         let rc = self.sqir.function_types.entry(key).or_insert_with(|| {
             let fn_type = FunctionType { arg_types, ret_type };
-            RcCell::new(Type::Function(fn_type))
+            Type::Function(fn_type).into()
         });
 
         Ok(rc.clone())

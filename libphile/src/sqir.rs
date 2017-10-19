@@ -715,14 +715,14 @@ impl Ord for Relation {
 impl Sqir {
     /// Creates an "empty" SQIR value, populated with builtins only.
     pub fn new() -> Sqir {
-        let named_types = btree_map![
-            BUILTIN_NAME.bool_name   => RcCell::new(Type::Bool),
-            BUILTIN_NAME.int_name    => RcCell::new(Type::Int),
-            BUILTIN_NAME.float_name  => RcCell::new(Type::Float),
-            BUILTIN_NAME.string_name => RcCell::new(Type::String),
-            BUILTIN_NAME.blob_name   => RcCell::new(Type::Blob),
-            BUILTIN_NAME.date_name   => RcCell::new(Type::Date),
-        ];
+        let named_types = btree_map!{
+            BUILTIN_NAME.bool_name   => Type::Bool,
+            BUILTIN_NAME.int_name    => Type::Int,
+            BUILTIN_NAME.float_name  => Type::Float,
+            BUILTIN_NAME.string_name => Type::String,
+            BUILTIN_NAME.blob_name   => Type::Blob,
+            BUILTIN_NAME.date_name   => Type::Date,
+        };
 
         Sqir {
             named_types:    named_types,

@@ -397,7 +397,7 @@ impl<'a> Parser<'a> {
         let name = name_tok.value;
         let range = make_range(let_keyword, semicolon);
         let decl = VarDecl { name, ty, expr };
-        let kind = ExpKind::VarDecl(Box::new(decl));
+        let kind = ExpKind::VarDecl(decl.into());
 
         Ok(Exp { kind, range })
     }
@@ -419,7 +419,7 @@ impl<'a> Parser<'a> {
 
         if self.accept(";").is_some() {
             let range = expr.range; // TODO(H2CO3): include semicolon
-            let kind = ExpKind::Semi(Box::new(expr));
+            let kind = ExpKind::Semi(expr.into());
             Ok(Exp { kind, range })
         } else if !self.is_at("}") {
             // no trailing semi but not the last statement of block
@@ -456,7 +456,7 @@ impl<'a> Parser<'a> {
 
         let range = make_range(&condition, &false_val);
         let expr = CondExp { condition, true_val, false_val };
-        let kind = ExpKind::CondExp(Box::new(expr));
+        let kind = ExpKind::CondExp(expr.into());
 
         Ok(Exp { kind, range })
     }
@@ -509,7 +509,7 @@ impl<'a> Parser<'a> {
         while self.accept("as").is_some() {
             let ty = self.parse_type()?;
             let range = make_range(&expr, &ty);
-            let kind = ExpKind::Cast(Box::new(expr), ty);
+            let kind = ExpKind::Cast(expr.into(), ty);
 
             expr = Exp { kind, range };
         }
@@ -568,7 +568,7 @@ impl<'a> Parser<'a> {
         let close_bracket = self.expect("]")?;
         let range = make_range(&base, close_bracket);
         let expr = Subscript { base, index };
-        let kind = ExpKind::Subscript(Box::new(expr));
+        let kind = ExpKind::Subscript(expr.into());
 
         Ok(Exp { kind, range })
     }
@@ -679,7 +679,7 @@ impl<'a> Parser<'a> {
         let range = make_range(&arg_range, &body);
         let name = None;
         let decl = Function { range, name, arguments, ret_type, body };
-        let kind = ExpKind::FuncExp(Box::new(decl));
+        let kind = ExpKind::FuncExp(decl.into());
 
         Ok(Exp { kind, range })
     }
@@ -707,7 +707,7 @@ impl<'a> Parser<'a> {
             else_arm.as_ref().unwrap_or(&then_arm)
         );
         let if_expr = If { condition, then_arm, else_arm };
-        let kind = ExpKind::If(Box::new(if_expr));
+        let kind = ExpKind::If(if_expr.into());
 
         Ok(Exp { kind, range })
     }
@@ -745,7 +745,7 @@ impl<'a> Parser<'a> {
             let range = make_range(&lhs, &rhs);
             let op = token.value;
             let expr = BinaryOp { op, lhs, rhs };
-            let kind = ExpKind::BinaryOp(Box::new(expr));
+            let kind = ExpKind::BinaryOp(expr.into());
 
             lhs = Exp { kind, range };
         }
@@ -770,7 +770,7 @@ impl<'a> Parser<'a> {
             } else {
                 let range = make_range(&lhs, &rhs);
                 let expr = BinaryOp { op, lhs, rhs };
-                let kind = ExpKind::BinaryOp(Box::new(expr));
+                let kind = ExpKind::BinaryOp(expr.into());
 
                 Ok(Exp { kind, range })
             }
@@ -817,7 +817,7 @@ impl<'a> Parser<'a> {
         // currently, optional is the only postfix type
         while let Some(token) = self.accept("?") {
             let range = make_range(&node, token);
-            let kind = TyKind::Optional(Box::new(node));
+            let kind = TyKind::Optional(node.into());
             node = Ty { kind, range };
         }
 
@@ -856,7 +856,7 @@ impl<'a> Parser<'a> {
         let element_type = self.parse_type()?;
         let close_bracket = self.expect("]")?;
         let range = make_range(open_bracket, close_bracket);
-        let kind = TyKind::Array(Box::new(element_type));
+        let kind = TyKind::Array(element_type.into());
 
         Ok(Ty { kind, range })
     }
@@ -884,7 +884,7 @@ impl<'a> Parser<'a> {
                 let child = self.parse_prefix(tokens, nodes, subexpr)?;
                 let range = make_range(token, &child);
                 let index = tokens.iter().position(|&v| v == token.value).unwrap();
-                let kind = nodes[index](Box::new(child));
+                let kind = nodes[index](child.into());
 
                 Ok(Node { kind, range })
             },
