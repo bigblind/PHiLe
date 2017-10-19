@@ -2534,47 +2534,35 @@ fn valid_prefix_expression() {
             "-+~-~+x",
             Exp {
                 kind: ExpKind::UnaryMinus(
-                    Box::new(
-                        Exp {
-                            kind: ExpKind::UnaryPlus(
-                                Box::new(
-                                    Exp {
-                                        kind: ExpKind::LogicNot(
-                                            Box::new(
-                                                Exp {
-                                                    kind: ExpKind::UnaryMinus(
-                                                        Box::new(
-                                                            Exp {
-                                                                kind: ExpKind::LogicNot(
-                                                                    Box::new(
-                                                                        Exp {
-                                                                            kind: ExpKind::UnaryPlus(
-                                                                                Box::new(
-                                                                                    Exp {
-                                                                                        kind: ExpKind::Identifier("x"),
-                                                                                        range: exp_range(6, 7..8),
-                                                                                    },
-                                                                                )
-                                                                            ),
-                                                                            range: exp_range(6, 6..8),
-                                                                        },
-                                                                    )
-                                                                ),
-                                                                range: exp_range(6, 5..8),
-                                                            },
-                                                        )
-                                                    ),
-                                                    range: exp_range(6, 4..8),
-                                                },
-                                            )
+                    Box::new(Exp {
+                        kind: ExpKind::UnaryPlus(
+                            Box::new(Exp {
+                                kind: ExpKind::LogicNot(
+                                    Box::new(Exp {
+                                        kind: ExpKind::UnaryMinus(
+                                            Box::new(Exp {
+                                                kind: ExpKind::LogicNot(
+                                                    Box::new(Exp {
+                                                        kind: ExpKind::UnaryPlus(
+                                                            Box::new(Exp {
+                                                                kind: ExpKind::Identifier("x"),
+                                                                range: exp_range(6, 7..8),
+                                                            })
+                                                        ),
+                                                        range: exp_range(6, 6..8),
+                                                    })
+                                                ),
+                                                range: exp_range(6, 5..8),
+                                            })
                                         ),
-                                        range: exp_range(6, 3..8),
-                                    },
-                                )
-                            ),
-                            range: exp_range(6, 2..8),
-                        },
-                    )
+                                        range: exp_range(6, 4..8),
+                                    })
+                                ),
+                                range: exp_range(6, 3..8),
+                            })
+                        ),
+                        range: exp_range(6, 2..8),
+                    })
                 ),
                 range: exp_range(6, 1..8),
             },
