@@ -438,16 +438,16 @@ fn generate_expr(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) -> R
     writeln!(wr)?;
 
     match ptr.value {
-        Value::Placeholder        => bug!("Placeholder should have been replaced"),
-        Value::Nil                => generate_nil_literal(wr, &ptr.id, params),
-        Value::Bool(b)            => generate_bool_literal(wr, &ptr.id, b, params),
-        Value::Int(n)             => generate_int_literal(wr, &ptr.id, n, params),
-        Value::Float(x)           => generate_float_literal(wr, &ptr.id, x, params),
-        Value::String(ref s)      => generate_string_literal(wr, &ptr.id, s, params),
-        Value::Load(ref expr)     => generate_load(wr, &ptr.id, expr, params),
-        Value::OptionalWrap(_)    => unimplemented!(),
-        Value::Ignore(ref expr)   => generate_ignore(wr, &ptr.id, expr, params),
-        Value::Seq(ref exprs)     => generate_sequence(wr, &ptr.id, exprs, params),
+        Value::Placeholder      => bug!("Placeholder should have been replaced"),
+        Value::Nil              => generate_nil_literal(wr, &ptr.id, params),
+        Value::Bool(b)          => generate_bool_literal(wr, &ptr.id, b, params),
+        Value::Int(n)           => generate_int_literal(wr, &ptr.id, n, params),
+        Value::Float(x)         => generate_float_literal(wr, &ptr.id, x, params),
+        Value::String(ref s)    => generate_string_literal(wr, &ptr.id, s, params),
+        Value::Load(ref expr)   => generate_load(wr, &ptr.id, expr, params),
+        Value::OptionalWrap(_)  => unimplemented!(),
+        Value::Ignore(ref expr) => generate_ignore(wr, &ptr.id, expr, params),
+        Value::Seq(ref exprs)   => generate_sequence(wr, &ptr.id, exprs, params),
         _ => unimplemented!(),
     }
 }
