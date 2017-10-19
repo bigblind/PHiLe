@@ -350,6 +350,26 @@ fn invalid_struct_or_class_decl() {
             marker:  "                                   ^^",
             message: "Expected }; found end of input",
         },
+        InvalidTestCase {
+            source:  "struct Keyword { nil: SomeType, }",
+            marker:  "                 ^__^            ",
+            message: "Expected identifier; found nil",
+        },
+        InvalidTestCase {
+            source:  "class NoGood { enum: OtherType, }",
+            marker:  "               ^___^",
+            message: "Expected identifier; found enum",
+        },
+        InvalidTestCase {
+            source:  "struct KeywordType { hey: impl, }",
+            marker:  "                          ^___^",
+            message: "Expected a type; found impl",
+        },
+        InvalidTestCase {
+            source:  "class NoGoodType { ouch: if, }",
+            marker:  "                         ^_^  ",
+            message: "Expected a type; found if",
+        },
     ];
 
     test_invalid_cases(test_cases);
@@ -505,6 +525,16 @@ fn invalid_enum_decl() {
             source:  "enum OnlyOneTypeAllowed { Data(int, Cassos3), }",
             marker:  "                                  ^^           ",
             message: "Expected ); found ,",
+        },
+        InvalidTestCase {
+            source:  "enum KeywordVariant { fn, }",
+            marker:  "                      ^_^",
+            message: "Expected identifier; found fn",
+        },
+        InvalidTestCase {
+            source:  "enum KeywordAssocType { Boo(as), }",
+            marker:  "                            ^_^   ",
+            message: "Expected a type; found as",
         },
     ];
 
