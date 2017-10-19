@@ -2443,6 +2443,142 @@ fn valid_prefix_expression() {
     let (exp_range, evaluate) = valid_expression_tester();
 
     let cases = vec![
+        (
+            "+abcdefgh",
+            Exp {
+                kind: ExpKind::UnaryPlus(
+                    Box::new(Exp {
+                        kind: ExpKind::Identifier("abcdefgh"),
+                        range: exp_range(0, 2..10),
+                    })
+                ),
+                range: exp_range(0, 1..10),
+            },
+        ),
+        (
+            "-nil",
+            Exp {
+                kind: ExpKind::UnaryMinus(
+                    Box::new(Exp {
+                        kind: ExpKind::Nil,
+                        range: exp_range(1, 2..5),
+                    })
+                ),
+                range: exp_range(1, 1..5),
+            },
+        ),
+        (
+            "~8438",
+            Exp {
+                kind: ExpKind::LogicNot(
+                    Box::new(Exp {
+                        kind: ExpKind::Int("8438"),
+                        range: exp_range(2, 2..6),
+                    })
+                ),
+                range: exp_range(2, 1..6),
+            },
+        ),
+        (
+            "++00",
+            Exp {
+                kind: ExpKind::UnaryPlus(
+                    Box::new(Exp {
+                        kind: ExpKind::UnaryPlus(
+                            Box::new(Exp {
+                                kind: ExpKind::Int("00"),
+                                range: exp_range(3, 3..5),
+                            })
+                        ),
+                        range: exp_range(3, 2..5),
+                    })
+                ),
+                range: exp_range(3, 1..5),
+            },
+        ),
+        (
+            "--49.06",
+            Exp {
+                kind: ExpKind::UnaryMinus(
+                    Box::new(Exp {
+                        kind: ExpKind::UnaryMinus(
+                            Box::new(Exp {
+                                kind: ExpKind::Float("49.06"),
+                                range: exp_range(4, 3..8),
+                            })
+                        ),
+                        range: exp_range(4, 2..8),
+                    })
+                ),
+                range: exp_range(4, 1..8),
+            },
+        ),
+        (
+            "~~false",
+            Exp {
+                kind: ExpKind::LogicNot(
+                    Box::new(Exp {
+                        kind: ExpKind::LogicNot(
+                            Box::new(Exp {
+                                kind: ExpKind::Bool("false"),
+                                range: exp_range(5, 3..8),
+                            })
+                        ),
+                        range: exp_range(5, 2..8),
+                    })
+                ),
+                range: exp_range(5, 1..8),
+            },
+        ),
+        (
+            "-+~-~+x",
+            Exp {
+                kind: ExpKind::UnaryMinus(
+                    Box::new(
+                        Exp {
+                            kind: ExpKind::UnaryPlus(
+                                Box::new(
+                                    Exp {
+                                        kind: ExpKind::LogicNot(
+                                            Box::new(
+                                                Exp {
+                                                    kind: ExpKind::UnaryMinus(
+                                                        Box::new(
+                                                            Exp {
+                                                                kind: ExpKind::LogicNot(
+                                                                    Box::new(
+                                                                        Exp {
+                                                                            kind: ExpKind::UnaryPlus(
+                                                                                Box::new(
+                                                                                    Exp {
+                                                                                        kind: ExpKind::Identifier("x"),
+                                                                                        range: exp_range(6, 7..8),
+                                                                                    },
+                                                                                )
+                                                                            ),
+                                                                            range: exp_range(6, 6..8),
+                                                                        },
+                                                                    )
+                                                                ),
+                                                                range: exp_range(6, 5..8),
+                                                            },
+                                                        )
+                                                    ),
+                                                    range: exp_range(6, 4..8),
+                                                },
+                                            )
+                                        ),
+                                        range: exp_range(6, 3..8),
+                                    },
+                                )
+                            ),
+                            range: exp_range(6, 2..8),
+                        },
+                    )
+                ),
+                range: exp_range(6, 1..8),
+            },
+        ),
     ];
 
     evaluate(cases);
