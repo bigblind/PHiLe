@@ -2603,6 +2603,57 @@ fn valid_prefix_expression() {
 }
 
 #[test]
+fn valid_cast_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
+        (
+            "expr as Type",
+            Exp {
+                kind: ExpKind::Cast(
+                    Box::new(Exp {
+                        kind: ExpKind::Identifier("expr"),
+                        range: exp_range(0, 1..5),
+                    }),
+                    Ty {
+                        kind: TyKind::Named("Type"),
+                        range: exp_range(0, 9..13),
+                    },
+                ),
+                range: exp_range(0, 1..13),
+            },
+        ),
+        (
+            "36 as float as TUV",
+            Exp {
+                kind: ExpKind::Cast(
+                    Box::new(Exp {
+                        kind: ExpKind::Cast(
+                            Box::new(Exp {
+                                kind: ExpKind::Int("36"),
+                                range: exp_range(1, 1..3),
+                            }),
+                            Ty {
+                                kind: TyKind::Named("float"),
+                                range: exp_range(1, 7..12),
+                            },
+                        ),
+                        range: exp_range(1, 1..12),
+                    }),
+                    Ty {
+                        kind: TyKind::Named("TUV"),
+                        range: exp_range(1, 16..19),
+                    },
+                ),
+                range: exp_range(1, 1..19),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_expression() {
 }
 
