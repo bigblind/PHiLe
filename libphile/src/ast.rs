@@ -74,25 +74,25 @@ pub enum ExpKind<'a> {
     /// Namespace access, `foo::bar`
     QualAccess(QualAccess<'a>),
     /// Function call
-    FuncCall(FuncCall<'a>),
+    Call(Call<'a>),
     /// Literal `nil`
-    NilLiteral,
+    Nil,
     /// Literal `true` or `false`.
-    BoolLiteral(&'a str),
+    Bool(&'a str),
     /// An unparsed integer literal, without a sign.
-    IntLiteral(&'a str),
+    Int(&'a str),
     /// An unparsed floating-point literal.
-    FloatLiteral(&'a str),
+    Float(&'a str),
     /// A still potentially escaped string literal.
-    StringLiteral(&'a str),
+    String(&'a str),
     /// The name of an entity, e.g. function, variable, or type.
     Identifier(&'a str),
     /// A tuple literal.
-    TupleLiteral(Vec<Exp<'a>>),
+    Tuple(Vec<Exp<'a>>),
     /// An array literal.
-    ArrayLiteral(Vec<Exp<'a>>),
+    Array(Vec<Exp<'a>>),
     /// A struct literal.
-    StructLiteral(StructLiteral<'a>),
+    Struct(Struct<'a>),
     /// An if expression or statement.
     If(Box<If<'a>>),
     /// A match expression or statement.
@@ -294,7 +294,7 @@ pub struct QualAccess<'a> {
 
 /// A function call operation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FuncCall<'a> {
+pub struct Call<'a> {
     /// The LHS, that is, the function being called.
     pub function: Box<Exp<'a>>,
     /// The RHS, that is, the list of actual arguments.
@@ -303,7 +303,7 @@ pub struct FuncCall<'a> {
 
 /// A struct literal.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct StructLiteral<'a> {
+pub struct Struct<'a> {
     /// Name of the struct type being instantiated.
     pub name: &'a str,
     /// The list of fields: `(name, value)`.

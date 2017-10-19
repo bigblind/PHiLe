@@ -58,9 +58,9 @@ pub enum TokenKind {
     /// Operators and other punctuation characters, e.g. semicolons.
     Punctuation,
     /// String literal.
-    StringLiteral,
+    String,
     /// Integer or floating-point literal.
-    NumericLiteral,
+    Numeric,
 }
 
 /// Represents a lexeme and its associated type and location information as an abstract token.
@@ -151,12 +151,12 @@ impl<'a> Lexer<'a> {
             location: Default::default(),
             tokens: Vec::new(),
             regexes: [
-                (TokenKind::Whitespace,     Regex::new(r#"^\s+"#).unwrap()),
-                (TokenKind::Comment,        Regex::new(r#"^#[^\n\v\f\r\x{0085}\x{2028}\x{2029}]*(\r\n|[\n\v\f\r\x{0085}\x{2028}\x{2029}])?"#).unwrap()),
-                (TokenKind::Word,           Regex::new(r#"^[_\p{XID_Start}]\p{XID_Continue}*"#).unwrap()),
-                (TokenKind::NumericLiteral, Regex::new(r#"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|([0-9]+(\.[0-9]+([eE][\+\-]?[0-9]+)?)?))"#).unwrap()),
-                (TokenKind::Punctuation,    Regex::new(r#"^([!\?\*\+]?<\->[!\?\*\+]?|\.{1,3}|[<>]=?|[=!]=|\->|=>?|::?|[\(\)\[\]\{\}\+\-\*/%&\|~\?,;])"#).unwrap()),
-                (TokenKind::StringLiteral,  Regex::new(r#"^"([^\\"]|\\[\\"nrt]|\\x[[:xdigit:]]{2}|\\u\{[[:xdigit:]]+\})*""#).unwrap()),
+                (TokenKind::Whitespace,  Regex::new(r#"^\s+"#).unwrap()),
+                (TokenKind::Comment,     Regex::new(r#"^#[^\n\v\f\r\x{0085}\x{2028}\x{2029}]*(\r\n|[\n\v\f\r\x{0085}\x{2028}\x{2029}])?"#).unwrap()),
+                (TokenKind::Word,        Regex::new(r#"^[_\p{XID_Start}]\p{XID_Continue}*"#).unwrap()),
+                (TokenKind::Numeric,     Regex::new(r#"^((0[bB][0-1]+)|(0[oO][0-7]+)|(0[xX][[:xdigit:]]+)|([0-9]+(\.[0-9]+([eE][\+\-]?[0-9]+)?)?))"#).unwrap()),
+                (TokenKind::Punctuation, Regex::new(r#"^([!\?\*\+]?<\->[!\?\*\+]?|\.{1,3}|[<>]=?|[=!]=|\->|=>?|::?|[\(\)\[\]\{\}\+\-\*/%&\|~\?,;])"#).unwrap()),
+                (TokenKind::String,      Regex::new(r#"^"([^\\"]|\\[\\"nrt]|\\x[[:xdigit:]]{2}|\\u\{[[:xdigit:]]+\})*""#).unwrap()),
             ],
         }
     }

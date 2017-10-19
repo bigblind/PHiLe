@@ -561,7 +561,7 @@ impl Lexeme for ValidNumber {
         end.column += grapheme_count(&self.buf); // because we contain no newlines
         *buf += &self.buf;
 
-        lexer::TokenKind::NumericLiteral
+        lexer::TokenKind::Numeric
     }
 }
 
@@ -696,7 +696,7 @@ impl Lexeme for ValidString {
             }
         }
 
-        lexer::TokenKind::StringLiteral
+        lexer::TokenKind::String
     }
 }
 
@@ -1249,7 +1249,7 @@ fn ascii_digit_is_numeric() {
         let token = tokens[0];
 
         assert_eq!(tokens.len(), 1);
-        assert_eq!(token.kind, lexer::TokenKind::NumericLiteral);
+        assert_eq!(token.kind, lexer::TokenKind::Numeric);
         assert_eq!(token.value, lexeme);
         assert_eq!(token.range, range);
     }

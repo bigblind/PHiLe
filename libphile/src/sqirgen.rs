@@ -1459,19 +1459,19 @@ impl SqirGen {
         let ctx = TyCtx { ty, range };
 
         let tmp = match node.kind {
-            ExpKind::NilLiteral           => self.generate_nil_literal(ctx.clone()),
-            ExpKind::BoolLiteral(val)     => self.generate_bool_literal(val, range),
-            ExpKind::IntLiteral(val)      => self.generate_int_literal(ctx.clone(), val, range),
-            ExpKind::FloatLiteral(val)    => self.generate_float_literal(val, range),
-            ExpKind::StringLiteral(val)   => self.generate_string_literal(val, range),
+            ExpKind::Nil                  => self.generate_nil_literal(ctx.clone()),
+            ExpKind::Bool(val)            => self.generate_bool_literal(val, range),
+            ExpKind::Int(val)             => self.generate_int_literal(ctx.clone(), val, range),
+            ExpKind::Float(val)           => self.generate_float_literal(val, range),
+            ExpKind::String(val)          => self.generate_string_literal(val, range),
             ExpKind::Identifier(name)     => self.generate_name_ref(name, range),
             ExpKind::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
             ExpKind::Empty                => self.generate_empty_stmt(ctx.clone()),
             ExpKind::Semi(ref expr)       => self.generate_semi(expr),
             ExpKind::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
             ExpKind::Cast(ref ex, ref ty) => self.generate_cast(ctx.clone(), ex, ty),
-            ExpKind::TupleLiteral(ref vs) => self.generate_tuple(ctx.clone(), vs),
-            ExpKind::ArrayLiteral(ref vs) => self.generate_array(ctx.clone(), vs),
+            ExpKind::Tuple(ref vs)        => self.generate_tuple(ctx.clone(), vs),
+            ExpKind::Array(ref vs)        => self.generate_array(ctx.clone(), vs),
             ExpKind::Block(ref items)     => self.generate_block(ctx.clone(), items),
             ExpKind::FuncExp(ref func)    => self.generate_function(ctx.clone(), func),
             ExpKind::CondExp(_)           => unimplemented!(),
@@ -1481,8 +1481,8 @@ impl SqirGen {
             ExpKind::Subscript(_)         => unimplemented!(),
             ExpKind::MemberAccess(_)      => unimplemented!(),
             ExpKind::QualAccess(_)        => unimplemented!(),
-            ExpKind::FuncCall(ref call)   => self.generate_call(ctx.clone(), call),
-            ExpKind::StructLiteral(_)     => unimplemented!(),
+            ExpKind::Call(ref call)       => self.generate_call(ctx.clone(), call),
+            ExpKind::Struct(_)            => unimplemented!(),
             ExpKind::If(_)                => unimplemented!(),
             ExpKind::Match(_)             => unimplemented!(),
         };
@@ -1554,7 +1554,7 @@ impl SqirGen {
     fn generate_bool_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_bool_type()?;
         let b = parse_bool_literal(val, range)?;
-        let value = Value::BoolConst(b);
+        let value = Value::Bool(b);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
@@ -1568,7 +1568,7 @@ impl SqirGen {
 
         let ty = self.get_int_type()?;
         let n = parse_int_literal(val, range)?;
-        let value = Value::IntConst(n);
+        let value = Value::Int(n);
         let id = self.next_temp_id();
 
         Ok(RcCell::new(Expr { ty, value, id }))
@@ -1577,7 +1577,7 @@ impl SqirGen {
     fn generate_float_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_float_type()?;
         let x = parse_float_literal(val, range)?;
-        let value = Value::FloatConst(x);
+        let value = Value::Float(x);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
@@ -1585,7 +1585,7 @@ impl SqirGen {
     fn generate_string_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
         let ty = self.get_string_type()?;
         let s = parse_string_literal(val, range)?;
-        let value = Value::StringConst(s);
+        let value = Value::String(s);
         let id = self.next_temp_id();
         Ok(RcCell::new(Expr { ty, value, id }))
     }
@@ -1730,7 +1730,7 @@ impl SqirGen {
         Ok(RcCell::new(Expr { ty, value, id }))
     }
 
-    fn generate_call(&mut self, _ctx: TyCtx, _call: &ast::FuncCall) -> Result<RcExpr> {
+    fn generate_call(&mut self, _ctx: TyCtx, _call: &ast::Call) -> Result<RcExpr> {
         unimplemented!()
     }
 

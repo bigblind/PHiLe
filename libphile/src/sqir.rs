@@ -267,13 +267,13 @@ pub enum Value {
     /// A nil constant.
     Nil,
     /// A Boolean constant.
-    BoolConst(bool),
+    Bool(bool),
     /// An integral constant.
-    IntConst(u64),
+    Int(u64),
     /// A floating-point constant.
-    FloatConst(f64),
+    Float(f64),
     /// A string constant.
-    StringConst(String),
+    String(String),
 
     /// A function definition (~lambda expression).
     Function(Function),
@@ -353,7 +353,7 @@ pub enum Value {
     Tuple(Vec<RcExpr>),
     /// A struct literal. Keys are field names,
     /// values are the corresponding expressions.
-    StructLiteral(BTreeMap<String, RcExpr>),
+    Struct(BTreeMap<String, RcExpr>),
 
     /// Generalized projection.
     Map(Map),

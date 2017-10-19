@@ -579,7 +579,7 @@ impl<'a> Parser<'a> {
         )?;
         let range = make_range(&callee, &arg_range);
         let function = Box::new(callee);
-        let kind = ExpKind::FuncCall(FuncCall { function, arguments });
+        let kind = ExpKind::Call(Call { function, arguments });
 
         Ok(Exp { kind, range })
     }
@@ -605,18 +605,18 @@ impl<'a> Parser<'a> {
         if let Some(token) = self.accept_one_of(&["nil", "true", "false"]) {
             let range = token.range;
             let kind = match token.value {
-                "nil" => ExpKind::NilLiteral,
-                _     => ExpKind::BoolLiteral(token.value),
+                "nil" => ExpKind::Nil,
+                _     => ExpKind::Bool(token.value),
             };
             return Ok(Exp { kind, range });
         }
 
-        if let Some(token) = self.accept_of_kind(TokenKind::NumericLiteral) {
+        if let Some(token) = self.accept_of_kind(TokenKind::Numeric) {
             return Self::parse_numeric_literal(token);
         }
 
-        if let Some(token) = self.accept_of_kind(TokenKind::StringLiteral) {
-            let kind = ExpKind::StringLiteral(token.value);
+        if let Some(token) = self.accept_of_kind(TokenKind::String) {
+            let kind = ExpKind::String(token.value);
             let range = token.range;
             return Ok(Exp { kind, range });
         }
@@ -632,16 +632,16 @@ impl<'a> Parser<'a> {
 
     // Helper for parse_atomic_expr
     fn parse_numeric_literal(token: &Token<'a>) -> ExpResult<'a> {
-        assert!(token.kind == TokenKind::NumericLiteral);
+        assert!(token.kind == TokenKind::Numeric);
 
         // If the lexeme contains a decimal point or an exponent,
         // then it's floating-point, otherwise it's an integer.
         let float_chars: &[char] = &['.', 'e', 'E'];
 
         let kind = if token.value.contains(float_chars) {
-            ExpKind::FloatLiteral(token.value)
+            ExpKind::Float(token.value)
         } else {
-            ExpKind::IntLiteral(token.value)
+            ExpKind::Int(token.value)
         };
 
         let range = token.range;
@@ -651,13 +651,13 @@ impl<'a> Parser<'a> {
 
     fn parse_tuple_expr(&mut self) -> ExpResult<'a> {
         let (exprs, range) = self.parse_paren_delim("(", Self::parse_expr, ",", ")")?;
-        let kind = ExpKind::TupleLiteral(exprs);
+        let kind = ExpKind::Tuple(exprs);
         Ok(Exp { kind, range })
     }
 
     fn parse_array_expr(&mut self) -> ExpResult<'a> {
         let (exprs, range) = self.parse_paren_delim("[", Self::parse_expr, ",", "]")?;
-        let kind = ExpKind::ArrayLiteral(exprs);
+        let kind = ExpKind::Array(exprs);
         Ok(Exp { kind, range })
     }
 
