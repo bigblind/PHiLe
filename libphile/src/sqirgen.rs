@@ -51,8 +51,8 @@ macro_rules! sema_error {
         let range = $cause.range().into();
         Err(Error::Semantic { message, range })
     });
-    ($cause: expr, $fmt: expr, $($arg: tt)+) => ({
-        let message = format!($fmt, $($arg)+);
+    ($cause: expr, $fmt: expr, $($args: tt)*) => ({
+        let message = format!($fmt, $($args)*);
         let range = $cause.range().into();
         Err(Error::Semantic { message, range })
     });
@@ -64,8 +64,8 @@ macro_rules! occurs_check_error {
         let range = None;
         Err(Error::Semantic { message, range })
     });
-    ($fmt: expr, $($arg: tt)+) => ({
-        let message = format!($fmt, $($arg)+);
+    ($fmt: expr, $($args: tt)*) => ({
+        let message = format!($fmt, $($args)*);
         let range = None;
         Err(Error::Semantic { message, range })
     });
@@ -77,8 +77,8 @@ macro_rules! reciprocity_error {
         let range = None;
         Err(Error::Semantic { message, range })
     });
-    ($fmt: expr, $($arg: tt)+) => ({
-        let message = format!($fmt, $($arg)+);
+    ($fmt: expr, $($args: tt)*) => ({
+        let message = format!($fmt, $($args)*);
         let range = None;
         Err(Error::Semantic { message, range })
     });

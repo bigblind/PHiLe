@@ -20,35 +20,39 @@ use util::{ Diagnostic, DiagnosticKind };
 use lexer::Range;
 
 
+/// Internal helper for macros `bug!()` and `lazy_bug!()`.
+macro_rules! unreachable_error {
+    ($msg: expr) => {
+        Error::Unreachable {
+            message: $msg,
+            file: file!(),
+            line: line!() as usize,
+        }
+    }
+}
+
 /// Indicates a compiler error. Makes the current function return
 /// an `Error::Unreachable`. This is basically a non-panicking
 /// substitute for the standard `unreachable!()` macro.
 macro_rules! bug {
-    () => { bug!("Internal inconsistency") };
-    ($msg: expr) => { bug!("{}", $msg) };
-    ($fmt: expr, $($args: expr),+) => {
-        return Err(Error::Unreachable {
-            message: format!($fmt, $($args),+),
-            file:    file!(),
-            line:    line!() as usize,
-        })
+    ($msg: expr) => {
+        return Err(unreachable_error!($msg.to_owned()))
     };
-    ($fmt: expr, $($args: expr),+,) => { bug!($fmt, $($args),+) };
+    ($fmt: expr, $($args: tt)*) => {
+        return Err(unreachable_error!(format!($fmt, $($args)*)))
+    };
 }
 
 /// Similar to `bug!()`, but it yields a closure that returns an
 /// `Error::Unreachable`. Useful for handling errors efficiently,
 /// lazily, primarily using `Option::ok_or_else()`.
 macro_rules! lazy_bug {
-    ($msg: expr) => { lazy_bug!("{}", $msg) };
-    ($fmt: expr, $($args: expr),+) => {
-        || Error::Unreachable {
-            message: format!($fmt, $($args),+),
-            file:    file!(),
-            line:    line!() as usize,
-        }
+    ($msg: expr) => {
+        || unreachable_error!($msg.to_owned())
     };
-    ($fmt: expr, $($args: expr),+,) => { lazy_bug!($fmt, $($args),+) };
+    ($fmt: expr, $($args: tt)*) => {
+        || unreachable_error!(format!($fmt, $($args)*))
+    };
 }
 
 

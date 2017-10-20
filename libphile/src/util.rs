@@ -20,17 +20,13 @@ use error::{ Error, Result };
 use unicode_segmentation::UnicodeSegmentation;
 
 
-/// Generic macro for building an associated container literal.
+/// Generic macro for building an associative container literal.
 macro_rules! assoc_map {
-    ($t: ident, $($k: expr => $v: expr),*) => ({
-        let mut _tmp = ::std::collections::$t::new();
-        $({
-            let key = $k;
-            let val = $v;
-            _tmp.insert(key.into(), val.into()).map(
-                |_| panic!("duplicate value for key {:#?}", key)
-            );
-        })*
+    ($ty: ident, $($key: expr => $val: expr),*) => ({
+        let mut _tmp = ::std::collections::$ty::new();
+        $(
+            _tmp.insert($key.into(), $val.into());
+        )*
         _tmp
     })
 }
@@ -41,10 +37,10 @@ macro_rules! assoc_map {
 /// the format `key => value`, and key-value pairs are separated by
 /// commas. A trailing comma is permitted and will be ignored.
 macro_rules! btree_map {
-    ($($k: expr => $v: expr),*) => {
-        assoc_map!(BTreeMap, $($k => $v),*)
+    ($($key: expr => $val: expr),*) => {
+        assoc_map!(BTreeMap, $($key => $val),*)
     };
-    ($($k: expr => $v: expr),+,) => { btree_map!($($k => $v),+) };
+    ($($key: expr => $val: expr),+,) => { btree_map!($($key => $val),+) };
 }
 
 /// Type of a global descriptor that holds information about
