@@ -102,7 +102,7 @@ impl<'a> PodUdTypeGen<'a> {
                 Type::Struct(ref st) => self.write_fields(&mut *wr, name, &st.fields)?,
                 Type::Class(ref ct)  => self.write_fields(&mut *wr, name, &ct.fields)?,
                 Type::Enum(ref et)   => self.write_variants(&mut *wr, name, &et.variants)?,
-                ref t => bug!("Attempt to declare primitive type {}?!", t),
+                ref t => bug!("Attempt to declare primitive type {}?!", t)?,
             }
         }
 
@@ -242,7 +242,7 @@ fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> Result
         Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, params))?,
 
         Type::Function(ref ft) => write_function_type(wr, ft, params)?,
-        Type::Placeholder { ref name, kind } => bug!("Unresolved Placeholder({}, {})", name, kind),
+        Type::Placeholder { ref name, kind } => bug!("Unresolved Placeholder({}, {})", name, kind)?,
     }
 
     Ok(())
@@ -553,10 +553,10 @@ fn generate_function(
         match ptr.value {
             Value::FuncArg { .. } => match ptr.id {
                 ExprId::Local(_) => {},
-                ExprId::Global(ref name) => bug!("FuncArg is global {}?!", name),
-                ExprId::Temp(index) => bug!("FuncArg is temporary {}?!", index),
+                ExprId::Global(ref name) => bug!("FuncArg is global {}?!", name)?,
+                ExprId::Temp(index) => bug!("FuncArg is temporary {}?!", index)?,
             },
-            ref val => bug!("Non-FuncArg argument?! {:#?}", val),
+            ref val => bug!("Non-FuncArg argument?! {:#?}", val)?,
         }
 
         write_expr_decl(wr, arg, params)?;

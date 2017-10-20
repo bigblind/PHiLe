@@ -112,7 +112,7 @@ fn unwrap_entity_name(entity: &RcType) -> Result<String> {
 
 fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
     if !lexeme.starts_with('"') || !lexeme.ends_with('"') || lexeme.len() < 2 {
-        bug!("Missing leading or trailing \" in string at {}", range)
+        bug!("Missing leading or trailing \" in string at {}", range)?
     }
 
     let mut chars = lexeme[1..lexeme.len() - 1].chars();
@@ -130,7 +130,7 @@ fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
                 't' => buf.push('\t'),
                 'x' => buf.push(unescape_hex(&mut chars, range)?),
                 'u' => buf.push(unescape_unicode(&mut chars, range)?),
-                esc => bug!("Invalid escape \\{} in string at {}", esc, range),
+                esc => bug!("Invalid escape \\{} in string at {}", esc, range)?,
             }
         } else {
             buf.push(ch); // unescaped
@@ -176,7 +176,7 @@ fn unescape_hex(chars: &mut Chars, range: Range) -> Result<char> {
 // TODO(H2CO3): keep this in sync with the lexer.
 fn unescape_unicode(chars: &mut Chars, range: Range) -> Result<char> {
     if chars.next() != Some('{') {
-        bug!("digits in \\u escape must be within {{}}s (string at {})", range)
+        bug!("digits in \\u escape must be within {{}}s (string at {})", range)?
     }
 
     let payload = chars.as_str();
@@ -864,7 +864,7 @@ impl SqirGen {
                     ),
                 }
             },
-            ref ty => bug!("Non-pointer pointer type?! {}", ty),
+            ref ty => bug!("Non-pointer pointer type?! {}", ty)?,
         }
 
         Ok(pointer_type)
@@ -1056,7 +1056,7 @@ impl SqirGen {
 
         let class = match *class_type {
             Type::Class(ref c) => c,
-            ref ty => bug!("Non-class entity type?! {}", ty),
+            ref ty => bug!("Non-class entity type?! {}", ty)?,
         };
 
         let field_type_rc = class.fields[field.name].to_rc()?;
@@ -1135,7 +1135,7 @@ impl SqirGen {
                     rhs_field_name,
                 )
             },
-            ref ty => bug!("Non-class entity type?! {}", ty),
+            ref ty => bug!("Non-class entity type?! {}", ty)?,
         }
 
         // The rest of the validation is a separate task,
@@ -1445,7 +1445,7 @@ impl SqirGen {
 
         slot.value = match expr_ref.value {
             Value::Function(ref func) => Value::Function(func.clone()),
-            ref val => bug!("Global function compiled to non-Function value?! {:#?}", val),
+            ref val => bug!("Global function compiled to non-Function value?! {:#?}", val)?,
         };
 
         Ok(())
@@ -1850,7 +1850,7 @@ impl SqirGen {
         for arg in args {
             match arg.borrow_mut()?.value {
                 Value::FuncArg { ref mut func, .. } => *func = fn_expr.to_weak(),
-                ref val => bug!("Non-FuncArg argument?! {:#?}", val),
+                ref val => bug!("Non-FuncArg argument?! {:#?}", val)?,
             }
         }
 

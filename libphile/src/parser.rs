@@ -225,7 +225,7 @@ impl<'a> Parser<'a> {
             "class" => Item::ClassDecl(
                 ClassDecl { range, name, fields }
             ),
-            lexeme => bug!("Forgot to handle '{}'", lexeme),
+            lexeme => bug!("Forgot to handle '{}'", lexeme)?,
         };
 
         Ok(item)
@@ -554,7 +554,7 @@ impl<'a> Parser<'a> {
         let kind = match op {
             "."  => ExpKind::MemberAccess(MemberAccess { base, member }),
             "::" => ExpKind::QualAccess(QualAccess { base, member }),
-            _    => bug!("Forgot to handle '{}'", op),
+            _    => bug!("Forgot to handle '{}'", op)?,
         };
 
         Ok(Exp { kind, range })

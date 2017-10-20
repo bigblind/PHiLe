@@ -31,15 +31,14 @@ macro_rules! unreachable_error {
     }
 }
 
-/// Indicates a compiler error. Makes the current function return
-/// an `Error::Unreachable`. This is basically a non-panicking
-/// substitute for the standard `unreachable!()` macro.
+/// Indicates a compiler error. Expands to an `Err(Error::Unreachable)`. This is
+/// basically a non-panicking substitute for the standard `unreachable!()` macro.
 macro_rules! bug {
     ($msg: expr) => {
-        return Err(unreachable_error!($msg.to_owned()))
+        Err(unreachable_error!($msg.to_owned()))
     };
     ($fmt: expr, $($args: tt)*) => {
-        return Err(unreachable_error!(format!($fmt, $($args)*)))
+        Err(unreachable_error!(format!($fmt, $($args)*)))
     };
 }
 
