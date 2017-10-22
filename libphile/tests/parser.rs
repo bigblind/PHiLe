@@ -620,7 +620,7 @@ fn valid_fn_source_and_ast(
                 }
             });
 
-            arguments.push(FuncArg {
+            arguments.push(Argument {
                 range: arg_range,
                 name: arg_name,
                 ty: arg_type,
@@ -829,7 +829,7 @@ fn valid_impl_def() {
                     range: oneline_range(2, 13..27),
                     name: Some("x"),
                     arguments: vec![
-                        FuncArg {
+                        Argument {
                             range: oneline_range(2, 18..23),
                             name: "x0",
                             ty: Some(Ty {
@@ -848,7 +848,7 @@ fn valid_impl_def() {
                     range: oneline_range(2, 28..55),
                     name: Some("x_dagger"),
                     arguments: vec![
-                        FuncArg {
+                        Argument {
                             range: oneline_range(2, 40..51),
                             name: "x0",
                             ty: Some(Ty {
@@ -1665,7 +1665,7 @@ fn valid_closure() {
                         range: exp_range(1, 1..6),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(1, 2..3),
                                 name: "a",
                                 ty: None,
@@ -1689,7 +1689,7 @@ fn valid_closure() {
                         range: exp_range(2, 1..10),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(2, 2..5),
                                 name: "foo",
                                 ty: None,
@@ -1713,12 +1713,12 @@ fn valid_closure() {
                         range: exp_range(3, 1..9),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(3, 2..3),
                                 name: "a",
                                 ty: None,
                             },
-                            FuncArg {
+                            Argument {
                                 range: exp_range(3, 5..6),
                                 name: "b",
                                 ty: None,
@@ -1742,12 +1742,12 @@ fn valid_closure() {
                         range: exp_range(4, 1..10),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(4, 2..3),
                                 name: "a",
                                 ty: None,
                             },
-                            FuncArg {
+                            Argument {
                                 range: exp_range(4, 5..6),
                                 name: "b",
                                 ty: None,
@@ -1771,7 +1771,7 @@ fn valid_closure() {
                         range: exp_range(5, 1..9),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(5, 2..6),
                                 name: "a",
                                 ty: Some(Ty {
@@ -1798,7 +1798,7 @@ fn valid_closure() {
                         range: exp_range(6, 1..10),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(6, 2..6),
                                 name: "b",
                                 ty: Some(Ty {
@@ -1825,7 +1825,7 @@ fn valid_closure() {
                         range: exp_range(7, 1..15),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(7, 2..6),
                                 name: "a",
                                 ty: Some(Ty {
@@ -1833,7 +1833,7 @@ fn valid_closure() {
                                     range: exp_range(7, 5..6),
                                 }),
                             },
-                            FuncArg {
+                            Argument {
                                 range: exp_range(7, 8..12),
                                 name: "b",
                                 ty: Some(Ty {
@@ -1860,7 +1860,7 @@ fn valid_closure() {
                         range: exp_range(8, 1..16),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(8, 2..6),
                                 name: "a",
                                 ty: Some(Ty {
@@ -1868,7 +1868,7 @@ fn valid_closure() {
                                     range: exp_range(8, 5..6),
                                 }),
                             },
-                            FuncArg {
+                            Argument {
                                 range: exp_range(8, 8..12),
                                 name: "b",
                                 ty: Some(Ty {
@@ -1921,7 +1921,7 @@ fn valid_closure() {
                         range: exp_range(10, 1..28),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(10, 2..10),
                                 name: "arg_name",
                                 ty: None,
@@ -1958,7 +1958,7 @@ fn valid_closure() {
                         range: exp_range(11, 1..23),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(11, 2..9),
                                 name: "x",
                                 ty: Some(Ty {
@@ -2003,12 +2003,12 @@ fn valid_closure() {
                         range: exp_range(12, 1..22),
                         name: None,
                         arguments: vec![
-                            FuncArg {
+                            Argument {
                                 range: exp_range(12, 2..4),
                                 name: "_0",
                                 ty: None,
                             },
-                            FuncArg {
+                            Argument {
                                 range: exp_range(12, 6..8),
                                 name: "_1",
                                 ty: None,

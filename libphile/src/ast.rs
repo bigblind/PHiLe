@@ -17,9 +17,9 @@ use lexer::{ Range, Ranged };
 
 
 /// AST node representing an expression.
-pub type Exp<'a>  = Node<ExpKind<'a>>;
+pub type Exp<'a> = Node<ExpKind<'a>>;
 /// AST node representing a type annotation.
-pub type Ty<'a>   = Node<TyKind<'a>>;
+pub type Ty<'a>  = Node<TyKind<'a>>;
 
 /// Root of the AST.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -209,7 +209,7 @@ pub struct Function<'a> {
     /// Name of the function if it is a named global, `None` for closures.
     pub name: Option<&'a str>,
     /// The list of arguments to the function.
-    pub arguments: Vec<FuncArg<'a>>,
+    pub arguments: Vec<Argument<'a>>,
     /// The return type specification, if present.
     pub ret_type: Option<Ty<'a>>,
     /// The function body expression.
@@ -218,7 +218,7 @@ pub struct Function<'a> {
 
 /// Declaration of a single function argument.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FuncArg<'a> {
+pub struct Argument<'a> {
     /// Source range of the declaration.
     pub range: Range,
     /// Name of the argument.
@@ -377,7 +377,7 @@ impl_ranged! {
     EnumDecl,
     Variant,
     Function,
-    FuncArg,
+    Argument,
     Impl,
 }
 

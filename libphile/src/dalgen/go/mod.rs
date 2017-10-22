@@ -551,12 +551,12 @@ fn generate_function(
     for arg in &func.args {
         let ptr = arg.borrow()?;
         match ptr.value {
-            Value::FuncArg { .. } => match ptr.id {
+            Value::Argument { .. } => match ptr.id {
                 ExprId::Local(_) => {},
-                ExprId::Global(ref name) => bug!("FuncArg is global {}?!", name)?,
-                ExprId::Temp(index) => bug!("FuncArg is temporary {}?!", index)?,
+                ExprId::Global(ref name) => bug!("Argument is global {}?!", name)?,
+                ExprId::Temp(index) => bug!("Argument is temporary {}?!", index)?,
             },
-            ref val => bug!("Non-FuncArg argument?! {:#?}", val)?,
+            ref val => bug!("Non-Argument argument?! {:#?}", val)?,
         }
 
         write_expr_decl(wr, arg, params)?;

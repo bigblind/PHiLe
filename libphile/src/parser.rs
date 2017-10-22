@@ -329,7 +329,7 @@ impl<'a> Parser<'a> {
         Ok(Function { range, name, arguments, ret_type, body })
     }
 
-    fn parse_decl_arg(&mut self) -> Result<FuncArg<'a>> {
+    fn parse_decl_arg(&mut self) -> Result<Argument<'a>> {
         let name_tok = self.expect_identifier()?;
         let ty = match self.accept(":") {
             Some(_) => self.parse_type().map(Some)?,
@@ -341,7 +341,7 @@ impl<'a> Parser<'a> {
             &ty.as_ref().map_or(name_tok.range, Ranged::range)
         );
 
-        Ok(FuncArg { range, name, ty })
+        Ok(Argument { range, name, ty })
     }
 
     fn parse_impl(&mut self) -> ItemResult<'a> {

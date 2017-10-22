@@ -281,7 +281,7 @@ pub enum Value {
     Call(Call),
     /// A function argument. This has its own variant because it
     /// makes optimizations significantly easier.
-    FuncArg {
+    Argument {
         /// A back-pointer to the containing function.
         func: WkExpr,
         /// 0-based index of the argument within its containing function.
@@ -447,7 +447,7 @@ pub enum ExprId {
 /// A function. This is the value of global functions and closures.
 #[derive(Debug, Clone)]
 pub struct Function {
-    /// Each function argument in order; `FuncArg` expressions.
+    /// Each function argument in order; `Argument` expressions.
     pub args: Vec<RcExpr>,
     /// The expression that is evaluated when the function is called.
     pub body: RcExpr,

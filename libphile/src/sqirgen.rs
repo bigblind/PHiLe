@@ -17,7 +17,7 @@ use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
 use lexer::{ Range, Ranged };
-use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, FuncArg, Field };
+use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, Argument, Field };
 use ast::{ Prog, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ Error, Result };
 
@@ -1389,7 +1389,7 @@ impl SqirGen {
         )
     }
 
-    fn arg_types_for_toplevel_func(&mut self, args: &[FuncArg]) -> Result<Vec<RcType>> {
+    fn arg_types_for_toplevel_func(&mut self, args: &[Argument]) -> Result<Vec<RcType>> {
         args.iter().map(|arg| match arg.ty {
             Some(ref ty) => self.type_from_decl(ty),
             None => sema_error!(arg, "Type required for argument"),
@@ -1837,10 +1837,10 @@ impl SqirGen {
             |(index, (arg, ty))| {
                 let func = WkCell::new(); // dummy, points nowhere (yet)
                 let ty = ty.clone();
-                let value = Value::FuncArg { func, index };
+                let value = Value::Argument { func, index };
                 let id = ExprId::Local(arg.name.to_owned());
                 let expr = RcCell::new(Expr { ty, value, id });
-                // Sets the id of the FuncArg to ExprId::Local (again, redundantly)
+                // Sets the id of the Argument to ExprId::Local (again, redundantly)
                 self.declare_local(arg.name, expr, arg)
             }
         ).collect()
@@ -1849,8 +1849,8 @@ impl SqirGen {
     fn fixup_function_arguments(args: Vec<RcExpr>, fn_expr: &RcExpr) -> Result<()> {
         for arg in args {
             match arg.borrow_mut()?.value {
-                Value::FuncArg { ref mut func, .. } => *func = fn_expr.to_weak(),
-                ref val => bug!("Non-FuncArg argument?! {:#?}", val)?,
+                Value::Argument { ref mut func, .. } => *func = fn_expr.to_weak(),
+                ref val => bug!("Non-Argument argument?! {:#?}", val)?,
             }
         }
 
@@ -1877,7 +1877,7 @@ impl SqirGen {
         }
     }
 
-    fn arg_type_with_hint(&mut self, arg: &FuncArg, ty: &WkType) -> Result<RcType> {
+    fn arg_type_with_hint(&mut self, arg: &Argument, ty: &WkType) -> Result<RcType> {
         match arg.ty {
             None => ty.to_rc(),
             Some(ref arg_ty) => {
@@ -1898,7 +1898,7 @@ impl SqirGen {
         }
     }
 
-    fn arg_type_no_hint(&mut self, arg: &FuncArg) -> Result<RcType> {
+    fn arg_type_no_hint(&mut self, arg: &Argument) -> Result<RcType> {
         match arg.ty {
             Some(ref ty) => self.type_from_decl(ty),
             None => sema_error!(arg, "Cannot infer argument type"),
