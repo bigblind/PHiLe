@@ -2654,6 +2654,126 @@ fn valid_cast_expression() {
 }
 
 #[test]
+fn valid_infix_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    // We test every pair of consecutive precedence levels.
+    // This should be sufficient as long as the infix operator
+    // parser is reasonably well-factored, because ordering of
+    // precedence is transitive and total.
+    // For example, the parser is currently implemented as a
+    // systematic chain of calls to parse_binop_{left|no}assoc()
+    // with identical structure, but it could be a purely
+    // data-oriented, precedence-table-driven Pratt parser too,
+    // for instance; it would still satisfy the above requirement.
+    // In addition, we also test associativity and every
+    // possible operator at each individual precedence level.
+    let cases = vec![
+        (
+            "15 * 823 as int", // higher precedence on RHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "*",
+                        lhs: Exp {
+                            kind: ExpKind::Int("15"),
+                            range: exp_range(0, 1..3),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Cast(
+                                Box::new(Exp {
+                                    kind: ExpKind::Int("823"),
+                                    range: exp_range(0, 6..9),
+                                }),
+                                Ty {
+                                    kind: TyKind::Named("int"),
+                                    range: exp_range(0, 13..16),
+                                },
+                            ),
+                            range: exp_range(0, 6..16),
+                        },
+                    })
+                ),
+                range: exp_range(0, 1..16),
+            },
+        ),
+        (
+            "1 as float / 2049", // higher precedence on LHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "/",
+                        lhs: Exp {
+                            kind: ExpKind::Cast(
+                                Box::new(Exp {
+                                    kind: ExpKind::Int("1"),
+                                    range: exp_range(1, 1..2),
+                                }),
+                                Ty {
+                                    kind: TyKind::Named("float"),
+                                    range: exp_range(1, 6..11),
+                                },
+                            ),
+                            range: exp_range(1, 1..11),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Int("2049"),
+                            range: exp_range(1, 14..18),
+                        },
+                    })
+                ),
+                range: exp_range(1, 1..18),
+            },
+        ),
+        (
+            "div % mod * 100 / 0.125", // associativity
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "/",
+                        lhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "*",
+                                    lhs: Exp {
+                                        kind: ExpKind::BinaryOp(
+                                            Box::new(BinaryOp {
+                                                op: "%",
+                                                lhs: Exp {
+                                                    kind: ExpKind::Identifier("div"),
+                                                    range: exp_range(2, 1..4),
+                                                },
+                                                rhs: Exp {
+                                                    kind: ExpKind::Identifier("mod"),
+                                                    range: exp_range(2, 7..10),
+                                                },
+                                            })
+                                        ),
+                                        range: exp_range(2, 1..10),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("100"),
+                                        range: exp_range(2, 13..16),
+                                    },
+                                })
+                            ),
+                            range: exp_range(2, 1..16),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Float("0.125"),
+                            range: exp_range(2, 19..24),
+                        },
+                    })
+                ),
+                range: exp_range(2, 1..24),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_expression() {
 }
 

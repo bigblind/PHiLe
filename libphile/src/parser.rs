@@ -897,7 +897,7 @@ impl<'a> Parser<'a> {
         open:    &str,
         subexpr: P,
         delim:   &str,
-        close:   &str
+        close:   &str,
     ) -> Result<(Vec<V>, Range)>
         where P: Fn(&mut Self) -> Result<V> {
 
