@@ -79,8 +79,10 @@ struct Lexer<'a> {
     source: &'a str,
     location: Location,
     tokens: Vec<Token<'a>>,
-    regexes: [(TokenKind, Regex); 6],
+    regexes: [(TokenKind, Regex); NUM_TOKEN_KINDS],
 }
+
+const NUM_TOKEN_KINDS: usize = 6;
 
 
 /// Given an array of source strings, returns an array of tokens
