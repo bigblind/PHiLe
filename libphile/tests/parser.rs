@@ -2775,7 +2775,6 @@ fn valid_multiplicative_expression() {
     evaluate(cases);
 }
 
-
 #[test]
 fn valid_additive_expression() {
     let (exp_range, evaluate) = valid_expression_tester();
@@ -2905,6 +2904,108 @@ fn valid_additive_expression() {
                 range: exp_range(3, 1..10),
             },
         ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_comparison_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    macro_rules! case_for_higher_lhs_precedence {
+        ($i: expr => $op: expr) => {
+            (
+                concat!("x - 9876.54321", $op, "0"),
+                Exp {
+                    kind: ExpKind::BinaryOp(
+                        Box::new(BinaryOp {
+                            op: $op,
+                            lhs: Exp {
+                                kind: ExpKind::BinaryOp(
+                                    Box::new(BinaryOp {
+                                        op: "-",
+                                        lhs: Exp {
+                                            kind: ExpKind::Identifier("x"),
+                                            range: exp_range($i * 2 + 0, 1..2),
+                                        },
+                                        rhs: Exp {
+                                            kind: ExpKind::Float("9876.54321"),
+                                            range: exp_range($i * 2 + 0, 5..15),
+                                        },
+                                    })
+                                ),
+                                range: exp_range($i * 2 + 0, 1..15),
+                            },
+                            rhs: Exp {
+                                kind: ExpKind::Int("0"),
+                                range: exp_range($i * 2 + 0, 15 + $op.len()..16 + $op.len()),
+                            },
+                        })
+                    ),
+                    range: exp_range($i * 2 + 0, 1..16 + $op.len()),
+                },
+            )
+        }
+    }
+
+    macro_rules! case_for_higher_rhs_precedence {
+        ($i: expr => $op: expr) => {
+            (
+                concat!("0.0", $op, "a + 9999"),
+                Exp {
+                    kind: ExpKind::BinaryOp(
+                        Box::new(BinaryOp {
+                            op: $op,
+                            lhs: Exp {
+                                kind: ExpKind::Float("0.0"),
+                                range: exp_range($i * 2 + 1, 1..4),
+                            },
+                            rhs: Exp {
+                                kind: ExpKind::BinaryOp(
+                                    Box::new(BinaryOp {
+                                        op: "+",
+                                        lhs: Exp {
+                                            kind: ExpKind::Identifier("a"),
+                                            range: exp_range($i * 2 + 1, 4 + $op.len()..5 + $op.len()),
+                                        },
+                                        rhs: Exp {
+                                            kind: ExpKind::Int("9999"),
+                                            range: exp_range($i * 2 + 1, 8 + $op.len()..12 + $op.len()),
+                                        },
+                                    })
+                                ),
+                                range: exp_range($i * 2 + 1, 4 + $op.len()..12 + $op.len()),
+                            },
+                        })
+                    ),
+                    range: exp_range($i * 2 + 1, 1..12 + $op.len()),
+                },
+            )
+        }
+    }
+
+    macro_rules! cases_for_operators {
+        ($($i: expr => $op: expr,)*) => {
+            vec![
+                $(
+                    case_for_higher_lhs_precedence!($i => $op),
+                    case_for_higher_rhs_precedence!($i => $op),
+                )*
+            ]
+        }
+    }
+
+    // There are no test cases for associativity,
+    // because comparison operators are not associative.
+
+    let cases = cases_for_operators![
+        0 => "==",
+        1 => "!=",
+        2 => "<",
+        3 => ">",
+        4 => "<=",
+        5 => ">=",
     ];
 
     evaluate(cases);

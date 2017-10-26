@@ -1684,7 +1684,7 @@ impl SqirGen {
 
                 return if expected_len == actual_len {
                     nodes.iter().zip(types).map(
-                        |(node, ty)| self.generate_expr(node, Some(ty.to_rc()?))
+                        |(node, ty)| self.generate_expr(node, ty.to_rc()?.into())
                     ).collect()
                 } else {
                     sema_error!(
@@ -1908,7 +1908,7 @@ impl SqirGen {
     fn type_hint_for_function(ctx: TyCtx) -> Result<Option<FunctionType>> {
         match ctx.ty {
             Some(ty) => match *ty.borrow()? {
-                Type::Function(ref f) => Ok(Some(f.clone())),
+                Type::Function(ref f) => Ok(f.clone().into()),
                 _ => sema_error!(
                     ctx.range,
                     "Non-function type {} prescribed for function",
