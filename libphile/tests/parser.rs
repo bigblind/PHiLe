@@ -3158,6 +3158,152 @@ fn valid_and_expression() {
 }
 
 #[test]
+fn valid_or_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
+        (
+            "c & b | a", // higher precedence on the LHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "|",
+                        lhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "&",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("c"),
+                                        range: exp_range(0, 1..2),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Identifier("b"),
+                                        range: exp_range(0, 5..6),
+                                    },
+                                })
+                            ),
+                            range: exp_range(0, 1..6),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Identifier("a"),
+                            range: exp_range(0, 9..10),
+                        },
+                    })
+                ),
+                range: exp_range(0, 1..10),
+            },
+        ),
+        (
+            "F | G & HH", // higher precedence on the RHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "|",
+                        lhs: Exp {
+                            kind: ExpKind::Identifier("F"),
+                            range: exp_range(1, 1..2),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "&",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("G"),
+                                        range: exp_range(1, 5..6),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Identifier("HH"),
+                                        range: exp_range(1, 9..11),
+                                    },
+                                })
+                            ),
+                            range: exp_range(1, 5..11),
+                        },
+                    })
+                ),
+                range: exp_range(1, 1..11),
+            },
+        ),
+        (
+            "i & j | k & 0", // higher precedence on both sides
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "|",
+                        lhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "&",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("i"),
+                                        range: exp_range(2, 1..2),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Identifier("j"),
+                                        range: exp_range(2, 5..6),
+                                    },
+                                })
+                            ),
+                            range: exp_range(2, 1..6),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "&",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("k"),
+                                        range: exp_range(2, 9..10),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("0"),
+                                        range: exp_range(2, 13..14),
+                                    },
+                                })
+                            ),
+                            range: exp_range(2, 9..14),
+                        },
+                    })
+                ),
+                range: exp_range(2, 1..14),
+            },
+        ),
+        (
+            "false | true | null", // left associativity
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "|",
+                        lhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "|",
+                                    lhs: Exp {
+                                        kind: ExpKind::Bool("false"),
+                                        range: exp_range(3, 1..6),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Bool("true"),
+                                        range: exp_range(3, 9..13),
+                                    },
+                                })
+                            ),
+                            range: exp_range(3, 1..13),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Identifier("null"),
+                            range: exp_range(3, 16..20),
+                        },
+                    })
+                ),
+                range: exp_range(3, 1..20),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_expression() {
 }
 
