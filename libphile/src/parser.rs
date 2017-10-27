@@ -421,11 +421,11 @@ impl<'a> Parser<'a> {
             let range = expr.range; // TODO(H2CO3): include semicolon
             let kind = ExpKind::Semi(expr.into());
             Ok(Exp { kind, range })
-        } else if !self.is_at("}") {
+        } else if self.is_at("}") {
+            Ok(expr)
+        } else {
             // no trailing semi but not the last statement of block
             Err(self.expectation_error("; or }"))
-        } else {
-            Ok(expr)
         }
     }
 

@@ -12,6 +12,19 @@
         unsafe_code,
         unstable_features,
         unused_import_braces, unused_qualifications)]
+#![cfg_attr(feature = "cargo-clippy",
+            warn(wrong_pub_self_convention, used_underscore_binding,
+                 stutter, similar_names, pub_enum_variant_names,
+                 // TODO(H2CO3): locally allowing non_ascii_literal doesn't work
+                 /* non_ascii_literal, */ unicode_not_nfc,
+                 /* result_unwrap_used, option_unwrap_used, */ // TODO(H2CO3): fix these
+                 option_map_unwrap_or_else, option_map_unwrap_or, filter_map,
+                 int_plus_one, string_add_assign, if_not_else,
+                 invalid_upcast_comparisons,
+                 cast_sign_loss, cast_precision_loss,
+                 cast_possible_wrap, cast_possible_truncation,
+                 mutex_integer, mut_mut, items_after_statements,
+                 print_stdout, mem_forget, maybe_infinite_iter))]
 
 #[macro_use]
 extern crate quickcheck;
@@ -237,8 +250,7 @@ impl Arbitrary for ValidWhitespace {
             let buf = self.buf
                 .chars()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, c)| c)
+                .filter_map(|(j, c)| if j == i { None } else { Some(c) })
                 .collect();
 
             ValidWhitespace { buf }
@@ -300,8 +312,7 @@ impl Arbitrary for ValidLineComment {
             let buf: String = self.buf
                 .chars()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, c)| c)
+                .filter_map(|(j, c)| if j == i { None } else { Some(c) })
                 .collect();
 
             assert!(buf.starts_with('#'));
@@ -368,8 +379,7 @@ impl Arbitrary for ValidWord {
             let buf: String = self.buf
                 .chars()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, c)| c)
+                .filter_map(|(j, c)| if j == i { None } else { Some(c) })
                 .collect();
 
             assert!(is_ident_start(buf.chars().next().unwrap()));
@@ -515,8 +525,7 @@ impl ValidNumber {
             let digits = payload
                 .chars()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, c)| c);
+                .filter_map(|(j, c)| if j == i { None } else { Some(c) });
 
             ValidNumber {
                 buf: prefix.chars().chain(digits).collect(),
@@ -650,8 +659,7 @@ impl Arbitrary for ValidString {
             let chars = self.chars
                 .iter()
                 .enumerate()
-                .filter(|&(j, _)| j != i)
-                .map(|(_, &c)| c)
+                .filter_map(|(j, &c)| if j == i { None } else { Some(c) })
                 .collect();
 
             ValidString { chars }
@@ -1572,6 +1580,7 @@ fn invalid_source() {
     }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 fn quickcheck_valid_lexeme<T: Lexeme>(lexeme: T) -> bool {
     let mut source = String::new();
     let start = lexer::Location { src_idx: 0, line: 1, column: 1 };

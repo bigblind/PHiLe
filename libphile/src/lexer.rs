@@ -187,6 +187,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(should_implement_trait))]
     fn next(&mut self) -> Result<Option<Token<'a>>> {
         if self.source.is_empty() {
             return Ok(None)

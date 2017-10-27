@@ -20,7 +20,7 @@ use sqir::*;
 /// # Return value:
 ///
 /// Optimized SQIR.
-pub fn optimize_sqir(mut _sqir: Sqir) -> Sqir {
+pub fn optimize_sqir(sqir: Sqir) -> Sqir {
     // trivial optimization: NOP
-    _sqir
+    sqir
 }

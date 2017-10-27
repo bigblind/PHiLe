@@ -105,14 +105,25 @@
 #![crate_name="philec"]
 #![crate_type="bin"]
 #![doc(html_root_url = "https://docs.rs/crate/philec/0.1.3")]
-#![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
-#![cfg_attr(feature = "cargo-clippy", allow(should_assert_eq))]
-#![cfg_attr(feature = "cargo-clippy", allow(clone_on_ref_ptr))]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,
         unstable_features,
         unused_import_braces, unused_qualifications, missing_docs)]
+#![cfg_attr(feature = "cargo-clippy",
+            allow(match_same_arms, should_assert_eq, clone_on_ref_ptr))]
+#![cfg_attr(feature = "cargo-clippy",
+            warn(wrong_pub_self_convention, used_underscore_binding,
+                 stutter, similar_names, pub_enum_variant_names,
+                 non_ascii_literal, unicode_not_nfc,
+                 /* result_unwrap_used, option_unwrap_used, */ // TODO(H2CO3): fix these
+                 option_map_unwrap_or_else, option_map_unwrap_or, filter_map,
+                 int_plus_one, string_add_assign, if_not_else,
+                 invalid_upcast_comparisons,
+                 cast_sign_loss, /* cast_precision_loss, */ // TODO(H2CO3): fix these
+                 cast_possible_wrap, cast_possible_truncation,
+                 mutex_integer, mut_mut, items_after_statements,
+                 print_stdout, mem_forget, maybe_infinite_iter))]
 
 #[macro_use]
 extern crate clap;
