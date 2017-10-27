@@ -414,9 +414,9 @@ impl SqirGen {
     }
 
     fn check_relation_reciprocity(&self, lhs_type: &RcType, lhs_field: &str, relation: &Relation) -> Result<()> {
-        let rhs_type = &relation.rhs.entity.clone();
+        let rhs_type = &relation.rhs.entity;
         let rhs_field = match relation.rhs.field {
-            Some(ref name) => name.clone(),
+            Some(ref name) => name,
             None => return Ok(()), // unilateral relations need no reciprocal references
         };
 
@@ -910,7 +910,8 @@ impl SqirGen {
         // A one-element tuple is converted to its element type,
         // _without_ validation of containment in a value type.
         if types.len() == 1 {
-            return Ok(types[0].clone())
+            let mut types = types;
+            return types.pop().ok_or_else(lazy_bug!("can't pop singleton Vec?!"));
         }
 
         // Tuples are full-fledged value types, similar to structs.
@@ -1659,8 +1660,10 @@ impl SqirGen {
 
     fn generate_tuple(&mut self, ctx: TyCtx, nodes: &[Exp]) -> Result<RcExpr> {
         // A one-element tuple is equivalent with its element
-        if nodes.len() == 1 {
-            return self.generate_expr(&nodes[0], ctx.ty)
+        if let Some((first, rest)) = nodes.split_first() {
+            if rest.is_empty() {
+                return self.generate_expr(first, ctx.ty)
+            }
         }
 
         let exprs = self.generate_tuple_items(ctx, nodes)?;
@@ -1714,7 +1717,7 @@ impl SqirGen {
                     |node| self.generate_expr(node, None)
                 ).collect::<Result<_>>()?;
 
-                let last_expr = self.generate_expr(last, ctx.ty.clone())?;
+                let last_expr = self.generate_expr(last, ctx.ty)?;
                 let last_ty = last_expr.borrow()?.ty.clone();
 
                 items.push(last_expr);
