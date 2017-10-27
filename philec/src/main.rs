@@ -113,7 +113,7 @@
 #![cfg_attr(feature = "cargo-clippy",
             allow(match_same_arms, should_assert_eq, clone_on_ref_ptr))]
 #![cfg_attr(feature = "cargo-clippy",
-            warn(wrong_pub_self_convention, used_underscore_binding,
+            deny(wrong_pub_self_convention, used_underscore_binding,
                  stutter, similar_names, pub_enum_variant_names,
                  non_ascii_literal, unicode_not_nfc,
                  /* result_unwrap_used, option_unwrap_used, */ // TODO(H2CO3): fix these

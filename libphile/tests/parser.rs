@@ -13,7 +13,9 @@
         unstable_features,
         unused_import_braces, unused_qualifications)]
 #![cfg_attr(feature = "cargo-clippy",
-            warn(wrong_pub_self_convention, used_underscore_binding,
+            allow(match_same_arms, should_assert_eq, clone_on_ref_ptr))]
+#![cfg_attr(feature = "cargo-clippy",
+            deny(wrong_pub_self_convention, used_underscore_binding,
                  stutter, similar_names, pub_enum_variant_names,
                  non_ascii_literal, unicode_not_nfc,
                  /* result_unwrap_used, option_unwrap_used, */ // TODO(H2CO3): fix these
@@ -47,7 +49,7 @@ struct InvalidTestCase {
     message: &'static str,
 }
 
-fn lex_filter_ws_comment<'a, S: AsRef<str>>(sources: &'a [S]) -> Vec<Token<'a>> {
+fn lex_filter_ws_comment<S: AsRef<str>>(sources: &[S]) -> Vec<Token> {
     let mut tokens = lexer::lex(sources).unwrap();
 
     tokens.retain(|token| match token.kind {
@@ -74,6 +76,7 @@ fn parse_invalid(source: &str) -> (String, Range) {
     }
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 fn oneline_range(src_idx: usize, char_range: std::ops::Range<usize>) -> Range {
     Range {
         start: Location { src_idx, line: 1, column: char_range.start },
@@ -583,9 +586,21 @@ fn range_by_appending(buf: &mut String, s: &str) -> Range {
     range
 }
 
+struct ValidFuncGenParams {
+    args:           &'static [(&'static str, &'static str)],
+    fn_name:        &'static str,
+    ret_type_str:   &'static str,
+    body_str:       &'static str,
+    has_arg_type:   bool,
+    has_ret_type:   bool,
+    has_body:       bool,
+    trailing_comma: bool,
+}
+
 // Helper for `valid_fn_def()`.
-fn valid_fn_source_and_ast(
-    (
+fn valid_fn_source_and_ast(params: &ValidFuncGenParams) -> (String, Function<'static>) {
+    let mut buf = String::new();
+    let &ValidFuncGenParams {
         args,
         fn_name,
         ret_type_str,
@@ -594,18 +609,7 @@ fn valid_fn_source_and_ast(
         has_ret_type,
         has_body,
         trailing_comma,
-    ): (
-        &[(&'static str, &'static str)],
-        &'static str,
-        &'static str,
-        &'static str,
-        bool,
-        bool,
-        bool,
-        bool,
-    )
-) -> (String, Function<'static>) {
-    let mut buf = String::new();
+    } = params;
 
     let ((arguments, ret_type, body), range) = range_by_appending_with(&mut buf, |buf| {
         let mut arguments = Vec::with_capacity(args.len());
@@ -614,9 +618,7 @@ fn valid_fn_source_and_ast(
         *buf += fn_name;
         *buf += "(";
 
-        for i in 0..args.len() {
-            let (arg_name, arg_type_name) = args[i];
-
+        for (i, &(arg_name, arg_type_name)) in args.iter().enumerate() {
             let (arg_type, arg_range) = range_by_appending_with(buf, |buf| {
                 *buf += arg_name;
 
@@ -691,7 +693,7 @@ fn valid_fn_source_and_ast(
 
 #[test]
 fn valid_fn_def() {
-    let args_name_type = [("foo", "String"), ("bar", "float")];
+    let args_name_type = &[("foo", "String"), ("bar", "float")];
     let args = (0..args_name_type.len() + 1).map(|n| &args_name_type[..n]);
     let fn_names = vec!["some_func", "_", "noname", "nonIdiomaticFunction"];
     let ret_type_strs = vec!["Quxy", "weirdType"];
@@ -703,8 +705,18 @@ fn valid_fn_def() {
 
     let it = iproduct!(args, fn_names, ret_type_strs, body_strs, arg_flags, comma_flags, ret_flags, body_flags);
 
-    for params in it {
-        let (buf, func) = valid_fn_source_and_ast(params);
+    for tuple in it {
+        let params = ValidFuncGenParams {
+            args:           tuple.0,
+            fn_name:        tuple.1,
+            ret_type_str:   tuple.2,
+            body_str:       tuple.3,
+            has_arg_type:   tuple.4,
+            has_ret_type:   tuple.5,
+            has_body:       tuple.6,
+            trailing_comma: tuple.7,
+        };
+        let (buf, func) = valid_fn_source_and_ast(&params);
         let sources = [buf];
         let tokens = lex_filter_ws_comment(&sources);
         let actual_ast = parse_valid(&tokens);

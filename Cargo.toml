@@ -2,7 +2,7 @@
 members = ["libphile", "philec"]
 
 [profile.dev]
-panic = "abort"
+panic = "unwind"
 
 [profile.release]
 panic = "abort"
