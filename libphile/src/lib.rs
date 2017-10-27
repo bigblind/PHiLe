@@ -40,6 +40,9 @@
 #![crate_type="rlib"]
 #![crate_type="dylib"]
 #![doc(html_root_url = "https://docs.rs/phile/0.1.3")]
+#![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
+#![cfg_attr(feature = "cargo-clippy", allow(should_assert_eq))]
+#![cfg_attr(feature = "cargo-clippy", allow(clone_on_ref_ptr))]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,

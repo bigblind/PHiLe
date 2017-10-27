@@ -236,7 +236,7 @@ fn transform_name<D>(
 
     use self::NameTransform::*;
 
-    match transform.unwrap_or(default(lang)) {
+    match transform.unwrap_or_else(|| default(lang)) {
         Identity       => name.to_owned(),
         LowerSnakeCase => name.to_snake_case(),
         UpperSnakeCase => name.to_shouty_snake_case(),

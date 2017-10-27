@@ -378,7 +378,7 @@ impl SqirGen {
     // because at this point, we should have gotten rid of
     // all placeholders that could hide self-containing types.)
     fn occurs_check_user_defined_types(&self) -> Result<()> {
-        for (_, t) in &self.sqir.named_types {
+        for t in self.sqir.named_types.values() {
             self.occurs_check(&t.to_weak())?
         }
 
@@ -414,7 +414,7 @@ impl SqirGen {
     }
 
     fn check_relation_reciprocity(&self, lhs_type: &RcType, lhs_field: &str, relation: &Relation) -> Result<()> {
-        let rhs_type = relation.rhs.entity.clone();
+        let rhs_type = &relation.rhs.entity.clone();
         let rhs_field = match relation.rhs.field {
             Some(ref name) => name.clone(),
             None => return Ok(()), // unilateral relations need no reciprocal references
@@ -426,17 +426,17 @@ impl SqirGen {
         match self.sqir.relations.get(&rhs_key) {
             None => return reciprocity_error!(
                 "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
-                unwrap_entity_name(&lhs_type)?,
+                unwrap_entity_name(lhs_type)?,
                 lhs_field,
-                unwrap_entity_name(&rhs_type)?,
+                unwrap_entity_name(rhs_type)?,
                 rhs_field,
             ),
-            Some(ref inverse_relation) => if relation != *inverse_relation {
+            Some(inverse_relation) => if relation != inverse_relation {
                 return reciprocity_error!(
                     "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
-                    unwrap_entity_name(&lhs_type)?,
+                    unwrap_entity_name(lhs_type)?,
                     lhs_field,
-                    unwrap_entity_name(&rhs_type)?,
+                    unwrap_entity_name(rhs_type)?,
                     rhs_field,
                 )
             },
@@ -1067,10 +1067,10 @@ impl SqirGen {
         // or [&T]), then implicitly form a relation.
         match field.relation {
             Some(ref rel) => self.define_explicit_relation(
-                &class_type_rc, &*field_type, field.name, rel, field
+                class_type_rc, &*field_type, field.name, rel, field
             ),
             None => self.define_implicit_relation(
-                &class_type_rc, &*field_type, field.name
+                class_type_rc, &*field_type, field.name
             ),
         }
     }

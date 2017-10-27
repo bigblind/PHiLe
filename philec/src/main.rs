@@ -105,6 +105,9 @@
 #![crate_name="philec"]
 #![crate_type="bin"]
 #![doc(html_root_url = "https://docs.rs/crate/philec/0.1.3")]
+#![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
+#![cfg_attr(feature = "cargo-clippy", allow(should_assert_eq))]
+#![cfg_attr(feature = "cargo-clippy", allow(clone_on_ref_ptr))]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,
@@ -192,7 +195,7 @@ macro_rules! stopwatch {
         let val = $code;
         let t1 = Instant::now();
         let dt = t1 - t0;
-        let secs = dt.as_secs() as f64 + dt.subsec_nanos() as f64 * 1e-9;
+        let secs = dt.as_secs() as f64 + f64::from(dt.subsec_nanos()) * 1e-9;
         let message = format!("{:6.1} ms", secs * 1e3);
         eprintln!("{}", Diagnostic::new(message, DiagnosticKind::Info));
         val
@@ -324,6 +327,7 @@ fn handle_argument_error(arg_name: &str, value: &str) -> ! {
 // Entry point
 //
 
+#[cfg_attr(feature = "cargo-clippy", allow(let_unit_value))]
 fn philec_main(args: &ProgramArgs, wp: &mut WriterProvider) -> Result<()> {
     let sources = stopwatch!("Reading Sources", {
         read_files(&args.sources)?

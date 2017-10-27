@@ -130,7 +130,7 @@ impl<'a> PodUdTypeGen<'a> {
     fn writer_with_preamble(&mut self, name: &str) -> Result<Rc<RefCell<io::Write>>> {
         let file_name = name.to_owned() + ".go";
         let wptr = (self.wp)(&file_name)?;
-        write_header(&mut *wptr.try_borrow_mut()?, &self.params)?;
+        write_header(&mut *wptr.try_borrow_mut()?, self.params)?;
         Ok(wptr)
     }
 
@@ -142,13 +142,13 @@ impl<'a> PodUdTypeGen<'a> {
         fields: &BTreeMap<String, WkType>,
     ) -> Result<()> {
         // Respect the type name transform
-        let struct_name = transform_type_name(raw_struct_name, &self.params);
+        let struct_name = transform_type_name(raw_struct_name, self.params);
         writeln!(wr, "type {} struct {{", struct_name)?;
 
         // Respect the field name transform
         // TODO(H2CO3): For efficiency, sort fields by alignment.
         let transformed_fields: Vec<_> = fields.iter().map(
-            |(name, ty)| (transform_field_name(name, &self.params), ty)
+            |(name, ty)| (transform_field_name(name, self.params), ty)
         ).collect();
 
         let max_len = transformed_fields.iter()
@@ -160,7 +160,7 @@ impl<'a> PodUdTypeGen<'a> {
         // Indexing `pad` with grapheme counts is safe because it's ASCII-only.
         for (name, ty) in transformed_fields {
             write!(wr, "    {}{} ", name, &pad[grapheme_count(&name)..])?;
-            write_type(wr, ty, &self.params)?;
+            write_type(wr, ty, self.params)?;
             writeln!(wr)?;
         }
 
@@ -175,7 +175,7 @@ impl<'a> PodUdTypeGen<'a> {
         variants: &BTreeMap<String, WkType>,
     ) -> io::Result<()> {
         // Respect the type name transform
-        let enum_name = transform_type_name(raw_enum_name, &self.params);
+        let enum_name = transform_type_name(raw_enum_name, self.params);
 
         // TODO(H2CO3): if none of the variants has an
         // associated value (every variant has type ()),
@@ -198,7 +198,7 @@ impl<'a> PodUdTypeGen<'a> {
         // the final, correctly cased and prefixed variant name.
         let transformed_variants: Vec<_> = variants.keys().map(|vname| {
             let variant_name = raw_enum_name.to_owned() + "_" + vname;
-            transform_variant_name(&variant_name, &self.params)
+            transform_variant_name(&variant_name, self.params)
         }).collect();
 
         let max_len = transformed_variants.iter().map(String::len).max().unwrap_or(0);
@@ -489,7 +489,7 @@ fn generate_string_literal(wr: &mut io::Write, id: &ExprId, s: &str, params: &Co
 
 fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr, params: &CodegenParams) -> Result<()> {
     write!(wr, "    ")?;
-    write_expr_id(wr, &id, params)?;
+    write_expr_id(wr, id, params)?;
     write!(wr, " = ")?;
     let rc = expr.to_rc()?;
     write_expr_id(wr, &rc.borrow()?.id, params)?;
@@ -500,7 +500,7 @@ fn generate_load(wr: &mut io::Write, id: &ExprId, expr: &WkExpr, params: &Codege
 fn generate_ignore(wr: &mut io::Write, id: &ExprId, expr: &RcExpr, params: &CodegenParams) -> Result<()> {
     generate_expr(wr, expr, params)?;
     write!(wr, "    ")?;
-    write_expr_id(wr, &id, params)?;
+    write_expr_id(wr, id, params)?;
     writeln!(wr, " = struct{{}}{{}}")?;
     Ok(())
 }
@@ -511,7 +511,7 @@ fn generate_sequence(wr: &mut io::Write, id: &ExprId, exprs: &[RcExpr], params: 
     }
 
     write!(wr, "    ")?;
-    write_expr_id(wr, &id, params)?;
+    write_expr_id(wr, id, params)?;
     write!(wr, " = ")?;
 
     match exprs.last() {
@@ -536,7 +536,7 @@ fn generate_function(
 
     write!(wr, "func")?;
 
-    if let Some(ref func_name) = name {
+    if let Some(func_name) = name {
         write!(
             wr,
             " ({} {}) {}",

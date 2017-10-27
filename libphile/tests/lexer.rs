@@ -304,7 +304,7 @@ impl Arbitrary for ValidLineComment {
                 .map(|(_, c)| c)
                 .collect();
 
-            assert!(buf.chars().next().unwrap() == '#');
+            assert!(buf.starts_with('#'));
             assert!(is_ver_ws(buf.chars().last().unwrap()));
 
             ValidLineComment { buf }
@@ -317,7 +317,7 @@ impl Arbitrary for ValidLineComment {
 impl Lexeme for ValidLineComment {
     fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
         // A line comment represented by this type always ends in a newline.
-        assert!(self.buf.chars().next().unwrap() == '#');
+        assert!(self.buf.starts_with('#'));
         assert!(is_ver_ws(self.buf.chars().last().unwrap()));
 
         end.line += 1;
@@ -499,7 +499,7 @@ impl ValidNumber {
     }
 
     fn shrink_int(&self) -> Box<Iterator<Item=Self>> {
-        assert!(self.kind != ValidNumberKind::FloatingPoint);
+        assert_ne!(self.kind, ValidNumberKind::FloatingPoint);
         assert!(self.prefix_len < self.buf.len());
 
         let prefix = &self.buf[..self.prefix_len];

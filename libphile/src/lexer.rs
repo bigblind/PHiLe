@@ -97,7 +97,7 @@ const NUM_TOKEN_KINDS: usize = 6;
 ///
 /// * `Ok(Vec<Token>)` if the source files were lexically correct.
 /// * `Err(Error::Syntax)` if there was a lexical error in the input.
-pub fn lex<'a, S: AsRef<str>>(sources: &'a [S]) -> Result<Vec<Token<'a>>> {
+pub fn lex<S: AsRef<str>>(sources: &[S]) -> Result<Vec<Token>> {
     Lexer::new().lex(sources)
 }
 
