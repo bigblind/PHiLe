@@ -21,6 +21,7 @@
                  /* non_ascii_literal, */ unicode_not_nfc,
                  /* result_unwrap_used, option_unwrap_used, */ // TODO(H2CO3): fix these
                  option_map_unwrap_or_else, option_map_unwrap_or, filter_map,
+                 shadow_unrelated, shadow_reuse, shadow_same,
                  int_plus_one, string_add_assign, if_not_else,
                  invalid_upcast_comparisons,
                  cast_sign_loss, cast_precision_loss,
@@ -189,10 +190,10 @@ impl Lexeme for ValidToken {
 }
 
 impl Arbitrary for ValidToken {
-    fn arbitrary<G: Gen>(g: &mut G) -> ValidToken {
+    fn arbitrary<G: Gen>(g: &mut G) -> Self {
         use ValidToken::*;
 
-        let token_gens: &[fn(&mut G) -> ValidToken] = &[
+        let token_gens: &[fn(&mut G) -> Self] = &[
             |g| Whitespace(ValidWhitespace::arbitrary(g)),
             |g| LineComment(ValidLineComment::arbitrary(g)),
             |g| Word(ValidWord::arbitrary(g)),
@@ -542,7 +543,7 @@ impl ValidNumber {
 
 impl Arbitrary for ValidNumber {
     fn arbitrary<G: Gen>(g: &mut G) -> Self {
-        let funcs: &[fn(&mut G) -> ValidNumber] = &[
+        let funcs: &[fn(&mut G) -> Self] = &[
             Self::arbitrary_decimal_int,
             Self::arbitrary_binary_int,
             Self::arbitrary_octal_int,

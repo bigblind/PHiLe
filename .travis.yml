@@ -10,7 +10,7 @@ env:
     - RUST_BACKTRACE=1
 
 script:
-  - cargo build --all
+  - cargo test --no-run --all
   - cargo test --verbose --release --all
 
 after_success: |

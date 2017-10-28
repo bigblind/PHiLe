@@ -118,6 +118,7 @@
                  non_ascii_literal, unicode_not_nfc,
                  /* result_unwrap_used, option_unwrap_used, */ // TODO(H2CO3): fix these
                  option_map_unwrap_or_else, option_map_unwrap_or, filter_map,
+                 shadow_unrelated, shadow_reuse, shadow_same,
                  int_plus_one, string_add_assign, if_not_else,
                  invalid_upcast_comparisons,
                  cast_sign_loss, /* cast_precision_loss, */ // TODO(H2CO3): fix these

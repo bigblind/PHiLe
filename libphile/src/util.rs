@@ -223,7 +223,7 @@ pub struct RcCell<T: ?Sized> {
 
 impl<T> RcCell<T> {
     /// Creates an `RcCell` owning the `value`.
-    pub fn new(value: T) -> RcCell<T> {
+    pub fn new(value: T) -> Self {
         RcCell {
             ptr: Rc::new(RefCell::new(value))
         }
@@ -272,7 +272,7 @@ impl<T> RcCell<T> {
 /// Clones the pointer only, such that the returned strong
 /// pointer points to the same value as `self`.
 impl<T> Clone for RcCell<T> {
-    fn clone(&self) -> RcCell<T> {
+    fn clone(&self) -> Self {
         RcCell {
             ptr: self.ptr.clone()
         }
@@ -309,7 +309,7 @@ impl<T> Display for RcCell<T> where T: Display {
 }
 
 impl<T> From<T> for RcCell<T> {
-    fn from(value: T) -> RcCell<T> {
+    fn from(value: T) -> Self {
         RcCell::new(value)
     }
 }
@@ -323,7 +323,7 @@ pub struct WkCell<T: ?Sized> {
 impl<T> WkCell<T> {
     /// Creates a `WkCell` that doesn't refer to any value.
     /// `to_rc()` will always return an `Err` for such `WkCell`s.
-    pub fn new() -> WkCell<T> {
+    pub fn new() -> Self {
         WkCell {
             ptr: Weak::new()
         }
@@ -344,7 +344,7 @@ impl<T> WkCell<T> {
 /// the same value as `self` does, if any. If `self` doesn't point
 /// anywhere, the clone will not be able to be strongified either.
 impl<T> Clone for WkCell<T> {
-    fn clone(&self) -> WkCell<T> {
+    fn clone(&self) -> Self {
         WkCell {
             ptr: self.ptr.clone()
         }
@@ -356,7 +356,7 @@ impl<T> Clone for WkCell<T> {
 /// (This is implemented manually because `#[derive]`ing
 /// imposes the overly conservative bound `T: Default`.)
 impl<T> Default for WkCell<T> {
-    fn default() -> WkCell<T> {
+    fn default() -> Self {
         WkCell::new()
     }
 }

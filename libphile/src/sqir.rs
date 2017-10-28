@@ -714,7 +714,7 @@ impl Ord for Relation {
 
 impl Sqir {
     /// Creates an "empty" SQIR value, populated with builtins only.
-    pub fn new() -> Sqir {
+    pub fn new() -> Self {
         let named_types = btree_map!{
             BUILTIN_NAME.bool_name   => Type::Bool,
             BUILTIN_NAME.int_name    => Type::Int,
@@ -752,7 +752,7 @@ impl Sqir {
 
 /// Returns the same empty SQIR object as `Sqir::new()`.
 impl Default for Sqir {
-    fn default() -> Sqir {
+    fn default() -> Self {
         Sqir::new()
     }
 }
