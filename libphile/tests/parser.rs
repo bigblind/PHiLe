@@ -3333,6 +3333,130 @@ fn valid_range_expression() {
     let (exp_range, evaluate) = valid_expression_tester();
 
     let cases = vec![
+        (
+            "1 | 2..3", // higher precedence on LHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "..",
+                        lhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "|",
+                                    lhs: Exp {
+                                        kind: ExpKind::Int("1"),
+                                        range: exp_range(0, 1..2),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("2"),
+                                        range: exp_range(0, 5..6),
+                                    },
+                                })
+                            ),
+                            range: exp_range(0, 1..6),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Int("3"),
+                            range: exp_range(0, 8..9),
+                        },
+                    })
+                ),
+                range: exp_range(0, 1..9),
+            },
+        ),
+        (
+            "x..y | z", // higher precedence on RHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "..",
+                        lhs: Exp {
+                            kind: ExpKind::Identifier("x"),
+                            range: exp_range(1, 1..2),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "|",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("y"),
+                                        range: exp_range(1, 4..5),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Identifier("z"),
+                                        range: exp_range(1, 8..9),
+                                    },
+                                })
+                            ),
+                            range: exp_range(1, 4..9),
+                        },
+                    })
+                ),
+                range: exp_range(1, 1..9),
+            },
+        ),
+        (
+            "Q | W...E", // higher precedence on LHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "...",
+                        lhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "|",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("Q"),
+                                        range: exp_range(2, 1..2),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Identifier("W"),
+                                        range: exp_range(2, 5..6),
+                                    },
+                                })
+                            ),
+                            range: exp_range(2, 1..6),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Identifier("E"),
+                            range: exp_range(2, 9..10),
+                        },
+                    })
+                ),
+                range: exp_range(2, 1..10),
+            },
+        ),
+        (
+            "R...T | Y", // higher precedence on RHS
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "...",
+                        lhs: Exp {
+                            kind: ExpKind::Identifier("R"),
+                            range: exp_range(3, 1..2),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "|",
+                                    lhs: Exp {
+                                        kind: ExpKind::Identifier("T"),
+                                        range: exp_range(3, 5..6),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Identifier("Y"),
+                                        range: exp_range(3, 9..10),
+                                    },
+                                })
+                            ),
+                            range: exp_range(3, 5..10),
+                        },
+                    })
+                ),
+                range: exp_range(3, 1..10),
+            },
+        ),
     ];
 
     evaluate(cases);
