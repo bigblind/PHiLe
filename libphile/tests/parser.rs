@@ -3839,5 +3839,175 @@ fn valid_named_type() {
 }
 
 #[test]
+fn valid_array_type() {
+    let (ty_range, evaluate) = valid_type_tester();
+
+    let cases = vec![
+        (
+            "[Element]",
+            Ty {
+                kind: TyKind::Array(
+                    Box::new(Ty {
+                        kind: TyKind::Named("Element"),
+                        range: ty_range(0, 2..9),
+                    })
+                ),
+                range: ty_range(0, 1..10),
+            },
+        ),
+        (
+            "[[Nested]]",
+            Ty {
+                kind: TyKind::Array(
+                    Box::new(Ty {
+                        kind: TyKind::Array(
+                            Box::new(Ty {
+                                kind: TyKind::Named("Nested"),
+                                range: ty_range(1, 3..9),
+                            })
+                        ),
+                        range: ty_range(1, 2..10),
+                    })
+                ),
+                range: ty_range(1, 1..11),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_tuple_type() {
+    let (ty_range, evaluate) = valid_type_tester();
+
+    let cases = vec![
+        (
+            "()",
+            Ty {
+                kind: TyKind::Tuple(vec![]),
+                range: ty_range(0, 1..3),
+            },
+        ),
+        (
+            "(())",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(1, 2..4),
+                    },
+                ]),
+                range: ty_range(1, 1..5),
+            },
+        ),
+        (
+            "((),)",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(2, 2..4),
+                    },
+                ]),
+                range: ty_range(2, 1..6),
+            },
+        ),
+        (
+            "((),())",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(3, 2..4),
+                    },
+                    Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(3, 5..7),
+                    },
+                ]),
+                range: ty_range(3, 1..8),
+            },
+        ),
+        (
+            "((),(),)",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(4, 2..4),
+                    },
+                    Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(4, 5..7),
+                    },
+                ]),
+                range: ty_range(4, 1..9),
+            },
+        ),
+        (
+            "(T)",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Named("T"),
+                        range: ty_range(5, 2..3),
+                    },
+                ]),
+                range: ty_range(5, 1..4),
+            },
+        ),
+        (
+            "(TT , )",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Named("TT"),
+                        range: ty_range(6, 2..4),
+                    },
+                ]),
+                range: ty_range(6, 1..8),
+            },
+        ),
+        (
+            "(Ultra, Violet)",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Named("Ultra"),
+                        range: ty_range(7, 2..7),
+                    },
+                    Ty {
+                        kind: TyKind::Named("Violet"),
+                        range: ty_range(7, 9..15),
+                    },
+                ]),
+                range: ty_range(7, 1..16),
+            },
+        ),
+        (
+            "(Woo , Hoo,)",
+            Ty {
+                kind: TyKind::Tuple(vec![
+                    Ty {
+                        kind: TyKind::Named("Woo"),
+                        range: ty_range(8, 2..5),
+                    },
+                    Ty {
+                        kind: TyKind::Named("Hoo"),
+                        range: ty_range(8, 8..11),
+                    },
+                ]),
+                range: ty_range(8, 1..13),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_type() {
+    // named type: keywords (if, as, nil, true/false), integer literals, string literals, etc. where a type NAME is expected
+    // arrays: zero or multiple type elements ([], [Foo, Bar])
 }
