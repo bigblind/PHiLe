@@ -4007,6 +4007,62 @@ fn valid_tuple_type() {
 }
 
 #[test]
+fn valid_prefix_type() {
+    let (ty_range, evaluate) = valid_type_tester();
+
+    let cases = vec![
+        (
+            "&Pointee",
+            Ty {
+                kind: TyKind::Pointer(
+                    Box::new(Ty {
+                        kind: TyKind::Named("Pointee"),
+                        range: ty_range(0, 2..9),
+                    })
+                ),
+                range: ty_range(0, 1..9),
+            },
+        ),
+        (
+            "&&Nestie",
+            Ty {
+                kind: TyKind::Pointer(
+                    Box::new(Ty {
+                        kind: TyKind::Pointer(
+                            Box::new(Ty {
+                                kind: TyKind::Named("Nestie"),
+                                range: ty_range(1, 3..9),
+                            })
+                        ),
+                        range: ty_range(1, 2..9),
+                    })
+                ),
+                range: ty_range(1, 1..9),
+            },
+        ),
+        (
+            "&[PointerToCompound]",
+            Ty {
+                kind: TyKind::Pointer(
+                    Box::new(Ty {
+                        kind: TyKind::Array(
+                            Box::new(Ty {
+                                kind: TyKind::Named("PointerToCompound"),
+                                range: ty_range(2, 3..20),
+                            })
+                        ),
+                        range: ty_range(2, 2..21),
+                    })
+                ),
+                range: ty_range(2, 1..21),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_type() {
     // named type: keywords (if, as, nil, true/false), integer literals, string literals, etc. where a type NAME is expected
     // arrays: zero or multiple type elements ([], [Foo, Bar])
