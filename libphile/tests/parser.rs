@@ -1063,9 +1063,10 @@ fn invalid_toplevel() {
 
 // TODO(H2CO3): rewrite boxes usign impl trait once stable
 type RangeGen = Box<Fn(usize, std::ops::Range<usize>) -> Range>;
-type EvalTest = Box<Fn(Vec<(&str, Exp)>) -> ()>;
+type EvalExpTest = Box<Fn(Vec<(&str, Exp)>) -> ()>;
+type EvalTyTest = Box<Fn(Vec<(&str, Ty)>) -> ()>;
 
-fn valid_expression_tester() -> (RangeGen, EvalTest) {
+fn valid_expression_tester() -> (RangeGen, EvalExpTest) {
     // Wrap up every expression in the body of a minimal function.
     // `exp_range()` is a small helper that translates the ranges
     // as visually perceived by inspection of the `exprs` array
@@ -1131,6 +1132,71 @@ fn valid_expression_tester() -> (RangeGen, EvalTest) {
     };
 
     (Box::new(exp_range), Box::new(evaluate))
+}
+
+// This function is similar to valid_expression_tester(), but it
+// returns functions suitable for testing type parsers instead.
+fn valid_type_tester() -> (RangeGen, EvalTyTest) {
+    let prefix = "fn _(_: ";
+    let suffix = ") {}";
+
+    let ty_range = move |i, r: std::ops::Range<usize>| {
+        let shift = grapheme_count(prefix);
+        oneline_range(i, r.start + shift..r.end + shift)
+    };
+
+    let evaluate = move |cases: Vec<(&str, Ty)>| {
+        let decorate_case = |(i, (src, node))| {
+            let src = [prefix, src, suffix].join("");
+            let start_byte_index = src.find('(').unwrap() + 1;
+            let end_byte_index = src.rfind(')').unwrap();
+            let start = 1 + grapheme_count(&src[..start_byte_index]);
+            let end = 1 + grapheme_count(&src[..end_byte_index]);
+            let gr_count = grapheme_count(&src);
+
+            // these are just necessary to construct the wrapper Item:
+            // 1. range of the function argument (_: <Type>)
+            let arg_range = oneline_range(i, start..end);
+            // 2. range of the entire wrapper function
+            let func_range = oneline_range(i, 1..gr_count + 1);
+            // 3. range of the trailing "{}", the empty fn body
+            let body_range = oneline_range(i, gr_count - 2 + 1..gr_count + 1);
+
+            let item = Item::FuncDef(Function {
+                range: func_range,
+                name: Some("_"),
+                arguments: vec![
+                    Argument {
+                        range: arg_range,
+                        name: "_",
+                        ty: Some(node),
+                    },
+                ],
+                ret_type: None,
+                body: Exp {
+                    kind: ExpKind::Block(vec![]),
+                    range: body_range,
+                },
+            });
+
+            (src, item)
+        };
+
+        // Finally, parse the array of sources, and compare the resulting
+        // (actual) items to the expected ones constructed above.
+        let iter = cases.into_iter().enumerate().map(decorate_case);
+        let (sources, expected): (Vec<_>, Vec<_>) = iter.unzip();
+        let tokens = lex_filter_ws_comment(&sources);
+        let actual = parse_valid(&tokens).items;
+
+        assert_eq!(actual.len(), expected.len());
+
+        for (actual, expected) in actual.into_iter().zip(expected) {
+            assert_eq!(actual, expected);
+        }
+    };
+
+    (Box::new(ty_range), Box::new(evaluate))
 }
 
 #[test]
@@ -3756,7 +3822,20 @@ fn invalid_expression() {
 }
 
 #[test]
-fn valid_type() {
+fn valid_named_type() {
+    let (ty_range, evaluate) = valid_type_tester();
+
+    let cases = vec![
+        (
+            "MyAwesomeType",
+            Ty {
+                kind: TyKind::Named("MyAwesomeType"),
+                range: ty_range(0, 1..14),
+            },
+        ),
+    ];
+
+    evaluate(cases);
 }
 
 #[test]
