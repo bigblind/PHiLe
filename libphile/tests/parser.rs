@@ -3613,9 +3613,105 @@ fn valid_conditional_expression() {
                 range: exp_range(4, 1..22),
             },
         ),
-        // TODO(H2CO3): higher precedence on the LHS and true_val = None
-        // TODO(H2CO3): higher precedence on the RHS and true_val = None
-        // TODO(H2CO3): conditional expression as the middle true_val (foo ? bar ? baz : qux : lol)
+        (
+            "0...9 ?: 0.9", // higher precedence on the LHS
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "...",
+                                    lhs: Exp {
+                                        kind: ExpKind::Int("0"),
+                                        range: exp_range(5, 1..2),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("9"),
+                                        range: exp_range(5, 5..6),
+                                    },
+                                })
+                            ),
+                            range: exp_range(5, 1..6),
+                        },
+                        true_val: None,
+                        false_val: Exp {
+                            kind: ExpKind::Float("0.9"),
+                            range: exp_range(5, 10..13),
+                        },
+                    })
+                ),
+                range: exp_range(5, 1..13),
+            },
+        ),
+        (
+            "verylong ?: 0xa..0b10", // higher precedence on the RHS
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("verylong"),
+                            range: exp_range(6, 1..9),
+                        },
+                        true_val: None,
+                        false_val: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "..",
+                                    lhs: Exp {
+                                        kind: ExpKind::Int("0xa"),
+                                        range: exp_range(6, 13..16),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("0b10"),
+                                        range: exp_range(6, 18..22),
+                                    },
+                                })
+                            ),
+                            range: exp_range(6, 13..22),
+                        },
+                    })
+                ),
+                range: exp_range(6, 1..22),
+            },
+        ),
+        (
+            "foo ? bar ? baz : qux : lol", // right in the middle
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("foo"),
+                            range: exp_range(7, 1..4),
+                        },
+                        true_val: Some(Exp {
+                            kind: ExpKind::CondExp(
+                                Box::new(CondExp {
+                                    condition: Exp {
+                                        kind: ExpKind::Identifier("bar"),
+                                        range: exp_range(7, 7..10),
+                                    },
+                                    true_val: Some(Exp {
+                                        kind: ExpKind::Identifier("baz"),
+                                        range: exp_range(7, 13..16),
+                                    }),
+                                    false_val: Exp {
+                                        kind: ExpKind::Identifier("qux"),
+                                        range: exp_range(7, 19..22),
+                                    },
+                                })
+                            ),
+                            range: exp_range(7, 7..22),
+                        }),
+                        false_val: Exp {
+                            kind: ExpKind::Identifier("lol"),
+                            range: exp_range(7, 25..28),
+                        },
+                    })
+                ),
+                range: exp_range(7, 1..28),
+            },
+        ),
     ];
 
     evaluate(cases);
