@@ -4348,7 +4348,176 @@ fn valid_function_type() {
 }
 
 #[test]
-fn invalid_type() {
-    // named type: keywords (if, as, nil, true/false), integer literals, string literals, etc. where a type NAME is expected
-    // arrays: zero or multiple type elements ([], [Foo, Bar])
+fn invalid_atomic_type() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _(_: if) {}",
+            marker:  "        ^_^",
+            message: "Expected a type; found if",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: 8.3) {}",
+            marker:  "        ^__^",
+            message: "Expected a type; found 8.3",
+        },
+        InvalidTestCase {
+            source:  "fn _() -> nil {}",
+            marker:  "          ^__^",
+            message: "Expected a type; found nil",
+        },
+        InvalidTestCase {
+            source:  r#"fn _() -> "stringy" {}"#,
+            marker:  r#"          ^________^"#,
+            message: r#"Expected a type; found "stringy""#,
+        },
+        InvalidTestCase {
+            source:  "fn _(_: %) {}",
+            marker:  "        ^^",
+            message: "Expected a type; found %",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_tuple_type() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() -> (SomeType {}",
+            marker:  "                    ^^",
+            message: "Expected , or ); found {",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: (Item,,)) {}",
+            marker:  "              ^^",
+            message: "Expected a type; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: (A; B)) {}",
+            marker:  "          ^^",
+            message: "Expected , or ); found ;",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_array_type() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _(_: []) {}",
+            marker:  "         ^^",
+            message: "Expected a type; found ]",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: [Type,]) {}",
+            marker:  "             ^^",
+            message: "Expected ]; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: [nil]) {}",
+            marker:  "         ^__^",
+            message: "Expected a type; found nil",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: [Incomplete) {}",
+            marker:  "                   ^^",
+            message: "Expected ]; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: [[Nested]) {}",
+            marker:  "                 ^^",
+            message: "Expected ]; found )",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_prefix_type() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _(_: &) {}",
+            marker:  "         ^^",
+            message: "Expected a type; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: &false) {}",
+            marker:  "         ^____^",
+            message: "Expected a type; found false",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_postfix_type() {
+    // Most of these cases chiefly test if the postfix parser
+    // propagates errors in subexpressions up the call chain.
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _(_: ?) {}",
+            marker:  "        ^^",
+            message: "Expected a type; found ?",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: true?) {}",
+            marker:  "        ^___^",
+            message: "Expected a type; found true",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: (Foo,?)) {}",
+            marker:  "             ^^",
+            message: "Expected a type; found ?",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: []?) {}",
+            marker:  "         ^^",
+            message: "Expected a type; found ]",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_function_type() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _(_: Missing -> ) {}",
+            marker:  "                   ^^",
+            message: "Expected a type; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: Still -> Missing -> ) {}",
+            marker:  "                            ^^",
+            message: "Expected a type; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: Keyword -> as) {}",
+            marker:  "                   ^_^",
+            message: "Expected a type; found as",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: -> T) {}",
+            marker:  "        ^_^",
+            message: "Expected a type; found ->",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: U -> [V) {}",
+            marker:  "               ^^",
+            message: "Expected ]; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _(_: (Q,,) -> R) {}",
+            marker:  "           ^^",
+            message: "Expected a type; found ,",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
 }
