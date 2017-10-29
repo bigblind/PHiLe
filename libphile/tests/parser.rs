@@ -3463,6 +3463,165 @@ fn valid_range_expression() {
 }
 
 #[test]
+fn valid_conditional_expression() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
+        (
+            "cond ? true : false", // simple case
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("cond"),
+                            range: exp_range(0, 1..5),
+                        },
+                        true_val: Some(Exp {
+                            kind: ExpKind::Bool("true"),
+                            range: exp_range(0, 8..12),
+                        }),
+                        false_val: Exp {
+                            kind: ExpKind::Bool("false"),
+                            range: exp_range(0, 15..20),
+                        },
+                    })
+                ),
+                range: exp_range(0, 1..20),
+            },
+        ),
+        (
+            "option ?: default", // nil coalescing, "Elvis"
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("option"),
+                            range: exp_range(1, 1..7),
+                        },
+                        true_val: None,
+                        false_val: Exp {
+                            kind: ExpKind::Identifier("default"),
+                            range: exp_range(1, 11..18),
+                        },
+                    })
+                ),
+                range: exp_range(1, 1..18),
+            },
+        ),
+        (
+            "a ? b : c ? d : e", // right associativity
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("a"),
+                            range: exp_range(2, 1..2),
+                        },
+                        true_val: Some(Exp {
+                            kind: ExpKind::Identifier("b"),
+                            range: exp_range(2, 5..6),
+                        }),
+                        false_val: Exp {
+                            kind: ExpKind::CondExp(
+                                Box::new(CondExp {
+                                    condition: Exp {
+                                        kind: ExpKind::Identifier("c"),
+                                        range: exp_range(2, 9..10),
+                                    },
+                                    true_val: Some(Exp {
+                                        kind: ExpKind::Identifier("d"),
+                                        range: exp_range(2, 13..14),
+                                    }),
+                                    false_val: Exp {
+                                        kind: ExpKind::Identifier("e"),
+                                        range: exp_range(2, 17..18),
+                                    },
+                                })
+                            ),
+                            range: exp_range(2, 9..18),
+                        },
+                    })
+                ),
+                range: exp_range(2, 1..18),
+            },
+        ),
+        (
+            "0...1 ? x : y", // higher precedence on the LHS
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "...",
+                                    lhs: Exp {
+                                        kind: ExpKind::Int("0"),
+                                        range: exp_range(3, 1..2),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("1"),
+                                        range: exp_range(3, 5..6),
+                                    },
+                                })
+                            ),
+                            range: exp_range(3, 1..6),
+                        },
+                        true_val: Some(Exp {
+                            kind: ExpKind::Identifier("x"),
+                            range: exp_range(3, 9..10),
+                        }),
+                        false_val: Exp {
+                            kind: ExpKind::Identifier("y"),
+                            range: exp_range(3, 13..14),
+                        },
+                    })
+                ),
+                range: exp_range(3, 1..14),
+            },
+        ),
+        (
+            "foo ? bar : 0b1..0xff", // higher precedence on the RHS
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("foo"),
+                            range: exp_range(4, 1..4),
+                        },
+                        true_val: Some(Exp {
+                            kind: ExpKind::Identifier("bar"),
+                            range: exp_range(4, 7..10),
+                        }),
+                        false_val: Exp {
+                            kind: ExpKind::BinaryOp(
+                                Box::new(BinaryOp {
+                                    op: "..",
+                                    lhs: Exp {
+                                        kind: ExpKind::Int("0b1"),
+                                        range: exp_range(4, 13..16),
+                                    },
+                                    rhs: Exp {
+                                        kind: ExpKind::Int("0xff"),
+                                        range: exp_range(4, 18..22),
+                                    },
+                                })
+                            ),
+                            range: exp_range(4, 13..22),
+                        },
+                    })
+                ),
+                range: exp_range(4, 1..22),
+            },
+        ),
+        // TODO(H2CO3): higher precedence on the LHS and true_val = None
+        // TODO(H2CO3): higher precedence on the RHS and true_val = None
+        // TODO(H2CO3): conditional expression as the middle true_val (foo ? bar ? baz : qux : lol)
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_expression() {
 }
 
