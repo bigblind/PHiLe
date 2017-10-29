@@ -3833,6 +3833,13 @@ fn valid_named_type() {
                 range: ty_range(0, 1..14),
             },
         ),
+        (
+            "_",
+            Ty {
+                kind: TyKind::Named("_"),
+                range: ty_range(1, 1..2),
+            },
+        ),
     ];
 
     evaluate(cases);
@@ -4128,6 +4135,211 @@ fn valid_postfix_type() {
                     })
                 ),
                 range: ty_range(3, 1..9),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
+fn valid_function_type() {
+    let (ty_range, evaluate) = valid_type_tester();
+
+    let cases = vec![
+        (
+            "() -> ()",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Tuple(vec![]),
+                        range: ty_range(0, 7..9),
+                    }),
+                }),
+                range: ty_range(0, 1..9),
+            },
+        ),
+        (
+            "(Arg) -> Ret",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("Arg"),
+                            range: ty_range(1, 2..5),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Named("Ret"),
+                        range: ty_range(1, 10..13),
+                    }),
+                }),
+                range: ty_range(1, 1..13),
+            },
+        ),
+        (
+            "(Arg1, Arg2) -> Ret",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("Arg1"),
+                            range: ty_range(2, 2..6),
+                        },
+                        Ty {
+                            kind: TyKind::Named("Arg2"),
+                            range: ty_range(2, 8..12),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Named("Ret"),
+                        range: ty_range(2, 17..20),
+                    }),
+                }),
+                range: ty_range(2, 1..20),
+            },
+        ),
+        (
+            "(T, U,) -> V",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("T"),
+                            range: ty_range(3, 2..3),
+                        },
+                        Ty {
+                            kind: TyKind::Named("U"),
+                            range: ty_range(3, 5..6),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Named("V"),
+                        range: ty_range(3, 12..13),
+                    }),
+                }),
+                range: ty_range(3, 1..13),
+            },
+        ),
+        (
+            "SingleArg -> SingleRet",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("SingleArg"),
+                            range: ty_range(4, 1..10),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Named("SingleRet"),
+                        range: ty_range(4, 14..23),
+                    }),
+                }),
+                range: ty_range(4, 1..23),
+            },
+        ),
+        (
+            "OneArg -> (Many, Returns)",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("OneArg"),
+                            range: ty_range(5, 1..7),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Tuple(vec![
+                            Ty {
+                                kind: TyKind::Named("Many"),
+                                range: ty_range(5, 12..16),
+                            },
+                            Ty {
+                                kind: TyKind::Named("Returns"),
+                                range: ty_range(5, 18..25),
+                            },
+                        ]),
+                        range: ty_range(5, 11..26),
+                    }),
+                }),
+                range: ty_range(5, 1..26),
+            },
+        ),
+        (
+            "&LhsHigherPrecedence -> Foo",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Pointer(
+                                Box::new(Ty {
+                                    kind: TyKind::Named("LhsHigherPrecedence"),
+                                    range: ty_range(6, 2..21),
+                                })
+                            ),
+                            range: ty_range(6, 1..21),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Named("Foo"),
+                        range: ty_range(6, 25..28),
+                    }),
+                }),
+                range: ty_range(6, 1..28),
+            },
+        ),
+        (
+            "Bar -> RhsHigherPrecedence?",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("Bar"),
+                            range: ty_range(7, 1..4),
+                        }
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Optional(
+                            Box::new(Ty {
+                                kind: TyKind::Named("RhsHigherPrecedence"),
+                                range: ty_range(7, 8..27),
+                            })
+                        ),
+                        range: ty_range(7, 8..28),
+                    }),
+                }),
+                range: ty_range(7, 1..28),
+            },
+        ),
+        (
+            "Right -> Associative -> Arrows",
+            Ty {
+                kind: TyKind::Function(FunctionTy {
+                    arg_types: vec![
+                        Ty {
+                            kind: TyKind::Named("Right"),
+                            range: ty_range(8, 1..6),
+                        },
+                    ],
+                    ret_type: Box::new(Ty {
+                        kind: TyKind::Function(FunctionTy {
+                            arg_types: vec![
+                                Ty {
+                                    kind: TyKind::Named("Associative"),
+                                    range: ty_range(8, 10..21),
+                                },
+                            ],
+                            ret_type: Box::new(Ty {
+                                kind: TyKind::Named("Arrows"),
+                                range: ty_range(8, 25..31),
+                            }),
+                        }),
+                        range: ty_range(8, 10..31),
+                    }),
+                }),
+                range: ty_range(8, 1..31),
             },
         ),
     ];
