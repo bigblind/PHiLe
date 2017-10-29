@@ -3712,6 +3712,40 @@ fn valid_conditional_expression() {
                 range: exp_range(7, 1..28),
             },
         ),
+        (
+            "X ? Y ?: Z : W", // nil coalesce inside conditional
+            Exp {
+                kind: ExpKind::CondExp(
+                    Box::new(CondExp {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("X"),
+                            range: exp_range(8, 1..2),
+                        },
+                        true_val: Some(Exp {
+                            kind: ExpKind::CondExp(
+                                Box::new(CondExp {
+                                    condition: Exp {
+                                        kind: ExpKind::Identifier("Y"),
+                                        range: exp_range(8, 5..6),
+                                    },
+                                    true_val: None,
+                                    false_val: Exp {
+                                        kind: ExpKind::Identifier("Z"),
+                                        range: exp_range(8, 10..11),
+                                    },
+                                })
+                            ),
+                            range: exp_range(8, 5..11),
+                        }),
+                        false_val: Exp {
+                            kind: ExpKind::Identifier("W"),
+                            range: exp_range(8, 14..15),
+                        },
+                    })
+                ),
+                range: exp_range(8, 1..15),
+            },
+        ),
     ];
 
     evaluate(cases);
