@@ -4063,6 +4063,79 @@ fn valid_prefix_type() {
 }
 
 #[test]
+fn valid_postfix_type() {
+    let (ty_range, evaluate) = valid_type_tester();
+
+    let cases = vec![
+        (
+            "Simple?",
+            Ty {
+                kind: TyKind::Optional(
+                    Box::new(Ty {
+                        kind: TyKind::Named("Simple"),
+                        range: ty_range(0, 1..7),
+                    })
+                ),
+                range: ty_range(0, 1..8),
+            },
+        ),
+        (
+            "(Compound)?",
+            Ty {
+                kind: TyKind::Optional(
+                    Box::new(Ty {
+                        kind: TyKind::Tuple(vec![
+                            Ty {
+                                kind: TyKind::Named("Compound"),
+                                range: ty_range(1, 2..10),
+                            },
+                        ]),
+                        range: ty_range(1, 1..11),
+                    })
+                ),
+                range: ty_range(1, 1..12),
+            },
+        ),
+        (
+            "&Precedence?",
+            Ty {
+                kind: TyKind::Optional(
+                    Box::new(Ty {
+                        kind: TyKind::Pointer(
+                            Box::new(Ty {
+                                kind: TyKind::Named("Precedence"),
+                                range: ty_range(2, 2..12),
+                            })
+                        ),
+                        range: ty_range(2, 1..12),
+                    })
+                ),
+                range: ty_range(2, 1..13),
+            },
+        ),
+        (
+            "Double??",
+            Ty {
+                kind: TyKind::Optional(
+                    Box::new(Ty {
+                        kind: TyKind::Optional(
+                            Box::new(Ty {
+                                kind: TyKind::Named("Double"),
+                                range: ty_range(3, 1..7),
+                            })
+                        ),
+                        range: ty_range(3, 1..8),
+                    })
+                ),
+                range: ty_range(3, 1..9),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
+#[test]
 fn invalid_type() {
     // named type: keywords (if, as, nil, true/false), integer literals, string literals, etc. where a type NAME is expected
     // arrays: zero or multiple type elements ([], [Foo, Bar])
