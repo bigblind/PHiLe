@@ -1199,6 +1199,10 @@ fn valid_type_tester() -> (RangeGen, EvalTyTest) {
     (Box::new(ty_range), Box::new(evaluate))
 }
 
+//
+// Valid Expressions
+//
+
 #[test]
 fn valid_atomic_expression() {
     let (exp_range, evaluate) = valid_expression_tester();
@@ -3817,9 +3821,130 @@ fn valid_conditional_expression() {
     evaluate(cases);
 }
 
+//
+// Invalid Expressions
+//
+
 #[test]
-fn invalid_expression() {
+fn invalid_atomic_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { ) }",
+            marker:  "         ^^",
+            message: "Expected literal or identifier; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _() { & }",
+            marker:  "         ^^",
+            message: "Expected literal or identifier; found &",
+        },
+        InvalidTestCase {
+            source:  "fn _() { * }",
+            marker:  "         ^^",
+            message: "Expected literal or identifier; found *",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
 }
+
+#[test]
+fn invalid_tuple_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { ( }",
+            marker:  "           ^^",
+            message: "Expected literal or identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (,) }",
+            marker:  "          ^^",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (1, ((2)), 3, ,) }",
+            marker:  "                       ^^  ",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (foo, bar } ",
+            marker:  "                   ^^",
+            message: "Expected , or ); found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (foo, bar, ",
+            marker:  "                  ^^",
+            message: "Expected ); found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_array_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { [ }",
+            marker:  "           ^^",
+            message: "Expected literal or identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [,] }",
+            marker:  "          ^^",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [[a], b, [c], ,] }",
+            marker:  "                       ^^  ",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [baz, qux } ",
+            marker:  "                   ^^",
+            message: "Expected , or ]; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [qux, baz, ",
+            marker:  "                  ^^",
+            message: "Expected ]; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_block_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() {",
+            marker:  "       ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { 1337 ",
+            marker:  "         ^___^",
+            message: "Expected ; or }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { 42; ",
+            marker:  "           ^^",
+            message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { multiple; expressions; ",
+            marker:  "                              ^^",
+            message: "Expected }; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+//
+// Valid Types
+//
 
 #[test]
 fn valid_named_type() {
@@ -4346,6 +4471,10 @@ fn valid_function_type() {
 
     evaluate(cases);
 }
+
+//
+// Invalid Types
+//
 
 #[test]
 fn invalid_atomic_type() {
