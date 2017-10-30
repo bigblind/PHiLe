@@ -3876,6 +3876,11 @@ fn invalid_tuple_expression() {
             marker:  "                  ^^",
             message: "Expected ); found end of input",
         },
+        InvalidTestCase {
+            source:  "fn _() { (nil true) }",
+            marker:  "              ^___^",
+            message: "Expected , or ); found true",
+        },
     ];
 
     test_invalid_cases(test_cases);
@@ -3909,6 +3914,11 @@ fn invalid_array_expression() {
             marker:  "                  ^^",
             message: "Expected ]; found end of input",
         },
+        InvalidTestCase {
+            source:  "fn _() { [1 2] }",
+            marker:  "            ^^",
+            message: "Expected , or ]; found 2",
+        },
     ];
 
     test_invalid_cases(test_cases);
@@ -3936,6 +3946,142 @@ fn invalid_block_expression() {
             source:  "fn _() { multiple; expressions; ",
             marker:  "                              ^^",
             message: "Expected }; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { stuff more_stuff }",
+            marker:  "               ^_________^",
+            message: "Expected ; or }; found more_stuff",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_if_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { if ",
+            marker:  "         ^_^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if foo then",
+            marker:  "                ^___^",
+            message: "Expected {; found then",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if condition ",
+            marker:  "            ^________^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (if condition { ) }",
+            marker:  "                         ^^ ",
+            message: "Expected literal or identifier; found )",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if stuff { } else }",
+            marker:  "                           ^^",
+            message: "Expected if or block after else; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if foo { } else if",
+            marker:  "                         ^_^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if goo { } else if wat",
+            marker:  "                            ^__^",
+            message: "Expected {; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if whoo { } else if other {",
+            marker:  "                                   ^^",
+            message: "Expected }; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_function_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { |",
+            marker:  "         ^^ ",
+            message: "Expected |; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |as",
+            marker:  "          ^_^ ",
+            message: "Expected identifier; found as",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |arg_name",
+            marker:  "          ^_______^",
+            message: "Expected , or |; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |arg_name,,",
+            marker:  "                   ^^",
+            message: "Expected identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |arg_name:",
+            marker:  "                  ^^",
+            message: "Expected a type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |arg_name: ,",
+            marker:  "                    ^^",
+            message: "Expected a type; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |x: T",
+            marker:  "             ^^",
+            message: "Expected , or |; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |y: U, ",
+            marker:  "              ^^",
+            message: "Expected |; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |foo: Bar|",
+            marker:  "                  ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |bar: Foo| != } blah-blah",
+            marker:  "                    ^_^           ",
+            message: "Expected literal or identifier; found !=",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |x: Y| * }",
+            marker:  "                ^^",
+            message: "Expected literal or identifier; found *",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |value| ->",
+            marker:  "                 ^_^",
+            message: "Expected a type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |_| -> [&Wowza?] }",
+            marker:  "                          ^^",
+            message: "Expected {; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |_| -> [&Huzzah?] expr + more }",
+            marker:  "                           ^___^        ",
+            message: "Expected {; found expr",
+        },
+        InvalidTestCase {
+            source:  "fn _() { |a| -> T { }",
+            marker:  "                    ^^",
+            message: "Expected ; or }; found end of input",
         },
     ];
 
