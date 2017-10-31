@@ -4330,6 +4330,34 @@ fn invalid_prefix_expression() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn invalid_cast_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { 12345 as 98765 }",
+            marker:  "                  ^____^",
+            message: "Expected a type; found 98765",
+        },
+        InvalidTestCase {
+            source:  "fn _() { nil as ~? }",
+            marker:  "                ^^",
+            message: "Expected a type; found ~",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (1 + 2 / 3 * 4) as }",
+            marker:  "                            ^^",
+            message: "Expected a type; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [complex][0][expression] as Type1 as Type2 as",
+            marker:  "                                                    ^_^",
+            message: "Expected a type; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //
