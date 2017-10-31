@@ -712,6 +712,8 @@ impl<'a> Parser<'a> {
         Ok(Exp { kind, range })
     }
 
+    // TODO(H2CO3): test parsing `match` in both expressions *and*
+    // statement position; similarly to how `if` expr/stmt is tested
     fn parse_match(&mut self) -> ExpResult<'a> {
         unimplemented!()
     }

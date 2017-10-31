@@ -5533,3 +5533,88 @@ fn invalid_function_type() {
 
     test_invalid_cases(test_cases);
 }
+
+// Test parsing if, match and block {} constructs in statement position
+// (no separating semicolon required).
+// Also test that multi-line range generation is working correctly.
+// (multi-source is already being tested by almost all cases anyway.)
+#[test]
+fn statement_position_and_multiline_range() {
+    type LineCol = (usize, usize);
+
+    fn range((from_line, from_col): LineCol, (to_line, to_col): LineCol) -> Range {
+        Range {
+            start: Location { src_idx: 0, line: from_line, column: from_col },
+            end:   Location { src_idx: 0, line: to_line,   column: to_col   },
+        }
+    }
+
+    let sources = [r#"
+        fn stmt_multi_line() {
+            {
+            }
+            {
+            }
+            if quacky {}
+            if "mmm" {}
+        }
+    "#];
+
+    let item = Item::FuncDef(Function {
+        range: range((2, 9), (9, 10)),
+        name: Some("stmt_multi_line"),
+        arguments: vec![],
+        ret_type: None,
+        body: Exp {
+            kind: ExpKind::Block(vec![
+                Exp {
+                    kind: ExpKind::Block(vec![]),
+                    range: range((3, 13), (4, 14)),
+                },
+                Exp {
+                    kind: ExpKind::Block(vec![]),
+                    range: range((5, 13), (6, 14)),
+                },
+                Exp {
+                    kind: ExpKind::If(
+                        Box::new(If {
+                            condition: Exp {
+                                kind: ExpKind::Identifier("quacky"),
+                                range: range((7, 16), (7, 22)),
+                            },
+                            then_arm: Exp {
+                                kind: ExpKind::Block(vec![]),
+                                range: range((7, 23), (7, 25)),
+                            },
+                            else_arm: None,
+                        })
+                    ),
+                    range: range((7, 13), (7, 25)),
+                },
+                Exp {
+                    kind: ExpKind::If(
+                        Box::new(If {
+                            condition: Exp {
+                                kind: ExpKind::String(r#""mmm""#),
+                                range: range((8, 16), (8, 21)),
+                            },
+                            then_arm: Exp {
+                                kind: ExpKind::Block(vec![]),
+                                range: range((8, 22), (8, 24)),
+                            },
+                            else_arm: None,
+                        })
+                    ),
+                    range: range((8, 13), (8, 24)),
+                },
+            ]),
+            range: range((2, 30), (9, 10)),
+        },
+    });
+
+    let expected_ast = Prog { items: vec![item] };
+    let tokens = lex_filter_ws_comment(&sources);
+    let actual_ast = parse_valid(&tokens);
+
+    assert_eq!(actual_ast, expected_ast);
+}
