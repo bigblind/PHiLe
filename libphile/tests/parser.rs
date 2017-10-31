@@ -4302,6 +4302,34 @@ fn invalid_member_access_expression() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn invalid_prefix_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { + }",
+            marker:  "           ^^",
+            message: "Expected literal or identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { -",
+            marker:  "         ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { ~+--+-~+-",
+            marker:  "                 ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (((-++-+~-+-~))) }",
+            marker:  "                      ^^   ",
+            message: "Expected literal or identifier; found )",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //
