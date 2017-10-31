@@ -1,6 +1,6 @@
 [package]
 name          = "philec"
-version       = "0.1.3" # remember to update html_root_url in lib.rs and main.rs
+version       = "0.1.4" # remember to update html_root_url in lib.rs and main.rs
 authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository    = "https://github.com/H2CO3/PHiLe.git"
 homepage      = "https://h2co3.github.io/phile/"
@@ -12,7 +12,7 @@ keywords      = ["database", "orm", "storage", "codegen", "dsl"]
 categories    = ["command-line-interface", "command-line-utilities", "database", "database-implementations", "development-tools"]
 
 [dependencies]
-phile = { version = "0.1.3", path = "../libphile" }
+phile = { version = "0.1.4", path = "../libphile" }
 clap  = "2.27.1"
 
 [badges]

@@ -1,6 +1,6 @@
 [package]
 name          = "phile"
-version       = "0.1.3" # remember to update html_root_url in lib.rs and main.rs
+version       = "0.1.4" # remember to update html_root_url in lib.rs and main.rs
 authors       = ["Árpád Goretity <h2co3@h2co3.org>"]
 repository    = "https://github.com/H2CO3/PHiLe.git"
 homepage      = "https://h2co3.github.io/phile/"
