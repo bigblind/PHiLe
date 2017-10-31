@@ -4648,6 +4648,26 @@ fn invalid_binary_expression() {
             message: "Expected literal or identifier; found }",
         },
         InvalidTestCase {
+            source:  "fn _() { and | or | xor |",
+            marker:  "                        ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { yes | no | }",
+            marker:  "                    ^^",
+            message: "Expected literal or identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { wat || ugh }", // 2nd '|' is start of a closure
+            marker:  "                    ^^",
+            message: "Expected , or |; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { and && nope }",
+            marker:  "              ^^",
+            message: "Expected literal or identifier; found &",
+        },
+        InvalidTestCase {
             source:  "fn _() { aaa == bbb == zzz }",
             marker:  "                    ^_^",
             message: "Binary operator == is not associative",
