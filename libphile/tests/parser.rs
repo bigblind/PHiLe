@@ -13,7 +13,7 @@
         unstable_features,
         unused_import_braces, unused_qualifications)]
 #![cfg_attr(feature = "cargo-clippy",
-            allow(match_same_arms, should_assert_eq, clone_on_ref_ptr))]
+            allow(match_same_arms, clone_on_ref_ptr))]
 #![cfg_attr(feature = "cargo-clippy",
             deny(wrong_pub_self_convention, used_underscore_binding,
                  stutter, similar_names, pub_enum_variant_names,
@@ -1061,7 +1061,7 @@ fn invalid_toplevel() {
     test_invalid_cases(test_cases);
 }
 
-// TODO(H2CO3): rewrite boxes usign impl trait once stable
+// TODO(H2CO3): rewrite boxes using impl trait once stable
 type RangeGen = Box<Fn(usize, std::ops::Range<usize>) -> Range>;
 type EvalExpTest = Box<Fn(Vec<(&str, Exp)>) -> ()>;
 type EvalTyTest = Box<Fn(Vec<(&str, Ty)>) -> ()>;
@@ -4082,6 +4082,102 @@ fn invalid_function_expression() {
             source:  "fn _() { |a| -> T { }",
             marker:  "                    ^^",
             message: "Expected ; or }; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_subscript_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { something[",
+            marker:  "                  ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { base[index",
+            marker:  "              ^____^",
+            message: "Expected ]; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { base[index }",
+            marker:  "                    ^^",
+            message: "Expected ]; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { v[1, 2] }",
+            marker:  "            ^^    ",
+            message: "Expected ]; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { v[1; 2] }",
+            marker:  "            ^^    ",
+            message: "Expected ]; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { v[1 2] }",
+            marker:  "             ^^  ",
+            message: "Expected ]; found 2",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [[multi]][[] }",
+            marker:  "                      ^^",
+            message: "Expected ]; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [[moar]][[]][] }",
+            marker:  "                      ^^",
+            message: "Expected literal or identifier; found ]",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [[[even_moar]]][[[]]][",
+            marker:  "                              ^^",
+            message: "Expected a term; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_call_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { cally(",
+            marker:  "              ^^",
+            message: "Expected ); found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { fun(,) }",
+            marker:  "             ^^",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { more_fun(nil, nil,,) }",
+            marker:  "                           ^^",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { even_more_fun(expr } ",
+            marker:  "                            ^^",
+            message: "Expected , or ); found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { kitty(doge(sheep()) }",
+            marker:  "                             ^^",
+            message: "Expected , or ); found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { _(_(_(nested)),,) }",
+            marker:  "                        ^^  ",
+            message: "Expected literal or identifier; found ,",
+        },
+        InvalidTestCase {
+            source:  "fn _() { _(_(_(more(nested,)),),",
+            marker:  "                               ^^",
+            message: "Expected ); found end of input",
         },
     ];
 

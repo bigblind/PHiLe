@@ -111,7 +111,7 @@
         unstable_features,
         unused_import_braces, unused_qualifications, missing_docs)]
 #![cfg_attr(feature = "cargo-clippy",
-            allow(match_same_arms, should_assert_eq, clone_on_ref_ptr))]
+            allow(match_same_arms, clone_on_ref_ptr))]
 #![cfg_attr(feature = "cargo-clippy",
             deny(wrong_pub_self_convention, used_underscore_binding,
                  stutter, similar_names, pub_enum_variant_names,
