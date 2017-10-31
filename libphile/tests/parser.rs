@@ -3106,6 +3106,179 @@ fn valid_comparison_expression() {
     evaluate(cases);
 }
 
+// Although comparison expressions are not associative, associating
+// them explicitly via grouping/parentheses should still be allowed.
+#[test]
+fn valid_comparison_expression_noassoc() {
+    let (exp_range, evaluate) = valid_expression_tester();
+
+    let cases = vec![
+        (
+            "(a < b) < c",
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "<",
+                        lhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "<",
+                                            lhs: Exp {
+                                                kind: ExpKind::Identifier("a"),
+                                                range: exp_range(0, 2..3),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Identifier("b"),
+                                                range: exp_range(0, 6..7),
+                                            },
+                                        })
+                                    ),
+                                    range: exp_range(0, 2..7),
+                                },
+                            ]),
+                            range: exp_range(0, 1..8),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Identifier("c"),
+                            range: exp_range(0, 11..12),
+                        },
+                    })
+                ),
+                range: exp_range(0, 1..12),
+            },
+        ),
+        (
+            "42 > (43 > 44)",
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: ">",
+                        lhs: Exp {
+                            kind: ExpKind::Int("42"),
+                            range: exp_range(1, 1..3),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: ">",
+                                            lhs: Exp {
+                                                kind: ExpKind::Int("43"),
+                                                range: exp_range(1, 7..9),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Int("44"),
+                                                range: exp_range(1, 12..14),
+                                            },
+                                        })
+                                    ),
+                                    range: exp_range(1, 7..14),
+                                },
+                            ]),
+                            range: exp_range(1, 6..15),
+                        },
+                    })
+                ),
+                range: exp_range(1, 1..15),
+            },
+        ),
+        (
+            "nil < (null <= true)",
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "<",
+                        lhs: Exp {
+                            kind: ExpKind::Nil,
+                            range: exp_range(2, 1..4),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "<=",
+                                            lhs: Exp {
+                                                kind: ExpKind::Identifier("null"),
+                                                range: exp_range(2, 8..12),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Bool("true"),
+                                                range: exp_range(2, 16..20),
+                                            },
+                                        })
+                                    ),
+                                    range: exp_range(2, 8..20),
+                                },
+                            ]),
+                            range: exp_range(2, 7..21),
+                        },
+                    })
+                ),
+                range: exp_range(2, 1..21),
+            },
+        ),
+        (
+            "(72 != 11.0) >= (768.0 == param512)",
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: ">=",
+                        lhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "!=",
+                                            lhs: Exp {
+                                                kind: ExpKind::Int("72"),
+                                                range: exp_range(3, 2..4),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Float("11.0"),
+                                                range: exp_range(3, 8..12),
+                                            },
+                                        })
+                                    ),
+                                    range: exp_range(3, 2..12),
+                                },
+                            ]),
+                            range: exp_range(3, 1..13),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "==",
+                                            lhs: Exp {
+                                                kind: ExpKind::Float("768.0"),
+                                                range: exp_range(3, 18..23),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Identifier("param512"),
+                                                range: exp_range(3, 27..35),
+                                            },
+                                        })
+                                    ),
+                                    range: exp_range(3, 18..35),
+                                },
+                            ]),
+                            range: exp_range(3, 17..36),
+                        },
+                    })
+                ),
+                range: exp_range(3, 1..36),
+            },
+        ),
+    ];
+
+    evaluate(cases);
+}
+
 #[test]
 fn valid_and_expression() {
     let (exp_range, evaluate) = valid_expression_tester();
@@ -3525,6 +3698,114 @@ fn valid_range_expression() {
                     })
                 ),
                 range: exp_range(3, 1..10),
+            },
+        ),
+        (
+            "x1..(x0..x2)", // non-associative operator, but explicit grouping still allowed
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "..",
+                        lhs: Exp {
+                            kind: ExpKind::Identifier("x1"),
+                            range: exp_range(4, 1..3),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "..",
+                                            lhs: Exp {
+                                                kind: ExpKind::Identifier("x0"),
+                                                range: exp_range(4, 6..8),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Identifier("x2"),
+                                                range: exp_range(4, 10..12),
+                                            },
+                                        }),
+                                    ),
+                                    range: exp_range(4, 6..12),
+                                },
+                            ]),
+                            range: exp_range(4, 5..13),
+                        },
+                    })
+                ),
+                range: exp_range(4, 1..13),
+            },
+        ),
+        (
+            "(i...j)...k",
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "...",
+                        lhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "...",
+                                            lhs: Exp {
+                                                kind: ExpKind::Identifier("i"),
+                                                range: exp_range(5, 2..3),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Identifier("j"),
+                                                range: exp_range(5, 6..7),
+                                            },
+                                        }),
+                                    ),
+                                    range: exp_range(5, 2..7),
+                                },
+                            ]),
+                            range: exp_range(5, 1..8),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Identifier("k"),
+                            range: exp_range(5, 11..12),
+                        },
+                    })
+                ),
+                range: exp_range(5, 1..12),
+            },
+        ),
+        (
+            "(2...8)..4",
+            Exp {
+                kind: ExpKind::BinaryOp(
+                    Box::new(BinaryOp {
+                        op: "..",
+                        lhs: Exp {
+                            kind: ExpKind::Tuple(vec![
+                                Exp {
+                                    kind: ExpKind::BinaryOp(
+                                        Box::new(BinaryOp {
+                                            op: "...",
+                                            lhs: Exp {
+                                                kind: ExpKind::Int("2"),
+                                                range: exp_range(6, 2..3),
+                                            },
+                                            rhs: Exp {
+                                                kind: ExpKind::Int("8"),
+                                                range: exp_range(6, 6..7),
+                                            },
+                                        }),
+                                    ),
+                                    range: exp_range(6, 2..7),
+                                },
+                            ]),
+                            range: exp_range(6, 1..8),
+                        },
+                        rhs: Exp {
+                            kind: ExpKind::Int("4"),
+                            range: exp_range(6, 10..11),
+                        },
+                    })
+                ),
+                range: exp_range(6, 1..11),
             },
         ),
     ];
@@ -4352,6 +4633,59 @@ fn invalid_cast_expression() {
             source:  "fn _() { [complex][0][expression] as Type1 as Type2 as",
             marker:  "                                                    ^_^",
             message: "Expected a type; found end of input",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
+#[test]
+fn invalid_binary_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { 1 + 2 - 3 * 4 / 5 % 6 & }",
+            marker:  "                                 ^^",
+            message: "Expected literal or identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { aaa == bbb == zzz }",
+            marker:  "                    ^_^",
+            message: "Binary operator == is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { wat <= hey == nope }",
+            marker:  "                    ^_^",
+            message: "Binary operator <= is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { 42 + 43 > 59 / 58 < -1 - +2 }",
+            marker:  "                           ^^",
+            message: "Binary operator > is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (0 >= -1) != [funky > ops] == ((() > [])) }",
+            marker:  "                                    ^_^             ",
+            message: "Binary operator != is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { begin..middle..end }",
+            marker:  "                      ^_^    ",
+            message: "Binary operator .. is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { start...continue...stop }",
+            marker:  "                         ^__^    ",
+            message: "Binary operator ... is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { -1..0...1 }",
+            marker:  "              ^__^",
+            message: "Binary operator .. is not associative",
+        },
+        InvalidTestCase {
+            source:  "fn _() { -1.0...0.0..+1 }",
+            marker:  "                   ^_^   ",
+            message: "Binary operator ... is not associative",
         },
     ];
 
