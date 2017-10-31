@@ -1724,6 +1724,81 @@ fn valid_if_expression() {
                 range: exp_range(2, 1..36),
             },
         ),
+        (
+            "if this { if that {} }", // nested
+            Exp {
+                kind: ExpKind::If(
+                    Box::new(If {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("this"),
+                            range: exp_range(3, 4..8),
+                        },
+                        then_arm: Exp {
+                            kind: ExpKind::Block(vec![
+                                Exp {
+                                    kind: ExpKind::If(
+                                        Box::new(If {
+                                            condition: Exp {
+                                                kind: ExpKind::Identifier("that"),
+                                                range: exp_range(3, 14..18),
+                                            },
+                                            then_arm: Exp {
+                                                kind: ExpKind::Block(vec![]),
+                                                range: exp_range(3, 19..21),
+                                            },
+                                            else_arm: None,
+                                        })
+                                    ),
+                                    range: exp_range(3, 11..21),
+                                },
+                            ]),
+                            range: exp_range(3, 9..23),
+                        },
+                        else_arm: None,
+                    })
+                ),
+                range: exp_range(3, 1..23),
+            },
+        ),
+        (
+            "if those {} else { if these {} }", // more nested
+            Exp {
+                kind: ExpKind::If(
+                    Box::new(If {
+                        condition: Exp {
+                            kind: ExpKind::Identifier("those"),
+                            range: exp_range(4, 4..9),
+                        },
+                        then_arm: Exp {
+                            kind: ExpKind::Block(vec![]),
+                            range: exp_range(4, 10..12),
+                        },
+                        else_arm: Some(Exp {
+                            kind: ExpKind::Block(vec![
+                                Exp {
+                                    kind: ExpKind::If(
+                                        Box::new(If {
+                                            condition: Exp {
+                                                kind: ExpKind::Identifier("these"),
+                                                range: exp_range(4, 23..28),
+                                            },
+                                            then_arm: Exp {
+                                                kind: ExpKind::Block(vec![]),
+                                                range: exp_range(4, 29..31),
+                                            },
+                                            else_arm: None,
+                                        })
+                                    ),
+                                    range: exp_range(4, 20..31),
+                                },
+                            ]),
+                            range: exp_range(4, 18..33),
+                        }),
+                    })
+                ),
+                range: exp_range(4, 1..33),
+            },
+        ),
     ];
 
     evaluate(cases);
