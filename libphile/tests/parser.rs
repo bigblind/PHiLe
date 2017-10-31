@@ -4712,6 +4712,44 @@ fn invalid_binary_expression() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn invalid_conditional_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { cond ?",
+            marker:  "              ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { cond ? iftrue",
+            marker:  "                ^_____^",
+            message: "Expected :; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { cond ? iftrue :",
+            marker:  "                       ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { nullable ?: ",
+            marker:  "                   ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { boolean ? value : ] }",
+            marker:  "                           ^^ ",
+            message: "Expected literal or identifier; found ]",
+        },
+        InvalidTestCase {
+            source:  "fn _() { maybe ?: / }",
+            marker:  "                  ^^",
+            message: "Expected literal or identifier; found /",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //
