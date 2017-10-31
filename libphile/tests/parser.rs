@@ -4184,6 +4184,124 @@ fn invalid_call_expression() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn invalid_member_access_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { keyword.as }",
+            marker:  "                 ^_^ ",
+            message: "Expected identifier; found as",
+        },
+        InvalidTestCase {
+            source:  "fn _() { keyword.multi.class }",
+            marker:  "                       ^____^ ",
+            message: "Expected identifier; found class",
+        },
+        InvalidTestCase {
+            source:  "fn _() { infix.enum.between }",
+            marker:  "               ^___^         ",
+            message: "Expected identifier; found enum",
+        },
+        InvalidTestCase {
+            source:  "fn _() { babble. }",
+            marker:  "                 ^^",
+            message: "Expected identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { babble.bubble.() }",
+            marker:  "                       ^^",
+            message: "Expected identifier; found (",
+        },
+        InvalidTestCase {
+            source:  "fn _() { one.",
+            marker:  "            ^^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { unicorns.ponies.",
+            marker:  "                        ^^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { keyword::nil }",
+            marker:  "                  ^__^ ",
+            message: "Expected identifier; found nil",
+        },
+        InvalidTestCase {
+            source:  "fn _() { kwd::several::struct }",
+            marker:  "                       ^_____^ ",
+            message: "Expected identifier; found struct",
+        },
+        InvalidTestCase {
+            source:  "fn _() { between::impl::infix }",
+            marker:  "                  ^___^        ",
+            message: "Expected identifier; found impl",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [ babble:: ] }",
+            marker:  "                    ^^",
+            message: "Expected identifier; found ]",
+        },
+        InvalidTestCase {
+            source:  "fn _() { bubble::babble::[] }",
+            marker:  "                         ^^  ",
+            message: "Expected identifier; found [",
+        },
+        InvalidTestCase {
+            source:  "fn _() { single:: ",
+            marker:  "               ^_^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { pink::fluffy::rainbows::",
+            marker:  "                               ^_^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { mixed.member::qual.",
+            marker:  "                           ^^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { other::way.around::",
+            marker:  "                          ^_^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { a::b.c::d::e.false }",
+            marker:  "                      ^____^",
+            message: "Expected identifier; found false",
+        },
+        InvalidTestCase {
+            source:  "fn _() { x.y.z::u::v::w.- }",
+            marker:  "                        ^^",
+            message: "Expected identifier; found -",
+        },
+        InvalidTestCase {
+            source:  "fn _() { foo::GOO.Boo::+ }",
+            marker:  "                       ^^",
+            message: "Expected identifier; found +",
+        },
+        InvalidTestCase {
+            source:  "fn _() { numbers.0.not.allowed }",
+            marker:  "                 ^^",
+            message: "Expected identifier; found 0",
+        },
+        InvalidTestCase {
+            source:  "fn _() { neither::here::99.87 }",
+            marker:  "                        ^____^",
+            message: "Expected identifier; found 99.87",
+        },
+        InvalidTestCase {
+            source:  "fn _() { nor.1337::there }",
+            marker:  "             ^___^",
+            message: "Expected identifier; found 1337",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //
