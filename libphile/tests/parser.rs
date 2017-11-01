@@ -4825,6 +4825,99 @@ fn invalid_conditional_expression() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn invalid_variable_declaration() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { let let = 0; }",
+            marker:  "             ^__^",
+            message: "Expected identifier; found let",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let else = dangling; }",
+            marker:  "             ^___^",
+            message: "Expected identifier; found else",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let",
+            marker:  "         ^__^",
+            message: "Expected identifier; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let _ {",
+            marker:  "               ^^",
+            message: "Expected =; found {",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let _ ",
+            marker:  "             ^^",
+            message: "Expected =; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let var:",
+            marker:  "                ^^",
+            message: "Expected a type; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let var: ]",
+            marker:  "                  ^^",
+            message: "Expected a type; found ]",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let var: Whoo",
+            marker:  "                  ^___^",
+            message: "Expected =; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let var: Whoo; }",
+            marker:  "                      ^^",
+            message: "Expected =; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let var: Whoo }",
+            marker:  "                       ^^",
+            message: "Expected =; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let var: Whoo-hoo }",
+            marker:  "                      ^^",
+            message: "Expected =; found -",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let _x: Whatever = }",
+            marker:  "                            ^^",
+            message: "Expected literal or identifier; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let _x: Whatever =",
+            marker:  "                          ^^",
+            message: "Expected a term; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let _y: [Stuff?] = nope }",
+            marker:  "                                 ^^",
+            message: "Expected ;; found }",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let _y: [Stuff?] = still_not",
+            marker:  "                            ^________^",
+            message: "Expected ;; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let typeless = value",
+            marker:  "                        ^____^",
+            message: "Expected ;; found end of input",
+        },
+        InvalidTestCase {
+            source:  "fn _() { let typeless2 = value2 }",
+            marker:  "                                ^^",
+            message: "Expected ;; found }",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //
