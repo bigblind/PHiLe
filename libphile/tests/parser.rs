@@ -4187,17 +4187,17 @@ fn invalid_atomic_expression() {
         InvalidTestCase {
             source:  "fn _() { ) }",
             marker:  "         ^^",
-            message: "Expected literal or identifier; found )",
+            message: "Expected expression; found )",
         },
         InvalidTestCase {
             source:  "fn _() { & }",
             marker:  "         ^^",
-            message: "Expected literal or identifier; found &",
+            message: "Expected expression; found &",
         },
         InvalidTestCase {
             source:  "fn _() { * }",
             marker:  "         ^^",
-            message: "Expected literal or identifier; found *",
+            message: "Expected expression; found *",
         },
     ];
 
@@ -4210,17 +4210,17 @@ fn invalid_tuple_expression() {
         InvalidTestCase {
             source:  "fn _() { ( }",
             marker:  "           ^^",
-            message: "Expected literal or identifier; found }",
+            message: "Expected expression; found }",
         },
         InvalidTestCase {
             source:  "fn _() { (,) }",
             marker:  "          ^^",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { (1, ((2)), 3, ,) }",
             marker:  "                       ^^  ",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { (foo, bar } ",
@@ -4248,17 +4248,17 @@ fn invalid_array_expression() {
         InvalidTestCase {
             source:  "fn _() { [ }",
             marker:  "           ^^",
-            message: "Expected literal or identifier; found }",
+            message: "Expected expression; found }",
         },
         InvalidTestCase {
             source:  "fn _() { [,] }",
             marker:  "          ^^",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { [[a], b, [c], ,] }",
             marker:  "                       ^^  ",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { [baz, qux } ",
@@ -4319,7 +4319,7 @@ fn invalid_if_expression() {
         InvalidTestCase {
             source:  "fn _() { if ",
             marker:  "         ^_^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { if foo then",
@@ -4334,7 +4334,7 @@ fn invalid_if_expression() {
         InvalidTestCase {
             source:  "fn _() { (if condition { ) }",
             marker:  "                         ^^ ",
-            message: "Expected literal or identifier; found )",
+            message: "Expected expression; found )",
         },
         InvalidTestCase {
             source:  "fn _() { if stuff { } else }",
@@ -4344,7 +4344,7 @@ fn invalid_if_expression() {
         InvalidTestCase {
             source:  "fn _() { if foo { } else if",
             marker:  "                         ^_^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { if goo { } else if wat",
@@ -4407,17 +4407,17 @@ fn invalid_function_expression() {
         InvalidTestCase {
             source:  "fn _() { |foo: Bar|",
             marker:  "                  ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { |bar: Foo| != } blah-blah",
             marker:  "                    ^_^           ",
-            message: "Expected literal or identifier; found !=",
+            message: "Expected expression; found !=",
         },
         InvalidTestCase {
             source:  "fn _() { |x: Y| * }",
             marker:  "                ^^",
-            message: "Expected literal or identifier; found *",
+            message: "Expected expression; found *",
         },
         InvalidTestCase {
             source:  "fn _() { |value| ->",
@@ -4450,7 +4450,7 @@ fn invalid_subscript_expression() {
         InvalidTestCase {
             source:  "fn _() { something[",
             marker:  "                  ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { base[index",
@@ -4485,12 +4485,12 @@ fn invalid_subscript_expression() {
         InvalidTestCase {
             source:  "fn _() { [[moar]][[]][] }",
             marker:  "                      ^^",
-            message: "Expected literal or identifier; found ]",
+            message: "Expected expression; found ]",
         },
         InvalidTestCase {
             source:  "fn _() { [[[even_moar]]][[[]]][",
             marker:  "                              ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
     ];
 
@@ -4508,12 +4508,12 @@ fn invalid_call_expression() {
         InvalidTestCase {
             source:  "fn _() { fun(,) }",
             marker:  "             ^^",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { more_fun(nil, nil,,) }",
             marker:  "                           ^^",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { even_more_fun(expr } ",
@@ -4528,7 +4528,7 @@ fn invalid_call_expression() {
         InvalidTestCase {
             source:  "fn _() { _(_(_(nested)),,) }",
             marker:  "                        ^^  ",
-            message: "Expected literal or identifier; found ,",
+            message: "Expected expression; found ,",
         },
         InvalidTestCase {
             source:  "fn _() { _(_(_(more(nested,)),),",
@@ -4664,22 +4664,22 @@ fn invalid_prefix_expression() {
         InvalidTestCase {
             source:  "fn _() { + }",
             marker:  "           ^^",
-            message: "Expected literal or identifier; found }",
+            message: "Expected expression; found }",
         },
         InvalidTestCase {
             source:  "fn _() { -",
             marker:  "         ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { ~+--+-~+-",
             marker:  "                 ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { (((-++-+~-+-~))) }",
             marker:  "                      ^^   ",
-            message: "Expected literal or identifier; found )",
+            message: "Expected expression; found )",
         },
     ];
 
@@ -4720,17 +4720,17 @@ fn invalid_binary_expression() {
         InvalidTestCase {
             source:  "fn _() { 1 + 2 - 3 * 4 / 5 % 6 & }",
             marker:  "                                 ^^",
-            message: "Expected literal or identifier; found }",
+            message: "Expected expression; found }",
         },
         InvalidTestCase {
             source:  "fn _() { and | or | xor |",
             marker:  "                        ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { yes | no | }",
             marker:  "                    ^^",
-            message: "Expected literal or identifier; found }",
+            message: "Expected expression; found }",
         },
         InvalidTestCase {
             source:  "fn _() { wat || ugh }", // 2nd '|' is start of a closure
@@ -4740,7 +4740,7 @@ fn invalid_binary_expression() {
         InvalidTestCase {
             source:  "fn _() { and && nope }",
             marker:  "              ^^",
-            message: "Expected literal or identifier; found &",
+            message: "Expected expression; found &",
         },
         InvalidTestCase {
             source:  "fn _() { aaa == bbb == zzz }",
@@ -4793,7 +4793,7 @@ fn invalid_conditional_expression() {
         InvalidTestCase {
             source:  "fn _() { cond ?",
             marker:  "              ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { cond ? iftrue",
@@ -4803,22 +4803,22 @@ fn invalid_conditional_expression() {
         InvalidTestCase {
             source:  "fn _() { cond ? iftrue :",
             marker:  "                       ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { nullable ?: ",
             marker:  "                   ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { boolean ? value : ] }",
             marker:  "                           ^^ ",
-            message: "Expected literal or identifier; found ]",
+            message: "Expected expression; found ]",
         },
         InvalidTestCase {
             source:  "fn _() { maybe ?: / }",
             marker:  "                  ^^",
-            message: "Expected literal or identifier; found /",
+            message: "Expected expression; found /",
         },
     ];
 
@@ -4886,12 +4886,12 @@ fn invalid_variable_declaration() {
         InvalidTestCase {
             source:  "fn _() { let _x: Whatever = }",
             marker:  "                            ^^",
-            message: "Expected literal or identifier; found }",
+            message: "Expected expression; found }",
         },
         InvalidTestCase {
             source:  "fn _() { let _x: Whatever =",
             marker:  "                          ^^",
-            message: "Expected a term; found end of input",
+            message: "Expected expression; found end of input",
         },
         InvalidTestCase {
             source:  "fn _() { let _y: [Stuff?] = nope }",
@@ -4924,37 +4924,37 @@ fn semicolon_is_not_expression() {
         InvalidTestCase {
             source:  "fn _() { let var = ; }",
             marker:  "                   ^^ ",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
         InvalidTestCase {
             source:  "fn _() { if ; {} }",
             marker:  "            ^^    ",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
         InvalidTestCase {
             source:  "fn _() { 1338 * ; }",
             marker:  "                ^^ ",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
         InvalidTestCase {
             source:  "fn _() { 1339.0..; }",
             marker:  "                 ^^ ",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
         InvalidTestCase {
             source:  "fn _() { +-~; }",
             marker:  "            ^^ ",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
         InvalidTestCase {
             source:  "fn _() { ((),;,()) }",
             marker:  "             ^^",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
         InvalidTestCase {
             source:  "fn _() { [[[;]]] }",
             marker:  "            ^^    ",
-            message: "Expected literal or identifier; found ;",
+            message: "Expected expression; found ;",
         },
     ];
 

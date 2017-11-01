@@ -587,7 +587,7 @@ impl<'a> Parser<'a> {
     // TODO(H2CO3): parse struct literals and closures
     fn parse_term_expr(&mut self) -> ExpResult<'a> {
         let token = self.next_token().ok_or_else(
-            || self.expectation_error("a term")
+            || self.expectation_error("expression")
         )?;
 
         match token.value {
@@ -627,7 +627,7 @@ impl<'a> Parser<'a> {
             return Ok(Exp { kind, range });
         }
 
-        Err(self.expectation_error("literal or identifier"))
+        Err(self.expectation_error("expression"))
     }
 
     // Helper for parse_atomic_expr
