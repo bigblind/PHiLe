@@ -1458,23 +1458,24 @@ impl SqirGen {
     fn generate_expr(&mut self, node: &Exp, ty: Option<RcType>) -> Result<RcExpr> {
         let range = node.range;
         let ctx = TyCtx { ty, range };
+        let ctx_tmp = ctx.clone();
 
         let tmp = match node.kind {
-            ExpKind::Nil                  => self.generate_nil_literal(ctx.clone()),
+            ExpKind::Nil                  => self.generate_nil_literal(ctx),
             ExpKind::Bool(val)            => self.generate_bool_literal(val, range),
-            ExpKind::Int(val)             => self.generate_int_literal(ctx.clone(), val, range),
+            ExpKind::Int(val)             => self.generate_int_literal(ctx, val, range),
             ExpKind::Float(val)           => self.generate_float_literal(val, range),
             ExpKind::String(val)          => self.generate_string_literal(val, range),
             ExpKind::Identifier(name)     => self.generate_name_ref(name, range),
-            ExpKind::VarDecl(ref decl)    => self.generate_var_decl(ctx.clone(), decl),
-            ExpKind::Empty                => self.generate_empty_stmt(ctx.clone()),
+            ExpKind::VarDecl(ref decl)    => self.generate_var_decl(ctx, decl),
+            ExpKind::Empty                => self.generate_empty_stmt(ctx),
             ExpKind::Semi(ref expr)       => self.generate_semi(expr),
-            ExpKind::BinaryOp(ref binop)  => self.generate_binary_op(ctx.clone(), binop),
-            ExpKind::Cast(ref ex, ref ty) => self.generate_cast(ctx.clone(), ex, ty),
-            ExpKind::Tuple(ref vs)        => self.generate_tuple(ctx.clone(), vs),
-            ExpKind::Array(ref vs)        => self.generate_array(ctx.clone(), vs),
-            ExpKind::Block(ref items)     => self.generate_block(ctx.clone(), items),
-            ExpKind::FuncExp(ref func)    => self.generate_function(ctx.clone(), func),
+            ExpKind::BinaryOp(ref binop)  => self.generate_binary_op(ctx, binop),
+            ExpKind::Cast(ref ex, ref ty) => self.generate_cast(ctx, ex, ty),
+            ExpKind::Tuple(ref vs)        => self.generate_tuple(ctx, vs),
+            ExpKind::Array(ref vs)        => self.generate_array(ctx, vs),
+            ExpKind::Block(ref items)     => self.generate_block(ctx, items),
+            ExpKind::FuncExp(ref func)    => self.generate_function(ctx, func),
             ExpKind::CondExp(_)           => unimplemented!(),
             ExpKind::UnaryPlus(_)         => unimplemented!(),
             ExpKind::UnaryMinus(_)        => unimplemented!(),
@@ -1482,13 +1483,13 @@ impl SqirGen {
             ExpKind::Subscript(_)         => unimplemented!(),
             ExpKind::MemberAccess(_)      => unimplemented!(),
             ExpKind::QualAccess(_)        => unimplemented!(),
-            ExpKind::Call(ref call)       => self.generate_call(ctx.clone(), call),
+            ExpKind::Call(ref call)       => self.generate_call(ctx, call),
             ExpKind::Struct(_)            => unimplemented!(),
             ExpKind::If(_)                => unimplemented!(),
             ExpKind::Match(_)             => unimplemented!(),
         };
 
-        self.unify(tmp?, ctx)
+        self.unify(tmp?, ctx_tmp)
     }
 
     // Obtain a fresh ExprId for a temporary

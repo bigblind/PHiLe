@@ -4961,6 +4961,34 @@ fn semicolon_is_not_expression() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn let_is_not_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { let one = let two = three; }",
+            marker:  "                   ^__^",
+            message: "Expected expression; found let",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if let one = 01234567 { stuff(); } }",
+            marker:  "            ^__^",
+            message: "Expected expression; found let",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [let _ = _;] }",
+            marker:  "          ^__^         ",
+            message: "Expected expression; found let",
+        },
+        InvalidTestCase {
+            source:  "fn _() { (((let does_not_work = 0))) }",
+            marker:  "            ^__^                      ",
+            message: "Expected expression; found let",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //

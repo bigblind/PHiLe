@@ -22,7 +22,7 @@ pub type Exp<'a> = Node<ExpKind<'a>>;
 pub type Ty<'a>  = Node<TyKind<'a>>;
 
 /// Root of the AST.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Prog<'a> {
     /// The list of top-level items: type and function definitions or `impl`s.
     pub items: Vec<Item<'a>>,

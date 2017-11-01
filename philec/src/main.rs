@@ -210,6 +210,8 @@ impl FileWriterProvider {
 // Parsing Command-Line Arguments
 //
 
+type ArgResult<T> = std::result::Result<T, String>;
+
 #[derive(Debug)]
 struct CmdArgs {
     codegen_params: CodegenParams,
@@ -218,8 +220,6 @@ struct CmdArgs {
     migration_script: Option<String>,
     sources: Vec<String>,
 }
-
-type ArgResult<T> = std::result::Result<T, String>;
 
 impl CmdArgs {
     fn new() -> ArgResult<Self> {
