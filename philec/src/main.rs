@@ -133,11 +133,11 @@ extern crate phile;
 use std::collections::HashMap;
 use std::str;
 use std::fs::{ self, File };
-use std::path::PathBuf;
+use std::path::{ Path, PathBuf };
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::io::{ self, stderr };
+use std::io::stderr;
 use std::io::prelude::*;
 use phile::util::{ RcCell, Diagnostic, DiagnosticKind, PACKAGE_INFO };
 use phile::lexer::*;
@@ -148,13 +148,20 @@ use phile::dalgen::*;
 use phile::error::*;
 
 
-#[derive(Debug)]
-struct ProgramArgs {
-    codegen_params: CodegenParams,
-    output_directory: String,
-    outfile_prefix: String,
-    migration_script: Option<String>,
-    sources: Vec<String>,
+// Reporting elapsed time for each stage of the compiler pipeline
+macro_rules! stopwatch {
+    ($msg: expr, $code: expr) => ({
+        eprint!("    {:.<40}", $msg);
+        stderr().flush().expect("Could not flush stderr");
+        let t0 = Instant::now();
+        let val = $code;
+        let t1 = Instant::now();
+        let dt = t1 - t0;
+        let secs = dt.as_secs() as f64 + f64::from(dt.subsec_nanos()) * 1e-9;
+        let message = format!("{:6.1} ms", secs * 1e3);
+        eprintln!("{}", Diagnostic::new(message, DiagnosticKind::Info));
+        val
+    })
 }
 
 // TODO(H2CO3): Rewrite this using `RcCell` once custom smart pointers
@@ -167,7 +174,7 @@ struct FileWriterProvider {
 }
 
 impl FileWriterProvider {
-    fn new(args: &ProgramArgs) -> Self {
+    fn new(args: &CmdArgs) -> Self {
         FileWriterProvider {
             files: Default::default(),
             base_path: PathBuf::from(&args.output_directory),
@@ -199,140 +206,129 @@ impl FileWriterProvider {
     }
 }
 
-macro_rules! stopwatch {
-    ($msg: expr, $code: expr) => ({
-        eprint!("    {:.<40}", $msg);
-        stderr().flush().expect("Could not flush stderr");
-        let t0 = Instant::now();
-        let val = $code;
-        let t1 = Instant::now();
-        let dt = t1 - t0;
-        let secs = dt.as_secs() as f64 + f64::from(dt.subsec_nanos()) * 1e-9;
-        let message = format!("{:6.1} ms", secs * 1e3);
-        eprintln!("{}", Diagnostic::new(message, DiagnosticKind::Info));
-        val
-    })
-}
-
 //
 // Parsing Command-Line Arguments
 //
 
-fn get_args() -> ProgramArgs {
-    let args = clap_app!(philec =>
-        (name:    PACKAGE_INFO.name)
-        (version: PACKAGE_INFO.version)
-        (author:  PACKAGE_INFO.authors)
-        (about:   PACKAGE_INFO.description)
-        (@arg database:    -d --database   +takes_value +required "Database engine")
-        (@arg language:    -l --language   +takes_value +required "Wrapping language")
-        (@arg access:      -a --access     +takes_value           "Database access mode")
-        (@arg namespace:   -n --namespace  +takes_value           "Namespace for types and methods")
-        (@arg type_xform:  -t --typexform  +takes_value           "Type name transform")
-        (@arg field_xform: -e --fieldxform +takes_value           "Struct field name transform")
-        (@arg var_xform:   -v --varxform   +takes_value           "Enum variant name transform")
-        (@arg func_xform:  -f --funcxform  +takes_value           "Function name transform")
-        (@arg ns_xform:    -s --nsxform    +takes_value           "Namespace name transform")
-        (@arg outdir:      -o --outdir     +takes_value           "Output directory")
-        (@arg outprefix:   -p --outprefix  +takes_value           "Filename prefix for output files")
-        (@arg migrate:     -m --migrate    +takes_value           "Script to use for schema migration")
-        (@arg sources:     +multiple                    +required "One or more PHiLe files")
-    ).get_matches();
+#[derive(Debug)]
+struct CmdArgs {
+    codegen_params: CodegenParams,
+    output_directory: String,
+    outfile_prefix: String,
+    migration_script: Option<String>,
+    sources: Vec<String>,
+}
 
-    let codegen_params = CodegenParams {
-        database:               validate_database(args.value_of("database").unwrap()),
-        language:               validate_language(args.value_of("language").unwrap()),
-        database_access_mode:   validate_access(args.value_of("access")),
-        namespace:              args.value_of("namespace").map(str::to_owned),
-        type_name_transform:    validate_name_transform(args.value_of("type_xform")),
-        field_name_transform:   validate_name_transform(args.value_of("field_xform")),
-        variant_name_transform: validate_name_transform(args.value_of("var_xform")),
-        func_name_transform:    validate_name_transform(args.value_of("func_xform")),
-        namespace_transform:    validate_name_transform(args.value_of("ns_xform")),
-    };
+type ArgResult<T> = std::result::Result<T, String>;
 
-    ProgramArgs {
-        codegen_params:   codegen_params,
-        output_directory: args.value_of("outdir").unwrap_or(".").to_owned(),
-        outfile_prefix:   args.value_of("outprefix").unwrap_or("").to_owned(),
-        migration_script: args.value_of("migrate").map(str::to_owned),
-        sources:          args.values_of("sources").unwrap().map(str::to_owned).collect(),
+impl CmdArgs {
+    fn new() -> ArgResult<Self> {
+        let args = clap_app!(philec =>
+            (name:    PACKAGE_INFO.name)
+            (version: PACKAGE_INFO.version)
+            (author:  PACKAGE_INFO.authors)
+            (about:   PACKAGE_INFO.description)
+            (@arg database:    -d --database   +takes_value +required "Database engine")
+            (@arg language:    -l --language   +takes_value +required "Wrapping language")
+            (@arg access:      -a --access     +takes_value           "Database access mode")
+            (@arg namespace:   -n --namespace  +takes_value           "Namespace for types and methods")
+            (@arg type_xform:  -t --typexform  +takes_value           "Type name transform")
+            (@arg field_xform: -e --fieldxform +takes_value           "Struct field name transform")
+            (@arg var_xform:   -v --varxform   +takes_value           "Enum variant name transform")
+            (@arg func_xform:  -f --funcxform  +takes_value           "Function name transform")
+            (@arg ns_xform:    -s --nsxform    +takes_value           "Namespace name transform")
+            (@arg outdir:      -o --outdir     +takes_value           "Output directory")
+            (@arg outprefix:   -p --outprefix  +takes_value           "Filename prefix for output files")
+            (@arg migrate:     -m --migrate    +takes_value           "Script to use for schema migration")
+            (@arg sources:     +multiple                    +required "One or more PHiLe files")
+        ).get_matches();
+
+        let codegen_params = CodegenParams {
+            database:               Self::database(args.value_of("database").unwrap())?,
+            language:               Self::language(args.value_of("language").unwrap())?,
+            database_access_mode:   Self::access_mode(args.value_of("access"))?,
+            namespace:              args.value_of("namespace").map(str::to_owned),
+            type_name_transform:    Self::name_transform(args.value_of("type_xform"))?,
+            field_name_transform:   Self::name_transform(args.value_of("field_xform"))?,
+            variant_name_transform: Self::name_transform(args.value_of("var_xform"))?,
+            func_name_transform:    Self::name_transform(args.value_of("func_xform"))?,
+            namespace_transform:    Self::name_transform(args.value_of("ns_xform"))?,
+        };
+
+        let args = CmdArgs {
+            codegen_params:   codegen_params,
+            output_directory: args.value_of("outdir").unwrap_or(".").to_owned(),
+            outfile_prefix:   args.value_of("outprefix").unwrap_or("").to_owned(),
+            migration_script: args.value_of("migrate").map(str::to_owned),
+            sources:          args.values_of("sources").unwrap().map(str::to_owned).collect(),
+        };
+
+        Ok(args)
     }
-}
 
-fn validate_database(dbname: &str) -> DatabaseEngine {
-    match dbname {
-        "sqlite3" => DatabaseEngine::SQLite3,
-        "mongodb" => DatabaseEngine::MongoDB,
-        "mariadb" => DatabaseEngine::MariaDB,
-        _         => handle_argument_error("database engine", dbname),
+    fn database(dbname: &str) -> ArgResult<DatabaseEngine> {
+        Ok(match dbname {
+            "sqlite3" => DatabaseEngine::SQLite3,
+            "mongodb" => DatabaseEngine::MongoDB,
+            "mariadb" => DatabaseEngine::MariaDB,
+            _         => Self::arg_error("database engine", dbname)?,
+        })
     }
-}
 
-fn validate_language(langname: &str) -> Language {
-    match langname {
-        "rust"    => Language::Rust,
-        "c"       => Language::C,
-        "cxx"     => Language::CXX,
-        "objc"    => Language::ObjectiveC,
-        "swift"   => Language::Swift,
-        "go"      => Language::Go,
-        "js"      => Language::JavaScript,
-        "python"  => Language::Python,
-        "ruby"    => Language::Ruby,
-        "java"    => Language::Java,
-        "csharp"  => Language::CSharp,
-        "haskell" => Language::Haskell,
-        _         => handle_argument_error("language", langname),
+    fn language(langname: &str) -> ArgResult<Language> {
+        Ok(match langname {
+            "rust"    => Language::Rust,
+            "c"       => Language::C,
+            "cxx"     => Language::CXX,
+            "objc"    => Language::ObjectiveC,
+            "swift"   => Language::Swift,
+            "go"      => Language::Go,
+            "js"      => Language::JavaScript,
+            "python"  => Language::Python,
+            "ruby"    => Language::Ruby,
+            "java"    => Language::Java,
+            "csharp"  => Language::CSharp,
+            "haskell" => Language::Haskell,
+            _         => Self::arg_error("language", langname)?,
+        })
     }
-}
 
-fn validate_access(mode: Option<&str>) -> Option<DatabaseAccessMode> {
-    mode.map(|name| match name {
-        "pod" => DatabaseAccessMode::Pod,
-        "acr" => DatabaseAccessMode::ActiveRecord,
-        _     => handle_argument_error("DB access mode", name),
-    })
-}
+    fn access_mode(mode: Option<&str>) -> ArgResult<Option<DatabaseAccessMode>> {
+        Ok(match mode {
+            None        => None,
+            Some("pod") => Some(DatabaseAccessMode::Pod),
+            Some("acr") => Some(DatabaseAccessMode::ActiveRecord),
+            Some(value) => Self::arg_error("DB access mode", value)?,
+        })
+    }
 
-fn validate_name_transform(transform: Option<&str>) -> Option<NameTransform> {
-    transform.and_then(|name| match name {
-        "default"  => None,
-        "identity" => Some(NameTransform::Identity),
-        "lowsnake" => Some(NameTransform::LowerSnakeCase),
-        "upsnake"  => Some(NameTransform::UpperSnakeCase),
-        "lowcamel" => Some(NameTransform::LowerCamelCase),
-        "upcamel"  => Some(NameTransform::UpperCamelCase),
-        _          => handle_argument_error("name transform", name),
-    })
+    fn name_transform(transform: Option<&str>) -> ArgResult<Option<NameTransform>> {
+        Ok(match transform {
+            None             => None,
+            Some("default")  => None,
+            Some("identity") => Some(NameTransform::Identity),
+            Some("lowsnake") => Some(NameTransform::LowerSnakeCase),
+            Some("upsnake")  => Some(NameTransform::UpperSnakeCase),
+            Some("lowcamel") => Some(NameTransform::LowerCamelCase),
+            Some("upcamel")  => Some(NameTransform::UpperCamelCase),
+            Some(value)      => Self::arg_error("name transform", value)?,
+        })
+    }
+
+    fn arg_error<T>(name: &str, value: &str) -> ArgResult<T> {
+        Err(format!("Invalid {}: '{}'", name, Diagnostic::new(value, DiagnosticKind::Error)))
+    }
 }
 
 //
 // I/O
 //
 
-fn read_file(path: &str) -> io::Result<String> {
+fn read_file<P: AsRef<Path>>(path: P) -> Result<String> {
     let mut buf = String::new();
     let mut file = File::open(path)?;
     file.read_to_string(&mut buf)?;
     Ok(buf)
-}
-
-fn read_files<P: AsRef<str>>(paths: &[P]) -> io::Result<Vec<String>> {
-    paths.iter().map(|p| read_file(p.as_ref())).collect()
-}
-
-//
-// Error Reporting
-//
-
-fn handle_argument_error(arg_name: &str, value: &str) -> ! {
-    eprint!(
-        "    Invalid {}: '{}'\n\n",
-        arg_name,
-        Diagnostic::new(value, DiagnosticKind::Error),
-    );
-    ::std::process::exit(1)
 }
 
 //
@@ -340,9 +336,9 @@ fn handle_argument_error(arg_name: &str, value: &str) -> ! {
 //
 
 #[cfg_attr(feature = "cargo-clippy", allow(let_unit_value))]
-fn philec_main(args: &ProgramArgs, wp: &mut WriterProvider) -> Result<()> {
-    let sources = stopwatch!("Reading Sources", {
-        read_files(&args.sources)?
+fn philec_main(args: &CmdArgs, wp: &mut WriterProvider) -> Result<()> {
+    let sources: Vec<_> = stopwatch!("Reading Sources", {
+        args.sources.iter().map(read_file).collect::<Result<_>>()?
     });
 
     let tokens = stopwatch!("Lexing", {
@@ -382,7 +378,11 @@ fn main() {
     eprintln!("    Copyright (C) 2017, {}", PACKAGE_INFO.authors);
     eprintln!();
 
-    let args = get_args();
+    let args = CmdArgs::new().unwrap_or_else(|error| {
+        eprint!("    {}\n\n", error);
+        std::process::exit(1);
+    });
+
     let wp0 = RcCell::new(FileWriterProvider::new(&args));
     let wp1 = wp0.clone();
     let result = philec_main(&args, &mut move |name| wp0.borrow_mut()?.writer_with_name(name));
