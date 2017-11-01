@@ -4918,6 +4918,49 @@ fn invalid_variable_declaration() {
     test_invalid_cases(test_cases);
 }
 
+#[test]
+fn semicolon_is_not_expression() {
+    let test_cases: &[_] = &[
+        InvalidTestCase {
+            source:  "fn _() { let var = ; }",
+            marker:  "                   ^^ ",
+            message: "Expected literal or identifier; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { if ; {} }",
+            marker:  "            ^^    ",
+            message: "Expected literal or identifier; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { 1338 * ; }",
+            marker:  "                ^^ ",
+            message: "Expected literal or identifier; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { 1339.0..; }",
+            marker:  "                 ^^ ",
+            message: "Expected literal or identifier; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { +-~; }",
+            marker:  "            ^^ ",
+            message: "Expected literal or identifier; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { ((),;,()) }",
+            marker:  "             ^^",
+            message: "Expected literal or identifier; found ;",
+        },
+        InvalidTestCase {
+            source:  "fn _() { [[[;]]] }",
+            marker:  "            ^^    ",
+            message: "Expected literal or identifier; found ;",
+        },
+    ];
+
+    test_invalid_cases(test_cases);
+}
+
 //
 // Valid Types
 //
