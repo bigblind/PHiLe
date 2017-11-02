@@ -1068,7 +1068,7 @@ impl SqirGen {
         // or [&T]), then implicitly form a relation.
         match field.relation {
             Some(ref rel) => self.define_explicit_relation(
-                class_type_rc, &*field_type, field.name, rel, field
+                class_type_rc, &*field_type, field.name, rel, field.range
             ),
             None => self.define_implicit_relation(
                 class_type_rc, &*field_type, field.name
@@ -1098,16 +1098,16 @@ impl SqirGen {
     //     refer to C::c, then C::c can only refer back to
     //     at most one of A::a or B::b.
     // TODO(H2CO3): this is too long; refactor
-    fn define_explicit_relation<R: Ranged>(
+    fn define_explicit_relation(
         &mut self,
         lhs_class_type: &RcType,
         lhs_field_type: &Type,
         lhs_field_name: &str,
         relation:       &RelDecl,
-        range:          &R,
+        range:          Range,
     ) -> Result<()> {
         // Ensure that declared RHS cardinality matches with the field type
-        let (lhs_card, rhs_card) = parse_cardinality_op(relation.cardinality, range.range())?;
+        let (lhs_card, rhs_card) = parse_cardinality_op(relation.cardinality, range)?;
         let rhs_class_type = self.validate_type_cardinality(lhs_field_type, rhs_card, range)?;
 
         let rhs_field_name = match relation.field {
@@ -1116,7 +1116,7 @@ impl SqirGen {
                 &rhs_class_type,
                 lhs_field_name,
                 lhs_card,
-                rhs_card
+                rhs_card,
             ),
             Some(name) => name,
         };
@@ -1207,11 +1207,11 @@ impl SqirGen {
     // Otherwise, if the type is either not a relational type,
     // or it doesn't correspond to the specified cardinality,
     // then return an error.
-    fn validate_type_cardinality<R: Ranged>(
+    fn validate_type_cardinality(
         &self,
         t:           &Type,
         cardinality: Cardinality,
-        range:       &R,
+        range:       Range,
     ) -> Result<RcType> {
         let not_relational_error = || sema_error!(
             range,
@@ -1323,7 +1323,7 @@ impl SqirGen {
 
     fn forward_declare_free_function(&mut self, func: &ast::Function) -> Result<()> {
         let name = func.name.ok_or_else(lazy_bug!("No function name"))?;
-        let ty = self.compute_type_of_function(func)?;
+        let ty = self.type_of_function(func)?;
         let value = Value::Placeholder;
         let id = ExprId::Global(name.to_owned()); // XXX: assumes that function is global
         let entry = self.sqir.globals.entry(None); // no namespace
@@ -1339,7 +1339,7 @@ impl SqirGen {
 
     fn forward_declare_impl(&mut self, decl: &Impl) -> Result<()> {
         let types: Vec<_> = decl.functions.iter().map(
-            |func_node| self.compute_type_of_function(func_node)
+            |func_node| self.type_of_function(func_node)
         ).collect::<Result<_>>()?;
 
         let impl_name = decl.name.to_owned().into();
@@ -1375,7 +1375,7 @@ impl SqirGen {
         Ok(ns)
     }
 
-    fn compute_type_of_function(&mut self, func: &ast::Function) -> Result<RcType> {
+    fn type_of_function(&mut self, func: &ast::Function) -> Result<RcType> {
         let ret_type = func.ret_type.as_ref().map_or(
             self.get_unit_type(),
             |rt| self.type_from_decl(rt),
@@ -1449,6 +1449,10 @@ impl SqirGen {
             ref val => bug!("Global function compiled to non-Function value?! {:#?}", val)?,
         };
 
+        // Clean up after ourselves: set tmp_idx back to 0 for the next
+        // global function so as to confine diffs to a single fn body
+        self.tmp_idx = 0;
+
         Ok(())
     }
 
@@ -1494,9 +1498,8 @@ impl SqirGen {
 
     // Obtain a fresh ExprId for a temporary
     fn next_temp_id(&mut self) -> ExprId {
-        let id = ExprId::Temp(self.tmp_idx);
         self.tmp_idx += 1;
-        id
+        ExprId::Temp(self.tmp_idx)
     }
 
     // Try to unify the type of 'expr' with the type hint
