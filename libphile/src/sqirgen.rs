@@ -1636,7 +1636,6 @@ impl SqirGen {
 
         let init = self.generate_expr(&decl.expr, init_type_hint)?;
 
-        // changes id of 'init' from ExprId::Temp(_) to ExprId::Local(decl.name)
         self.declare_local(decl.name, init, &ctx)
     }
 
@@ -1747,8 +1746,7 @@ impl SqirGen {
 
     // Declares a local in the current (innermost/top-of-the-stack) scope.
     // Returns an error if a local with the specified name already exists.
-    // Also changes the id of 'expr' to ExprId::Local(name.to_owned()).
-    // Returns the already-changed 'expr' for convenience.
+    // Returns `expr` for convenience.
     fn declare_local<R: Ranged>(&mut self, name: &str, expr: RcExpr, range: &R) -> Result<RcExpr> {
         use std::collections::hash_map::Entry::{ Vacant, Occupied };
 
@@ -1756,11 +1754,7 @@ impl SqirGen {
 
         // insert into map of all transitively-visible locals
         let decl = match locals.var_map.entry(name.to_owned()) {
-            Vacant(entry) => {
-                // Change id of generated temporary to the specified name
-                expr.borrow_mut()?.id = ExprId::Local(name.to_owned());
-                entry.insert(expr).clone()
-            },
+            Vacant(entry) => entry.insert(expr).clone(),
             Occupied(_) => return sema_error!(range, "Redefinition of '{}'", name),
         };
 
@@ -1845,9 +1839,9 @@ impl SqirGen {
                 let func = WkCell::new(); // dummy, points nowhere (yet)
                 let ty = ty.clone();
                 let value = Value::Argument { func, index };
-                let id = ExprId::Local(arg.name.to_owned());
+                let id = self.next_temp_id();
                 let expr = RcCell::new(Expr { ty, value, id });
-                // Sets the id of the Argument to ExprId::Local (again, redundantly)
+
                 self.declare_local(arg.name, expr, arg)
             }
         ).collect()

@@ -438,8 +438,6 @@ impl Default for SortDirection {
 pub enum ExprId {
     /// A temporary. The integer is its ID, unique within a global `fn`.
     Temp(usize),
-    /// A local "variable" declaration, more precisely a name binding.
-    Local(String),
     /// A global. (For now, a function.) Contained `String` is its name.
     Global(String),
 }

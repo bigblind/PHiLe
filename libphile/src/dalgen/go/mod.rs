@@ -30,7 +30,6 @@ struct NamingConvention {
     context_type: &'static str,
     context_name: &'static str,
     tmp_prefix:   &'static str,
-    var_prefix:   &'static str,
     top_basename: &'static str,
 }
 
@@ -38,7 +37,6 @@ static NAMING_CONVENTION: NamingConvention = NamingConvention {
     context_type: "PhileCtx",
     context_name: "ctx",
     tmp_prefix:   "tmp_",
-    var_prefix:   "var_",
     top_basename: "PHiLe-Context",
 };
 
@@ -552,9 +550,8 @@ fn generate_function(
         let ptr = arg.borrow()?;
         match ptr.value {
             Value::Argument { .. } => match ptr.id {
-                ExprId::Local(_) => {},
+                ExprId::Temp(_) => {},
                 ExprId::Global(ref name) => bug!("Argument is global {}?!", name)?,
-                ExprId::Temp(index) => bug!("Argument is temporary {}?!", index)?,
             },
             ref val => bug!("Non-Argument argument?! {:#?}", val)?,
         }
@@ -582,7 +579,6 @@ fn generate_function(
 fn write_expr_id(wr: &mut io::Write, id: &ExprId, params: &CodegenParams) -> io::Result<()> {
     match *id {
         ExprId::Temp(index)      => write!(wr, "{}{}", NAMING_CONVENTION.tmp_prefix, index),
-        ExprId::Local(ref name)  => write!(wr, "{}{}", NAMING_CONVENTION.var_prefix, name),
         ExprId::Global(ref name) => write!(
             wr,
             "{}.{}", // TODO(H2CO3): only write 'ctx.' prefix for functions!!!
