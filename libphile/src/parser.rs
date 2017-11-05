@@ -885,8 +885,10 @@ impl<'a> Parser<'a> {
             Some(token) => {
                 let child = self.parse_prefix(tokens, nodes, subexpr)?;
                 let range = make_range(token, &child);
-                let index = tokens.iter().position(|&v| v == token.value).unwrap();
-                let kind = nodes[index](child.into());
+                let (_, node) = tokens.iter().zip(nodes)
+                    .find(|&(&v, _)| v == token.value)
+                    .ok_or_else(lazy_bug!("accepted token not found?!"))?;
+                let kind = node(child.into());
 
                 Ok(Node { kind, range })
             },
