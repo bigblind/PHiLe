@@ -27,237 +27,6 @@ pub type RcExpr = RcCell<Expr>;
 pub type WkExpr = WkCell<Expr>;
 
 //
-// Types (part of the Schema)
-//
-
-/// Centralized container for the name of each builtin type.
-#[allow(missing_docs)] // field names are self-explanatory...
-#[derive(Debug, Clone, Copy)]
-pub struct BuiltinName {
-    pub bool_name:    &'static str,
-    pub int_name:     &'static str,
-    pub float_name:   &'static str,
-    pub decimal_name: &'static str,
-    pub string_name:  &'static str,
-    pub blob_name:    &'static str,
-    pub date_name:    &'static str,
-}
-
-/// The "singleton" `BuiltinName` instance.
-pub static BUILTIN_NAME: BuiltinName = BuiltinName {
-    bool_name:    "bool",
-    int_name:     "int",
-    float_name:   "float",
-    decimal_name: "Decimal",
-    string_name:  "String",
-    blob_name:    "Blob",
-    date_name:    "Date",
-};
-
-/// `Type` is deliberately not `Clone`, `PartialEq` and `Eq`:
-/// it is meant to be used only with `RcCell`/`WkCell`,
-/// and its instances should be compared by address.
-#[derive(Debug)]
-pub enum Type {
-    /// Boolean type.
-    Bool,
-    /// Signed integer type.
-    Int,
-    /// Floating-point type.
-    Float,
-    /// Decimal number type.
-    Decimal {
-        /// The number of digits in the integral part of the number.
-        integral:   usize,
-        /// The number of digits in the fractional part of the number.
-        fractional: usize,
-    },
-
-    /// String type.
-    String,
-    /// Binary Large Object type.
-    Blob,
-    /// Date type; a single point in time.
-    Date,
-
-    /// Optional type: either a wrapped value or `nil`.
-    Optional(WkType),
-    /// Pointer type. An external reference to an entity.
-    Pointer(WkType),
-    /// Array type. An ordered list of values.
-    Array(WkType),
-    /// Tuple type. An ad-hoc product type.
-    Tuple(Vec<WkType>),
-
-    /// An enumerated (sum) type.
-    Enum(EnumType),
-    /// A structure type: a product type with named fields.
-    Struct(StructType),
-    /// A class type: a product and entity type with named fields.
-    Class(ClassType),
-
-    /// A Function type.
-    Function(FunctionType),
-
-    /// A placeholder type. Only exists during typechecking.
-    Placeholder {
-        /// The name of the type this placeholder temporarily stands for.
-        name: String,
-        /// The kind of the type this placeholder stands for.
-        kind: PlaceholderKind,
-        /// The range of the declaration this type was generated from.
-        range: Range,
-    },
-}
-
-/// The kind of the type a placeholder type stands for.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum PlaceholderKind {
-    /// Indicates that the placeholder stands for a `struct` type.
-    Struct,
-    /// Indicates that the placeholder stands for a `class` type.
-    Class,
-    /// Indicates that the placeholder stands for an `enum` type.
-    Enum,
-}
-
-/// A bit of terminology:
-///
-/// * Complex types include `enum`, `struct`, `class`, tuple,
-///   and function types.
-/// * Recursive but not complex types are pointers, optionals,
-///   and arrays.
-/// * Placeholders are temporaries that stand in for named types.
-/// * The rest of the types are called atomic or simple.
-///   They include numeric types (bool, integral, floating-point),
-///   Strings, Dates and Blobs.
-/// * User-defined types are `enum`s, `struct`s and `class`es.
-/// * Named types are also enums, structs and classes, along with
-///   the built-in types (e.g. numeric types, strings, etc.).
-/// * Product types are `struct`s, `class`es and tuples.
-/// * Value types are enums, structs, and tuples, along with
-///   the built-in types.
-/// * Entity types are only classes (for now).
-/// * Function types are… function types, obviously.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ComplexTypeKind {
-    /// A complex type that is a value type: `struct`, `enum`, tuple
-    Value,
-    /// A complex type that is an entity type: currently, only `class`.
-    Entity,
-    /// A complex type that is a function type.
-    Function,
-}
-
-/// Describes an enumerated type.
-#[derive(Debug)]
-pub struct EnumType {
-    /// The name of the enum type.
-    pub name: String,
-    /// The list of variants: keys are variant names, each value
-    /// is the type of the associated value of the variant.
-    pub variants: BTreeMap<String, WkType>,
-    /// The source range where this `enum` type is defined.
-    pub range: Range,
-}
-
-impl Ranged for EnumType {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-/// Describes a structure type.
-#[derive(Debug)]
-pub struct StructType {
-    /// The name of the struct type.
-    pub name: String,
-    /// The list of fields: keys are the field names;
-    /// each value is the type of the referred field.
-    pub fields: BTreeMap<String, WkType>,
-    /// The source range where this `struct` type is defined.
-    pub range: Range,
-}
-
-impl Ranged for StructType {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-/// Describes a class type.
-#[derive(Debug)]
-pub struct ClassType {
-    /// The name of the class type.
-    pub name: String,
-    /// The list of fields: keys are the field names;
-    /// each value is the type of the referred field.
-    pub fields: BTreeMap<String, WkType>,
-    /// The source range where this `class` type is defined.
-    pub range: Range,
-}
-
-impl Ranged for ClassType {
-    fn range(&self) -> Range {
-        self.range
-    }
-}
-
-/// Describes a function type.
-#[derive(Debug, Clone)]
-pub struct FunctionType {
-    /// The list of types of each argument in order.
-    pub arg_types: Vec<WkType>,
-    /// The return type of the function.
-    pub ret_type: WkType,
-}
-
-//
-// Relations (also part of the Schema)
-//
-
-/// Represents one side of a relationship between two entities.
-/// A particular `RelationSide` always describes the relation from
-/// the point of view of one particular entity type.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RelationSide {
-    /// Pointer to the type which forms this side of the relationship.
-    pub entity: RcType,
-    /// Name of the field this side uses to refer to the other side.
-    pub field: Option<String>,
-    /// Number of instances of this entity that may correspond to
-    /// an instance in the other entity.
-    pub cardinality: Cardinality,
-}
-
-/// The cardinality or multiplicity shows how many entities in the
-/// referred side may be related to each entity in the referring side.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Cardinality {
-    /// Optional relationship: an instance on this side may
-    /// or may not correspond to an instance on the other side.
-    ZeroOrOne,
-    /// Required, unique relationship: exactly one instance on this
-    /// side must correspond to an instance at the other side.
-    One,
-    /// Optional, multiple-valued relationship: any or no instances
-    /// on this side may correspond to an instance on the other side.
-    ZeroOrMore,
-    /// Required, multiple-valued relationship: at least one instance
-    /// on this side must correspond to an instance on the other side.
-    OneOrMore,
-}
-
-/// An entity relationship is an **unordered** pair of relation sides.
-#[derive(Debug, Clone)]
-pub struct Relation {
-    /// One side of the relationship.
-    pub lhs: RelationSide,
-    /// The other side of the relationship.
-    pub rhs: RelationSide,
-}
-
-//
 // Functions (Queries)
 //
 
@@ -552,6 +321,380 @@ pub struct Group {
     pub key: RcExpr,
 }
 
+//
+// Types (part of the Schema)
+//
+
+/// Centralized container for the name of each builtin type.
+#[allow(missing_docs)] // field names are self-explanatory...
+#[derive(Debug, Clone, Copy)]
+pub struct BuiltinName {
+    pub bool_name:    &'static str,
+    pub int_name:     &'static str,
+    pub float_name:   &'static str,
+    pub decimal_name: &'static str,
+    pub string_name:  &'static str,
+    pub blob_name:    &'static str,
+    pub date_name:    &'static str,
+}
+
+/// The "singleton" `BuiltinName` instance.
+pub static BUILTIN_NAME: BuiltinName = BuiltinName {
+    bool_name:    "bool",
+    int_name:     "int",
+    float_name:   "float",
+    decimal_name: "Decimal",
+    string_name:  "String",
+    blob_name:    "Blob",
+    date_name:    "Date",
+};
+
+/// `Type` is deliberately not `Clone`, `PartialEq` and `Eq`:
+/// it is meant to be used only with `RcCell`/`WkCell`,
+/// and its instances should be compared by address.
+#[derive(Debug)]
+pub enum Type {
+    /// Boolean type.
+    Bool,
+    /// Signed integer type.
+    Int,
+    /// Floating-point type.
+    Float,
+    /// Decimal number type.
+    Decimal {
+        /// The number of digits in the integral part of the number.
+        integral:   usize,
+        /// The number of digits in the fractional part of the number.
+        fractional: usize,
+    },
+
+    /// String type.
+    String,
+    /// Binary Large Object type.
+    Blob,
+    /// Date type; a single point in time.
+    Date,
+
+    /// Optional type: either a wrapped value or `nil`.
+    Optional(WkType),
+    /// Pointer type. An external reference to an entity.
+    Pointer(WkType),
+    /// Array type. An ordered list of values.
+    Array(WkType),
+    /// Tuple type. An ad-hoc product type.
+    Tuple(Vec<WkType>),
+
+    /// An enumerated (sum) type.
+    Enum(EnumType),
+    /// A structure type: a product type with named fields.
+    Struct(StructType),
+    /// A class type: a product and entity type with named fields.
+    Class(ClassType),
+
+    /// A Function type.
+    Function(FunctionType),
+
+    /// A placeholder type. Only exists during typechecking.
+    Placeholder {
+        /// The name of the type this placeholder temporarily stands for.
+        name: String,
+        /// The kind of the type this placeholder stands for.
+        kind: PlaceholderKind,
+        /// The range of the declaration this type was generated from.
+        range: Range,
+    },
+}
+
+impl Type {
+    fn write_tuple(f: &mut Formatter, types: &[WkType]) -> fmt::Result {
+        f.write_str("(")?;
+
+        for (index, ty) in types.iter().enumerate() {
+            let sep = if index > 0 { ", " } else { "" };
+            write!(f, "{}{}", sep, ty)?
+        }
+
+        f.write_str(")")
+    }
+
+    fn write_decimal(f: &mut Formatter, integral: usize, fractional: usize) -> fmt::Result {
+        write!(
+            f,
+            "{}<{}.{}>",
+            BUILTIN_NAME.decimal_name,
+            integral,
+            fractional
+        )
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match *self {
+            Type::Bool   => f.write_str(BUILTIN_NAME.bool_name),
+            Type::Int    => f.write_str(BUILTIN_NAME.int_name),
+            Type::Float  => f.write_str(BUILTIN_NAME.float_name),
+            Type::String => f.write_str(BUILTIN_NAME.string_name),
+            Type::Blob   => f.write_str(BUILTIN_NAME.blob_name),
+            Type::Date   => f.write_str(BUILTIN_NAME.date_name),
+
+            Type::Decimal { integral, fractional } => {
+                Self::write_decimal(f, integral, fractional)
+            },
+            Type::Optional(ref wrapped) => {
+                write!(f, "({})?", wrapped)
+            },
+            Type::Pointer(ref pointed) => {
+                write!(f, "&({})", pointed)
+            },
+            Type::Array(ref element) => {
+                write!(f, "[{}]", element)
+            },
+            Type::Function(ref ty) => {
+                Self::write_tuple(f, &ty.arg_types)?;
+                write!(f, " -> {}", ty.ret_type)
+            },
+            Type::Placeholder { ref name, kind, .. } => {
+                write!(f, "Placeholder({}, kind: {})", name, kind)
+            },
+
+            Type::Tuple(ref types) => Self::write_tuple(f, types),
+            Type::Enum(ref e)   => f.write_str(&e.name),
+            Type::Struct(ref s) => f.write_str(&s.name),
+            Type::Class(ref c)  => f.write_str(&c.name),
+        }
+    }
+}
+
+/// A bit of terminology:
+///
+/// * Complex types include `enum`, `struct`, `class`, tuple,
+///   and function types.
+/// * Recursive but not complex types are pointers, optionals,
+///   and arrays.
+/// * Placeholders are temporaries that stand in for named types.
+/// * The rest of the types are called atomic or simple.
+///   They include numeric types (bool, integral, floating-point),
+///   Strings, Dates and Blobs.
+/// * User-defined types are `enum`s, `struct`s and `class`es.
+/// * Named types are also enums, structs and classes, along with
+///   the built-in types (e.g. numeric types, strings, etc.).
+/// * Product types are `struct`s, `class`es and tuples.
+/// * Value types are enums, structs, and tuples, along with
+///   the built-in types.
+/// * Entity types are only classes (for now).
+/// * Function types are… function types, obviously.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ComplexTypeKind {
+    /// A complex type that is a value type: `struct`, `enum`, tuple
+    Value,
+    /// A complex type that is an entity type: currently, only `class`.
+    Entity,
+    /// A complex type that is a function type.
+    Function,
+}
+
+/// Describes an enumerated type.
+#[derive(Debug)]
+pub struct EnumType {
+    /// The name of the enum type.
+    pub name: String,
+    /// The list of variants: keys are variant names, each value
+    /// is the type of the associated value of the variant.
+    pub variants: BTreeMap<String, WkType>,
+    /// The source range where this `enum` type is defined.
+    pub range: Range,
+}
+
+impl Ranged for EnumType {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+/// Describes a structure type.
+#[derive(Debug)]
+pub struct StructType {
+    /// The name of the struct type.
+    pub name: String,
+    /// The list of fields: keys are the field names;
+    /// each value is the type of the referred field.
+    pub fields: BTreeMap<String, WkType>,
+    /// The source range where this `struct` type is defined.
+    pub range: Range,
+}
+
+impl Ranged for StructType {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+/// Describes a class type.
+#[derive(Debug)]
+pub struct ClassType {
+    /// The name of the class type.
+    pub name: String,
+    /// The list of fields: keys are the field names;
+    /// each value is the type of the referred field.
+    pub fields: BTreeMap<String, WkType>,
+    /// The source range where this `class` type is defined.
+    pub range: Range,
+}
+
+impl Ranged for ClassType {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
+/// Describes a function type.
+#[derive(Debug, Clone)]
+pub struct FunctionType {
+    /// The list of types of each argument in order.
+    pub arg_types: Vec<WkType>,
+    /// The return type of the function.
+    pub ret_type: WkType,
+}
+
+/// The kind of the type a placeholder type stands for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PlaceholderKind {
+    /// Indicates that the placeholder stands for a `struct` type.
+    Struct,
+    /// Indicates that the placeholder stands for a `class` type.
+    Class,
+    /// Indicates that the placeholder stands for an `enum` type.
+    Enum,
+}
+
+impl Display for PlaceholderKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let s = match *self {
+            PlaceholderKind::Struct => "struct",
+            PlaceholderKind::Class  => "class",
+            PlaceholderKind::Enum   => "enum",
+        };
+
+        f.write_str(s)
+    }
+}
+
+//
+// Relations (also part of the Schema)
+//
+
+/// The cardinality or multiplicity shows how many entities in the
+/// referred side may be related to each entity in the referring side.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Cardinality {
+    /// Optional relationship: an instance on this side may
+    /// or may not correspond to an instance on the other side.
+    ZeroOrOne,
+    /// Required, unique relationship: exactly one instance on this
+    /// side must correspond to an instance at the other side.
+    One,
+    /// Optional, multiple-valued relationship: any or no instances
+    /// on this side may correspond to an instance on the other side.
+    ZeroOrMore,
+    /// Required, multiple-valued relationship: at least one instance
+    /// on this side must correspond to an instance on the other side.
+    OneOrMore,
+}
+
+impl Display for Cardinality {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        let s = match *self {
+            Cardinality::ZeroOrOne  => "zero or one",
+            Cardinality::One        => "one",
+            Cardinality::ZeroOrMore => "zero or more",
+            Cardinality::OneOrMore  => "one or more",
+        };
+
+        f.write_str(s)
+    }
+}
+
+/// Represents one side of a relationship between two entities.
+/// A particular `RelationSide` always describes the relation from
+/// the point of view of one particular entity type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelationSide {
+    /// Pointer to the type which forms this side of the relationship.
+    pub entity: RcType,
+    /// Name of the field this side uses to refer to the other side.
+    pub field: Option<String>,
+    /// Number of instances of this entity that may correspond to
+    /// an instance in the other entity.
+    pub cardinality: Cardinality,
+}
+
+impl PartialOrd for RelationSide {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.cmp(other).into()
+    }
+}
+
+impl Ord for RelationSide {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_ref = self.entity.borrow().expect("self entity");
+        let other_ref = other.entity.borrow().expect("other entity");
+
+        let self_name = match *self_ref {
+            Type::Class(ref c) => &c.name,
+            _ => unreachable!("Non-Class class type?!"),
+        };
+        let other_name = match *other_ref {
+            Type::Class(ref c) => &c.name,
+            _ => unreachable!("Non-Class class type?!"),
+        };
+
+        let lhs = (self_name,  &self.field,  self.cardinality);
+        let rhs = (other_name, &other.field, other.cardinality);
+
+        lhs.cmp(&rhs)
+    }
+}
+
+/// An entity relationship is an **unordered** pair of relation sides.
+#[derive(Debug, Clone)]
+pub struct Relation {
+    /// One side of the relationship.
+    pub lhs: RelationSide,
+    /// The other side of the relationship.
+    pub rhs: RelationSide,
+}
+
+/// **NOTE:** Since an entity relationship is an **unordered** pair
+/// of two relation sides, `==` has some additional symmetry:
+///
+/// `Relation { lhs: S1, rhs: S2 } == Relation { lhs: S2, rhs: S1 }`
+///
+/// yields `true` for any two `RelationSide`s `S1` and `S2`.
+impl PartialEq for Relation {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for Relation {}
+
+impl PartialOrd for Relation {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.cmp(other).into()
+    }
+}
+
+impl Ord for Relation {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let self_min  = min(&self.lhs,  &self.rhs);
+        let self_max  = max(&self.lhs,  &self.rhs);
+        let other_min = min(&other.lhs, &other.rhs);
+        let other_max = max(&other.lhs, &other.rhs);
+        Ord::cmp(&(self_min, self_max), &(other_min, other_max))
+    }
+}
+
 /// Top-level type for wrapping SQIR for a complete program.
 /// Field names are (hopefully) self-explanatory.
 ///
@@ -592,148 +735,6 @@ pub struct Sqir {
     /// Stores global values (currently, functions only). Keys are namespace
     /// (`impl`) names; `None` means top-level/free function, not in an `impl`.
     pub globals: BTreeMap<Option<String>, BTreeMap<String, RcExpr>>,
-}
-
-
-fn write_many_types(f: &mut Formatter, types: &[WkType]) -> fmt::Result {
-    f.write_str("(")?;
-
-    for (index, ty) in types.iter().enumerate() {
-        let sep = if index > 0 { ", " } else { "" };
-        write!(f, "{}{}", sep, ty)?
-    }
-
-    f.write_str(")")
-}
-
-fn write_decimal_type(f: &mut Formatter, integral: usize, fractional: usize) -> fmt::Result {
-    write!(
-        f,
-        "{}<{}.{}>",
-        BUILTIN_NAME.decimal_name,
-        integral,
-        fractional
-    )
-}
-
-impl Display for Type {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match *self {
-            Type::Bool   => f.write_str(BUILTIN_NAME.bool_name),
-            Type::Int    => f.write_str(BUILTIN_NAME.int_name),
-            Type::Float  => f.write_str(BUILTIN_NAME.float_name),
-            Type::String => f.write_str(BUILTIN_NAME.string_name),
-            Type::Blob   => f.write_str(BUILTIN_NAME.blob_name),
-            Type::Date   => f.write_str(BUILTIN_NAME.date_name),
-
-            Type::Decimal { integral, fractional } => {
-                write_decimal_type(f, integral, fractional)
-            },
-            Type::Optional(ref wrapped) => {
-                write!(f, "({})?", wrapped)
-            },
-            Type::Pointer(ref pointed) => {
-                write!(f, "&({})", pointed)
-            },
-            Type::Array(ref element) => {
-                write!(f, "[{}]", element)
-            },
-            Type::Function(ref ty) => {
-                write_many_types(f, &ty.arg_types)?;
-                write!(f, " -> {}", ty.ret_type)
-            },
-            Type::Placeholder { ref name, kind, .. } => {
-                write!(f, "Placeholder({}, kind: {})", name, kind)
-            },
-
-            Type::Tuple(ref types) => write_many_types(f, types),
-            Type::Enum(ref e)   => f.write_str(&e.name),
-            Type::Struct(ref s) => f.write_str(&s.name),
-            Type::Class(ref c)  => f.write_str(&c.name),
-        }
-    }
-}
-
-impl Display for PlaceholderKind {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let s = match *self {
-            PlaceholderKind::Struct => "struct",
-            PlaceholderKind::Class  => "class",
-            PlaceholderKind::Enum   => "enum",
-        };
-
-        f.write_str(s)
-    }
-}
-
-impl Display for Cardinality {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let s = match *self {
-            Cardinality::ZeroOrOne  => "zero or one",
-            Cardinality::One        => "one",
-            Cardinality::ZeroOrMore => "zero or more",
-            Cardinality::OneOrMore  => "one or more",
-        };
-
-        f.write_str(s)
-    }
-}
-
-impl PartialOrd for RelationSide {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.cmp(other).into()
-    }
-}
-
-impl Ord for RelationSide {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let self_ref = self.entity.borrow().expect("self entity");
-        let other_ref = other.entity.borrow().expect("other entity");
-
-        let self_name = match *self_ref {
-            Type::Class(ref c) => &c.name,
-            _ => unreachable!("Non-Class class type?!"),
-        };
-        let other_name = match *other_ref {
-            Type::Class(ref c) => &c.name,
-            _ => unreachable!("Non-Class class type?!"),
-        };
-
-        let lhs = (self_name,  &self.field,  self.cardinality);
-        let rhs = (other_name, &other.field, other.cardinality);
-
-        lhs.cmp(&rhs)
-    }
-}
-
-/// **NOTE:** Since an entity relationship is an **unordered** pair
-/// of two relation sides, `==` has some additional symmetry:
-///
-/// `Relation { lhs: S1, rhs: S2 } == Relation { lhs: S2, rhs: S1 }`
-///
-/// yields `true` for any two `RelationSide`s `S1` and `S2`.
-impl PartialEq for Relation {
-    fn eq(&self, other: &Self) -> bool {
-        self.cmp(other) == Ordering::Equal
-    }
-}
-
-impl Eq for Relation {}
-
-impl PartialOrd for Relation {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.cmp(other).into()
-    }
-}
-
-impl Ord for Relation {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let self_min  = min(&self.lhs,  &self.rhs);
-        let self_max  = max(&self.lhs,  &self.rhs);
-        let other_min = min(&other.lhs, &other.rhs);
-        let other_max = max(&other.lhs, &other.rhs);
-        Ord::cmp(&(self_min, self_max), &(other_min, other_max))
-    }
 }
 
 impl Sqir {
