@@ -16,8 +16,7 @@ use std::io;
 use std::result;
 use std::fmt::{ self, Display, Formatter };
 use std::cell::{ BorrowError, BorrowMutError };
-use util::{ Diagnostic, DiagnosticKind };
-use lexer::Range;
+use util::{ Diagnostic, DiagnosticKind, Range };
 
 
 /// Internal helper for macros `bug!()` and `lazy_bug!()`.

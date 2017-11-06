@@ -161,36 +161,51 @@ impl<T> Display for Diagnostic<T> where T: Display {
     }
 }
 
-/// Returns the number of extended grapheme clusters in `string`.
-/// Useful for counting 'characters' in accordance with a user's
-/// notion of a 'character' or grapheme. Mainly used by the lexer
-/// for generating visually accurate source location data.
-///
-/// # Arguments:
-///
-/// * `string`: a string slice.
-///
-/// # Return value:
-///
-/// The number of extended grapheme clusters in `string`.
-pub fn grapheme_count(string: &str) -> usize {
-    string.graphemes(true).count()
+/// Represents the location of a single extended grapheme cluster
+/// in the sources fed to the lexer.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Location {
+    /// 0-based index of the source that this location points into.
+    pub src_idx: usize,
+    /// 1-based line index within the aforementioned source.
+    pub line: usize,
+    /// 1-based character index within the line.
+    pub column: usize,
 }
 
-/// Counts the grapheme clusters in a string that satisfy a condition.
-///
-/// # Arguments:
-///
-/// * `string`: a string slice.
-/// * `pred`: a predicate function invoked for each extended grapheme
-///   cluster in `string`.
-///
-/// # Return value:
-///
-/// The number of extended grapheme clusters in `string`
-/// for which `pred` returned `true`.
-pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
-    string.graphemes(true).filter(|&g| pred(g)).count()
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "line {}, char {}", self.line, self.column)
+    }
+}
+
+/// A half-open range representing a source span.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Range {
+    /// Location at the beginning of the source range.
+    pub start: Location,
+    /// Location one past the end of the source range.
+    pub end: Location,
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}...{}", self.start, self.end)
+    }
+}
+
+/// This trait is to be implemented by entities that correspond
+/// to some range in the source. This is used for generating
+/// location information in user-visible error messages.
+pub trait Ranged {
+    /// Returns the range `self` was generated from.
+    fn range(&self) -> Range;
+}
+
+impl Ranged for Range {
+    fn range(&self) -> Range {
+        *self
+    }
 }
 
 /// Extends iterators with the `skip_n()` function.
@@ -368,4 +383,36 @@ impl<T> Display for WkCell<T> where RcCell<T>: Display {
             Err(_) => f.write_str("<cannot strongify WkCell>"),
         }
     }
+}
+
+/// Returns the number of extended grapheme clusters in `string`.
+/// Useful for counting 'characters' in accordance with a user's
+/// notion of a 'character' or grapheme. Mainly used by the lexer
+/// for generating visually accurate source location data.
+///
+/// # Arguments:
+///
+/// * `string`: a string slice.
+///
+/// # Return value:
+///
+/// The number of extended grapheme clusters in `string`.
+pub fn grapheme_count(string: &str) -> usize {
+    string.graphemes(true).count()
+}
+
+/// Counts the grapheme clusters in a string that satisfy a condition.
+///
+/// # Arguments:
+///
+/// * `string`: a string slice.
+/// * `pred`: a predicate function invoked for each extended grapheme
+///   cluster in `string`.
+///
+/// # Return value:
+///
+/// The number of extended grapheme clusters in `string`
+/// for which `pred` returned `true`.
+pub fn grapheme_count_by<P: Fn(&str) -> bool>(string: &str, pred: P) -> usize {
+    string.graphemes(true).filter(|&g| pred(g)).count()
 }

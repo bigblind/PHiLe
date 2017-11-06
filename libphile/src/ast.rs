@@ -13,7 +13,7 @@
 //! module. AST nodes, like tokens, contain source location data
 //! in order to easily map them to the original source code.
 
-use lexer::{ Range, Ranged };
+use util::{ Range, Ranged };
 
 
 /// AST node representing an expression.

@@ -12,8 +12,9 @@
 //! on the `ast` module for providing the emitted node types.
 
 use std::slice;
-use lexer::{ Token, TokenKind, Range, Ranged };
+use lexer::{ Token, TokenKind };
 use error::{ Error, Result };
+use util::{ Range, Ranged };
 use ast::*;
 
 

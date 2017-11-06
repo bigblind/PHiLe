@@ -240,7 +240,9 @@ fn write_type(wr: &mut io::Write, ty: &WkType, params: &CodegenParams) -> Result
         Type::Class(ref ct)  => write!(wr, "{}", transform_type_name(&ct.name, params))?,
 
         Type::Function(ref ft) => write_function_type(wr, ft, params)?,
-        Type::Placeholder { ref name, kind } => bug!("Unresolved Placeholder({}, {})", name, kind)?,
+        Type::Placeholder { ref name, kind, .. } => bug!(
+            "Unresolved Placeholder({}, {})", name, kind
+        )?,
     }
 
     Ok(())

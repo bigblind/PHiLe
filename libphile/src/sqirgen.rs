@@ -16,7 +16,6 @@ use std::collections::{ HashMap, BTreeMap };
 use std::collections::btree_map::Entry::{ Vacant, Occupied };
 use util::*;
 use sqir::*;
-use lexer::{ Range, Ranged };
 use ast::{ self, Item, Exp, ExpKind, Ty, TyKind, Argument, Field };
 use ast::{ Prog, EnumDecl, StructDecl, ClassDecl, RelDecl, Impl };
 use error::{ Error, Result };
@@ -349,10 +348,13 @@ impl SqirGen {
                 return sema_error!(item, "Redefinition of '{}'", name)
             }
 
-            self.sqir.named_types.insert(
-                name.to_owned(),
-                RcCell::new(Type::Placeholder { name: name.to_owned(), kind })
-            );
+            let ty = Type::Placeholder {
+                name: name.to_owned(),
+                kind: kind,
+                range: item.range(),
+            };
+
+            self.sqir.named_types.insert(name.into(), ty.into());
         }
 
         Ok(())
@@ -483,6 +485,7 @@ impl SqirGen {
             StructType {
                 name:   decl.name.to_owned(),
                 fields: self.typecheck_struct_fields(decl)?,
+                range:  decl.range,
             }
         );
 
@@ -499,6 +502,7 @@ impl SqirGen {
             ClassType {
                 name:   decl.name.to_owned(),
                 fields: self.typecheck_class_fields(decl)?,
+                range: decl.range,
             }
         );
 
@@ -515,6 +519,7 @@ impl SqirGen {
             EnumType {
                 name:     decl.name.to_owned(),
                 variants: self.typecheck_enum_variants(decl)?,
+                range:    decl.range,
             }
         );
 
@@ -634,7 +639,7 @@ impl SqirGen {
                 "Class type '{}' not allowed without indirection",
                 t.name,
             ),
-            Type::Placeholder { ref name, kind: PlaceholderKind::Class } => sema_error!(
+            Type::Placeholder { ref name, kind: PlaceholderKind::Class, .. } => sema_error!(
                 range,
                 "Class type '{}' not allowed without indirection",
                 name,

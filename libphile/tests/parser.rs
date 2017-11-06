@@ -36,11 +36,11 @@ extern crate regex;
 extern crate phile;
 
 use regex::Regex;
-use phile::lexer::{ self, Token, TokenKind, Location, Range };
+use phile::lexer::{ self, Token, TokenKind };
 use phile::ast::*;
 use phile::error::*;
 use phile::parser;
-use phile::util::grapheme_count;
+use phile::util::{ grapheme_count, Location, Range };
 
 
 #[derive(Debug)]

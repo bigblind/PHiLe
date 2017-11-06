@@ -52,7 +52,7 @@ use unicode_segmentation::UnicodeSegmentation;
 use regex::Regex;
 use phile::error::Error;
 use phile::lexer;
-use phile::util::grapheme_count;
+use phile::util::{ self, grapheme_count };
 
 
 //
@@ -61,14 +61,14 @@ use phile::util::grapheme_count;
 
 // Append a lexeme onto `source`'s buffer
 trait Lexeme: Arbitrary {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind;
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind;
 }
 
 // Metadata about a token, without the actual underlying lexeme
 #[derive(Debug, Clone)]
 struct TokenHeader {
     slice: ops::Range<usize>,
-    range: lexer::Range,
+    range: util::Range,
     kind:  lexer::TokenKind,
 }
 
@@ -87,7 +87,7 @@ impl ValidSource {
 
         for (i, file) in self.files.iter().enumerate() {
             let mut buf = String::with_capacity(file.len() * 16);
-            let mut start = lexer::Location { src_idx: i, line: 1, column: 1 };
+            let mut start = util::Location { src_idx: i, line: 1, column: 1 };
 
             for token in file {
                 let mut end = start;
@@ -95,7 +95,7 @@ impl ValidSource {
                 let kind = token.render(&mut buf, &mut end);
                 let new_len = buf.len();
                 let slice = old_len..new_len;
-                let range = lexer::Range { start, end };
+                let range = util::Range { start, end };
                 tokens.push(TokenHeader { slice, range, kind });
                 start = end;
             }
@@ -175,7 +175,7 @@ enum ValidToken {
 }
 
 impl Lexeme for ValidToken {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         use ValidToken::*;
 
         match *self {
@@ -264,7 +264,7 @@ impl Arbitrary for ValidWhitespace {
 }
 
 impl Lexeme for ValidWhitespace {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         for g in self.buf.graphemes(true) {
             if g.contains(VER_WS) {
                 end.column = 1;
@@ -329,7 +329,7 @@ impl Arbitrary for ValidLineComment {
 }
 
 impl Lexeme for ValidLineComment {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         // A line comment represented by this type always ends in a newline.
         assert!(self.buf.starts_with('#'));
         assert!(is_ver_ws(self.buf.chars().last().unwrap()));
@@ -395,7 +395,7 @@ impl Arbitrary for ValidWord {
 }
 
 impl Lexeme for ValidWord {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         // Identifiers must not contain whitespace, including newlines
         assert!(!self.buf.contains(char::is_whitespace));
 
@@ -566,7 +566,7 @@ impl Arbitrary for ValidNumber {
 }
 
 impl Lexeme for ValidNumber {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         // Identifiers must not contain whitespace, including newlines
         assert!(!self.buf.contains(char::is_whitespace));
 
@@ -593,7 +593,7 @@ impl Arbitrary for ValidPunct {
 }
 
 impl Lexeme for ValidPunct {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         assert!(!self.value.contains(char::is_whitespace));
         assert!(self.value.is_ascii());
 
@@ -673,7 +673,7 @@ impl Arbitrary for ValidString {
 }
 
 impl Lexeme for ValidString {
-    fn render(&self, buf: &mut String, end: &mut lexer::Location) -> lexer::TokenKind {
+    fn render(&self, buf: &mut String, end: &mut util::Location) -> lexer::TokenKind {
         use CharacterLiteral::*;
 
         let old_len = buf.len();
@@ -1251,9 +1251,9 @@ fn ascii_digit_is_numeric() {
     ];
 
     for &lexeme in lexemes {
-        let range = lexer::Range {
-            start: lexer::Location { src_idx: 0, line: 1, column: 1 },
-            end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
+        let range = util::Range {
+            start: util::Location { src_idx: 0, line: 1, column: 1 },
+            end:   util::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
         };
         let sources = &[lexeme];
         let tokens = lexer::lex(sources).unwrap();
@@ -1280,9 +1280,9 @@ fn unicode_digit_is_not_numeric() {
     ];
 
     // They all express a single grapheme cluster.
-    let err_range = lexer::Range {
-        start: lexer::Location { src_idx: 0, line: 1, column: 1 },
-        end:   lexer::Location { src_idx: 0, line: 1, column: 2 },
+    let err_range = util::Range {
+        start: util::Location { src_idx: 0, line: 1, column: 1 },
+        end:   util::Location { src_idx: 0, line: 1, column: 2 },
     };
 
     for &lexeme in non_numeric_digits {
@@ -1312,9 +1312,9 @@ fn identifier_with_inner_unicode_digit() {
     ];
 
     for &ident in identifiers {
-        let range = lexer::Range {
-            start: lexer::Location { src_idx: 0, line: 1, column: 1 },
-            end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(ident) },
+        let range = util::Range {
+            start: util::Location { src_idx: 0, line: 1, column: 1 },
+            end:   util::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(ident) },
         };
         let sources = &[ident];
         let tokens = lexer::lex(sources).unwrap();
@@ -1330,9 +1330,9 @@ fn identifier_with_inner_unicode_digit() {
 #[test]
 fn all_valid_punctuation() {
     for &punct in PUNCTUATION {
-        let range = lexer::Range {
-            start: lexer::Location { src_idx: 0, line: 1, column: 1 },
-            end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(punct) },
+        let range = util::Range {
+            start: util::Location { src_idx: 0, line: 1, column: 1 },
+            end:   util::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(punct) },
         };
         let sources = &[punct];
         let tokens = lexer::lex(sources).unwrap();
@@ -1571,9 +1571,9 @@ fn invalid_source() {
         match lexer::lex(&[lexeme]) {
             Ok(tokens) => panic!("Invalid lexeme '{}' was unexpectedly recognized as {:?}", lexeme, tokens),
             Err(Error::Syntax { message, range }) => {
-                let expected_range = lexer::Range {
-                    start: lexer::Location { src_idx: 0, line: 1, column: 1 },
-                    end:   lexer::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
+                let expected_range = util::Range {
+                    start: util::Location { src_idx: 0, line: 1, column: 1 },
+                    end:   util::Location { src_idx: 0, line: 1, column: 1 + grapheme_count(lexeme) },
                 };
                 assert_eq!(message, "Invalid token");
                 assert_eq!(range, expected_range);
@@ -1586,10 +1586,10 @@ fn invalid_source() {
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 fn quickcheck_valid_lexeme<T: Lexeme>(lexeme: T) -> bool {
     let mut source = String::new();
-    let start = lexer::Location { src_idx: 0, line: 1, column: 1 };
+    let start = util::Location { src_idx: 0, line: 1, column: 1 };
     let mut end = start;
     let expected_kind = lexeme.render(&mut source, &mut end);
-    let range = lexer::Range { start, end };
+    let range = util::Range { start, end };
     let sources = [source];
     let tokens = lexer::lex(&sources).unwrap();
 

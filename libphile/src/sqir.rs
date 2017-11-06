@@ -105,6 +105,8 @@ pub enum Type {
         name: String,
         /// The kind of the type this placeholder stands for.
         kind: PlaceholderKind,
+        /// The range of the declaration this type was generated from.
+        range: Range,
     },
 }
 
@@ -155,6 +157,8 @@ pub struct EnumType {
     /// The list of variants: keys are variant names, each value
     /// is the type of the associated value of the variant.
     pub variants: BTreeMap<String, WkType>,
+    /// The source range where this `enum` type is defined.
+    pub range: Range,
 }
 
 /// Describes a structure type.
@@ -165,6 +169,8 @@ pub struct StructType {
     /// The list of fields: keys are the field names;
     /// each value is the type of the referred field.
     pub fields: BTreeMap<String, WkType>,
+    /// The source range where this `struct` type is defined.
+    pub range: Range,
 }
 
 /// Describes a class type.
@@ -175,6 +181,8 @@ pub struct ClassType {
     /// The list of fields: keys are the field names;
     /// each value is the type of the referred field.
     pub fields: BTreeMap<String, WkType>,
+    /// The source range where this `class` type is defined.
+    pub range: Range,
 }
 
 /// Describes a function type.
@@ -616,7 +624,7 @@ impl Display for Type {
                 write_many_types(f, &ty.arg_types)?;
                 write!(f, " -> {}", ty.ret_type)
             },
-            Type::Placeholder { ref name, kind } => {
+            Type::Placeholder { ref name, kind, .. } => {
                 write!(f, "Placeholder({}, kind: {})", name, kind)
             },
 

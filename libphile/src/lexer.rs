@@ -11,39 +11,25 @@
 //! It also provides types for mapping tokens to their original
 //! location within the source code in a human-readable manner.
 
-use std::fmt::{ self, Display, Formatter };
 use regex::Regex;
 use error::{ Error, Result };
-use util::{ grapheme_count, grapheme_count_by };
+use util::{ Ranged, Range, Location, grapheme_count, grapheme_count_by };
 
 
-/// Represents the location of a single extended grapheme cluster
-/// in the sources fed to the lexer.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Location {
-    /// 0-based index of the source that this location points into.
-    pub src_idx: usize,
-    /// 1-based line index within the aforementioned source.
-    pub line: usize,
-    /// 1-based character index within the line.
-    pub column: usize,
-}
-
-/// A half-open range representing a source span.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Range {
-    /// Location at the beginning of the source range.
-    pub start: Location,
-    /// Location one past the end of the source range.
-    pub end: Location,
-}
-
-/// This trait is to be implemented by entities that correspond
-/// to some range in the source. This is used for generating
-/// location information in user-visible error messages.
-pub trait Ranged {
-    /// Returns the range `self` was generated from.
-    fn range(&self) -> Range;
+/// Given an array of source strings, returns an array of tokens
+/// extracted from those strings, or an error if there is a syntactic
+/// (more precisely, lexical) error in any of the source strings.
+///
+/// # Arguments
+///
+/// * `sources`: a slice of `str`-convertible source strings.
+///
+/// # Return value
+///
+/// * `Ok(Vec<Token>)` if the source files were lexically correct.
+/// * `Err(Error::Syntax)` if there was a lexical error in the input.
+pub fn lex<S: AsRef<str>>(sources: &[S]) -> Result<Vec<Token>> {
+    Lexer::new().lex(sources)
 }
 
 /// Describes the type of a single token or lexeme.
@@ -74,34 +60,17 @@ pub struct Token<'a> {
     pub range: Range,
 }
 
-#[derive(Debug)]
-struct Lexer<'a> {
-    source: &'a str,
-    location: Location,
-    tokens: Vec<Token<'a>>,
-    regexes: [(TokenKind, Regex); NUM_TOKEN_KINDS],
+impl<'a> Ranged for Token<'a> {
+    fn range(&self) -> Range {
+        self.range
+    }
 }
 
-const NUM_TOKEN_KINDS: usize = 6;
-
-
-/// Given an array of source strings, returns an array of tokens
-/// extracted from those strings, or an error if there is a syntactic
-/// (more precisely, lexical) error in any of the source strings.
-///
-/// # Arguments
-///
-/// * `sources`: a slice of `str`-convertible source strings.
-///
-/// # Return value
-///
-/// * `Ok(Vec<Token>)` if the source files were lexically correct.
-/// * `Err(Error::Syntax)` if there was a lexical error in the input.
-pub fn lex<S: AsRef<str>>(sources: &[S]) -> Result<Vec<Token>> {
-    Lexer::new().lex(sources)
+trait LocationExt {
+    fn advance_by(&self, lexeme: &str) -> Location;
 }
 
-impl Location {
+impl LocationExt for Location {
     fn advance_by(&self, lexeme: &str) -> Location {
         // TODO(H2CO3): Keep this list in sync with the regexes in Lexer::new()
         let line_breaks: &[char] = &['\n', '\x0b', '\x0c', '\r', '\u{0085}', '\u{2028}', '\u{2029}'];
@@ -122,28 +91,14 @@ impl Location {
     }
 }
 
-impl Display for Location {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "line {}, char {}", self.line, self.column)
-    }
-}
+const NUM_TOKEN_KINDS: usize = 6;
 
-impl Display for Range {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}...{}", self.start, self.end)
-    }
-}
-
-impl Ranged for Range {
-    fn range(&self) -> Range {
-        *self
-    }
-}
-
-impl<'a> Ranged for Token<'a> {
-    fn range(&self) -> Range {
-        self.range
-    }
+#[derive(Debug)]
+struct Lexer<'a> {
+    source: &'a str,
+    location: Location,
+    tokens: Vec<Token<'a>>,
+    regexes: [(TokenKind, Regex); NUM_TOKEN_KINDS],
 }
 
 impl<'a> Lexer<'a> {
