@@ -161,6 +161,12 @@ pub struct EnumType {
     pub range: Range,
 }
 
+impl Ranged for EnumType {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
 /// Describes a structure type.
 #[derive(Debug)]
 pub struct StructType {
@@ -173,6 +179,12 @@ pub struct StructType {
     pub range: Range,
 }
 
+impl Ranged for StructType {
+    fn range(&self) -> Range {
+        self.range
+    }
+}
+
 /// Describes a class type.
 #[derive(Debug)]
 pub struct ClassType {
@@ -183,6 +195,12 @@ pub struct ClassType {
     pub fields: BTreeMap<String, WkType>,
     /// The source range where this `class` type is defined.
     pub range: Range,
+}
+
+impl Ranged for ClassType {
+    fn range(&self) -> Range {
+        self.range
+    }
 }
 
 /// Describes a function type.

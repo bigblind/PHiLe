@@ -57,19 +57,6 @@ macro_rules! sema_error {
     });
 }
 
-macro_rules! occurs_check_error {
-    ($msg: expr) => ({
-        let message = $msg.to_owned();
-        let range = None;
-        Err(Error::Semantic { message, range })
-    });
-    ($fmt: expr, $($args: tt)*) => ({
-        let message = format!($fmt, $($args)*);
-        let range = None;
-        Err(Error::Semantic { message, range })
-    });
-}
-
 macro_rules! reciprocity_error {
     ($msg: expr) => ({
         let message = $msg.to_owned();
@@ -107,6 +94,19 @@ fn unwrap_entity_name(entity: &RcType) -> Result<String> {
         Type::Class(ref c) => Ok(c.name.clone()),
         ref ty => bug!("Non-class entity type?! {}", ty),
     }
+}
+
+// Gets the range of the `enum`, `struct`, or `class` type.
+// Returns an error if `ty` is not such a user-defined type.
+fn unwrap_ud_type_range(ty: &WkType) -> Result<Range> {
+    let ty = ty.to_rc()?;
+    let range = match *ty.borrow()? {
+        Type::Enum(ref e)   => e.range,
+        Type::Struct(ref s) => s.range,
+        Type::Class(ref c)  => c.range,
+        _ => bug!("Type {} doesn't have a range", ty)?,
+    };
+    Ok(range)
 }
 
 fn parse_string_literal(lexeme: &str, range: Range) -> Result<String> {
@@ -800,7 +800,8 @@ impl SqirGen {
             Type::Class(ref ct)   => self.ensure_transitive_noncontainment_multi(root, ct.fields.values()),
 
             // Function types are not allowed within user-defined types
-            Type::Function(_) => occurs_check_error!(
+            Type::Function(_) => sema_error!(
+                unwrap_ud_type_range(root)?,
                 "Function type should not occur within user-defined type {}",
                 root,
             ),
@@ -815,7 +816,8 @@ impl SqirGen {
 
     fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> Result<()> {
         if root.to_rc()? == child.to_rc()? {
-            occurs_check_error!(
+            sema_error!(
+                unwrap_ud_type_range(root)?,
                 "Recursive type {} contains itself without indirection",
                 root,
             )
