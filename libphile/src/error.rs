@@ -89,9 +89,8 @@ pub enum Error {
     Semantic {
         /// Description of the semantic error.
         message: String,
-        /// If available, the human-readable source range associated
-        /// with the error. End-of-input is represented as `None`.
-        range: Option<Range>,
+        /// The human-readable source range associated with the error.
+        range: Range,
     },
 }
 
@@ -115,8 +114,8 @@ impl Error {
             Error::BorrowMut(_)           => None,
             Error::Strongify              => None,
             Error::Unreachable { .. }     => None,
-            Error::Syntax   { range, .. } => range.into(),
-            Error::Semantic { range, .. } => range,
+            Error::Syntax   { range, .. } => Some(range),
+            Error::Semantic { range, .. } => Some(range),
         };
 
         if let Some(r) = range {

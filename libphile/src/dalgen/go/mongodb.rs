@@ -6,9 +6,8 @@
 // on 18/07/2017
 //
 
-use std::io;
 use error::Result;
-use dalgen::go::NAMING_CONVENTION;
+use dalgen::go::{ NAMING_CONVENTION, missing_namespace_error };
 use dalgen::*;
 use sqir::*;
 use util::*;
@@ -21,7 +20,7 @@ pub fn generate_schema(_sqir: &Sqir, params: &CodegenParams, wp: &mut WriterProv
     let package_name = params.namespace.as_ref().map(
         |ns| transform_namespace(ns, params)
     ).ok_or_else(
-        || io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
+        missing_namespace_error
     )?;
 
     write!(

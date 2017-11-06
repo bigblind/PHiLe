@@ -47,29 +47,15 @@ macro_rules! implement_wrapping_type_getter {
 macro_rules! sema_error {
     ($cause: expr, $msg: expr) => ({
         let message = $msg.to_owned();
-        let range = $cause.range().into();
+        let range = $cause.range();
         Err(Error::Semantic { message, range })
     });
     ($cause: expr, $fmt: expr, $($args: tt)*) => ({
         let message = format!($fmt, $($args)*);
-        let range = $cause.range().into();
+        let range = $cause.range();
         Err(Error::Semantic { message, range })
     });
 }
-
-macro_rules! reciprocity_error {
-    ($msg: expr) => ({
-        let message = $msg.to_owned();
-        let range = None;
-        Err(Error::Semantic { message, range })
-    });
-    ($fmt: expr, $($args: tt)*) => ({
-        let message = format!($fmt, $($args)*);
-        let range = None;
-        Err(Error::Semantic { message, range })
-    });
-}
-
 
 /// Takes a borrowed AST, performs various kinds of semantic
 /// analysis on it, and if it represents a correct program,
@@ -98,8 +84,7 @@ fn unwrap_entity_name(entity: &RcType) -> Result<String> {
 
 // Gets the range of the `enum`, `struct`, or `class` type.
 // Returns an error if `ty` is not such a user-defined type.
-fn unwrap_ud_type_range(ty: &WkType) -> Result<Range> {
-    let ty = ty.to_rc()?;
+fn unwrap_ud_type_range(ty: &RcType) -> Result<Range> {
     let range = match *ty.borrow()? {
         Type::Enum(ref e)   => e.range,
         Type::Struct(ref s) => s.range,
@@ -426,16 +411,18 @@ impl SqirGen {
         // LHS refers to a field in the RHS that doesn't correspond to a relation.
         let rhs_key = (rhs_type.clone(), rhs_field.clone());
         match self.sqir.relations.get(&rhs_key) {
-            None => return reciprocity_error!(
-                "Reciprocity check failed: {}::{} refers to {}::{} which is not a relational field",
+            None => return sema_error!(
+                unwrap_ud_type_range(lhs_type)?,
+                "Relation {}::{} refers to {}::{} which is not a relational field",
                 unwrap_entity_name(lhs_type)?,
                 lhs_field,
                 unwrap_entity_name(rhs_type)?,
                 rhs_field,
             ),
             Some(inverse_relation) => if relation != inverse_relation {
-                return reciprocity_error!(
-                    "Reciprocity check failed: the relations specified by {}::{} and {}::{} have mismatching types, cardinalities or field names",
+                return sema_error!(
+                    unwrap_ud_type_range(lhs_type)?,
+                    "Relations between {}::{} and {}::{} have mismatching types, cardinalities or field names",
                     unwrap_entity_name(lhs_type)?,
                     lhs_field,
                     unwrap_entity_name(rhs_type)?,
@@ -801,7 +788,7 @@ impl SqirGen {
 
             // Function types are not allowed within user-defined types
             Type::Function(_) => sema_error!(
-                unwrap_ud_type_range(root)?,
+                unwrap_ud_type_range(&root.to_rc()?)?,
                 "Function type should not occur within user-defined type {}",
                 root,
             ),
@@ -817,7 +804,7 @@ impl SqirGen {
     fn ensure_transitive_noncontainment(&self, root: &WkType, child: &WkType) -> Result<()> {
         if root.to_rc()? == child.to_rc()? {
             sema_error!(
-                unwrap_ud_type_range(root)?,
+                unwrap_ud_type_range(&root.to_rc()?)?,
                 "Recursive type {} contains itself without indirection",
                 root,
             )

@@ -310,10 +310,9 @@ fn write_comment_header(wr: &mut io::Write) -> io::Result<()> {
 fn write_namespace(wr: &mut io::Write, params: &CodegenParams) -> Result<()> {
     params.namespace.as_ref().map(
         |ns| transform_namespace(ns, params)
-    ).ok_or_else(|| Error::Semantic {
-        message: "Missing namespace".to_owned(),
-        range:   None,
-    }).and_then(
+    ).ok_or_else(
+        || Error::IO(missing_namespace_error())
+    ).and_then(
         |ns| writeln!(wr, "package {}\n", ns).map_err(From::from)
     )
 }
@@ -601,4 +600,8 @@ fn write_expr_decl(wr: &mut io::Write, expr: &RcExpr, params: &CodegenParams) ->
 fn name_for_global_func(ns: Option<&str>, raw_name: &str, params: &CodegenParams) -> String {
     let name = ns.map_or(String::new(), str::to_owned) + "_" + raw_name;
     transform_func_name(&name, params)
+}
+
+fn missing_namespace_error() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidInput, "Missing namespace")
 }
