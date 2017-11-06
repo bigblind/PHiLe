@@ -40,6 +40,14 @@ pub struct Expr {
     pub value: Value,
     /// The identifier of the expression, unique within a top-level function.
     pub id: ExprId,
+    /// The human-readable source range where this expression comes from.
+    pub range: Range,
+}
+
+impl Ranged for Expr {
+    fn range(&self) -> Range {
+        self.range
+    }
 }
 
 /// Represents the value of an expression node.

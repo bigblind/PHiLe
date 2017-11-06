@@ -1322,9 +1322,10 @@ impl SqirGen {
         let id = ExprId::Global(name.to_owned()); // XXX: assumes that function is global
         let entry = self.sqir.globals.entry(None); // no namespace
         let globals = entry.or_insert_with(BTreeMap::new);
-        let expr = RcCell::new(Expr { ty, value, id });
+        let range = func.range;
+        let expr = Expr { ty, value, id, range };
 
-        if globals.insert(name.to_owned(), expr).is_none() {
+        if globals.insert(name.into(), expr.into()).is_none() {
             Ok(())
         } else {
             sema_error!(func, "Redefinition of function '{}'", name)
@@ -1359,9 +1360,10 @@ impl SqirGen {
             let name = func.name.ok_or_else(lazy_bug!("No function name"))?;
             let value = Value::Placeholder;
             let id = ExprId::Global(name.to_owned()); // XXX: assumes function is global
-            let expr = RcCell::new(Expr { ty, value, id });
+            let range = func.range;
+            let expr = Expr { ty, value, id, range };
 
-            if ns.insert(name.to_owned(), expr).is_some() {
+            if ns.insert(name.into(), expr.into()).is_some() {
                 return sema_error!(func, "Redefinition of function '{}'", name)
             }
         }
@@ -1521,7 +1523,8 @@ impl SqirGen {
                 let ty = ty.clone();
                 let id = self.next_temp_id();
                 let value = Value::OptionalWrap(expr.clone());
-                return Ok(RcCell::new(Expr { ty, value, id }));
+                let range = expr_ref.range;
+                return Ok(RcCell::new(Expr { ty, value, id, range }));
             }
         }
 
@@ -1536,18 +1539,19 @@ impl SqirGen {
     fn generate_nil_literal(&mut self, ctx: TyCtx) -> Result<RcExpr> {
         let value = Value::Nil;
         let id = self.next_temp_id();
+        let range = ctx.range;
 
         let ty = match ctx.ty {
             Some(ty) => ty,
-            None => return sema_error!(ctx, "Cannot infer optional type"),
+            None => return sema_error!(range, "Cannot infer optional type"),
         };
 
         match *ty.borrow()? {
             Type::Optional(_) => {},
-            _ => return sema_error!(ctx.range, "Nil must have optional type"),
+            _ => return sema_error!(range, "Nil must have optional type"),
         }
 
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     fn generate_bool_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
@@ -1555,7 +1559,7 @@ impl SqirGen {
         let b = parse_bool_literal(val, range)?;
         let value = Value::Bool(b);
         let id = self.next_temp_id();
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     fn generate_int_literal(&mut self, ctx: TyCtx, val: &str, range: Range) -> Result<RcExpr> {
@@ -1570,7 +1574,7 @@ impl SqirGen {
         let value = Value::Int(n);
         let id = self.next_temp_id();
 
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     fn generate_float_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
@@ -1578,7 +1582,7 @@ impl SqirGen {
         let x = parse_float_literal(val, range)?;
         let value = Value::Float(x);
         let id = self.next_temp_id();
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     fn generate_string_literal(&mut self, val: &str, range: Range) -> Result<RcExpr> {
@@ -1586,16 +1590,19 @@ impl SqirGen {
         let s = parse_string_literal(val, range)?;
         let value = Value::String(s);
         let id = self.next_temp_id();
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
-    fn generate_name_ref<R: Ranged>(&mut self, name: &str, range: R) -> Result<RcExpr> {
+    fn generate_name_ref(&mut self, name: &str, range: Range) -> Result<RcExpr> {
         let expr = self.lookup_name(name, range)?;
-        self.generate_load(expr)
+        let ty = expr.borrow()?.ty.clone();
+        let value = Value::Load(expr.to_weak());
+        let id = self.next_temp_id();
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     // Helper for generate_name_ref()
-    fn lookup_name<R: Ranged>(&self, name: &str, range: R) -> Result<RcExpr> {
+    fn lookup_name(&self, name: &str, range: Range) -> Result<RcExpr> {
         if let Some(expr) = self.locals.borrow()?.var_map.get(name) {
             return Ok(expr.clone())
         }
@@ -1608,14 +1615,6 @@ impl SqirGen {
         }
 
         sema_error!(range, "Undeclared identifier: '{}'", name)
-    }
-
-    // Helper for generate_name_ref()
-    fn generate_load(&mut self, expr: RcExpr) -> Result<RcExpr> {
-        let ty = expr.borrow()?.ty.clone();
-        let value = Value::Load(expr.to_weak());
-        let id = self.next_temp_id();
-        Ok(RcCell::new(Expr { ty, value, id }))
     }
 
     fn generate_var_decl(&mut self, ctx: TyCtx, decl: &ast::VarDecl) -> Result<RcExpr> {
@@ -1642,7 +1641,8 @@ impl SqirGen {
         let ty = self.get_unit_type()?;
         let value = Value::Ignore(subexpr);
         let id = self.next_temp_id();
-        Ok(RcCell::new(Expr { ty, value, id }))
+        let range = node.range;
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     fn generate_binary_op(&mut self, _ctx: TyCtx, _op: &ast::BinaryOp) -> Result<RcExpr> {
@@ -1663,6 +1663,7 @@ impl SqirGen {
             }
         }
 
+        let range = ctx.range;
         let exprs = self.generate_tuple_items(ctx, nodes)?;
         let types = exprs.iter()
             .map(|expr| Ok(expr.borrow()?.ty.clone()))
@@ -1672,7 +1673,7 @@ impl SqirGen {
         let value = Value::Tuple(exprs);
         let id = self.next_temp_id();
 
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     // helper for generate_tuple()
@@ -1726,8 +1727,9 @@ impl SqirGen {
 
         let value = Value::Seq(items);
         let id = self.next_temp_id();
+        let range = ctx.range;
 
-        Ok(RcCell::new(Expr { ty, value, id }))
+        Ok(RcCell::new(Expr { ty, value, id, range }))
     }
 
     fn generate_call(&mut self, _ctx: TyCtx, _call: &ast::Call) -> Result<RcExpr> {
@@ -1811,7 +1813,7 @@ impl SqirGen {
             || self.next_temp_id(),
             |name| ExprId::Global(name.to_owned())
         );
-        let expr = RcCell::new(Expr { ty, value, id });
+        let expr = RcCell::new(Expr { ty, value, id, range });
 
         // Fix arguments so that they actually point back to the function.
         // A copy of the original `args` vector is used, which should be
@@ -1834,9 +1836,10 @@ impl SqirGen {
                 let ty = ty.clone();
                 let value = Value::Argument { func, index };
                 let id = self.next_temp_id();
-                let expr = RcCell::new(Expr { ty, value, id });
+                let range = arg.range;
+                let expr = Expr { ty, value, id, range };
 
-                self.declare_local(arg.name, expr, arg)
+                self.declare_local(arg.name, expr.into(), arg)
             }
         ).collect()
     }
