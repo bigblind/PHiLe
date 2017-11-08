@@ -53,6 +53,20 @@ macro_rules! lazy_bug {
     };
 }
 
+/// Generates a formatted semantic error with source location info.
+macro_rules! sema_error {
+    ($cause: expr, $msg: expr) => ({
+        let message = $msg.to_owned();
+        let range = $cause.range();
+        Err(Error::Semantic { message, range })
+    });
+    ($cause: expr, $fmt: expr, $($args: tt)*) => ({
+        let message = format!($fmt, $($args)*);
+        let range = $cause.range();
+        Err(Error::Semantic { message, range })
+    });
+}
+
 
 /// An error that may occur while compiling PHiLe source code.
 /// This can be either a user-induced error (e.g. syntax error),
