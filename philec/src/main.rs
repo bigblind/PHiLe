@@ -137,7 +137,7 @@ use std::path::{ Path, PathBuf };
 use std::time::Instant;
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::io::stderr;
+use std::io::{ stderr, BufWriter };
 use std::io::prelude::*;
 use phile::util::{ RcCell, Diagnostic, DiagnosticKind, PACKAGE_INFO };
 use phile::lexer::*;
@@ -189,7 +189,7 @@ impl FileWriterProvider {
             return Ok(rc.clone())
         }
 
-        let file = File::create(&path)?;
+        let file = BufWriter::new(File::create(&path)?);
         let rc: Rc<RefCell<Write>> = Rc::new(RefCell::new(file));
 
         self.files.insert(path, rc.clone());
