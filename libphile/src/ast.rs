@@ -315,7 +315,7 @@ pub struct Struct<'a> {
 pub struct If<'a> {
     /// The Boolean condition of the `if`.
     pub condition: Exp<'a>,
-    /// The expression evaulated when the condition is true.
+    /// The expression evaluated when the condition is true.
     pub then_arm: Exp<'a>,
     /// The expression evaluated when the condition is false.
     pub else_arm: Option<Exp<'a>>,
