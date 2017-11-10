@@ -71,11 +71,11 @@ fn parse_invalid(source: &str) -> (String, Range) {
     }
 }
 
-fn test_invalid_cases(test_cases: &[InvalidTestCase]) {
-    for &InvalidTestCase { source, marker, message } in test_cases {
-        let (actual_message, actual_range) = parse_invalid(source);
-        let expected_range = error_marker_range(marker);
-        let expected_message = message;
+fn test_invalid_cases(cases: &[InvalidTestCase]) {
+    for case in cases {
+        let (actual_message, actual_range) = parse_invalid(case.source);
+        let expected_message = case.message;
+        let expected_range = case.error_range();
 
         assert_eq!(actual_message, expected_message);
         assert_eq!(actual_range, expected_range);

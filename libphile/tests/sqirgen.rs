@@ -130,9 +130,11 @@ fn duplicate_user_defined_type() {
     ];
 
     for case in cases {
-        let error_range = error_marker_range(case.marker);
-        let (message, range) = sema_error_for_invalid_source(case.source);
-        assert_eq!(message, case.message);
-        assert_eq!(range,   error_range);
+        let (actual_message, actual_range) = sema_error_for_invalid_source(case.source);
+        let expected_message = case.message;
+        let expected_range = case.error_range();
+
+        assert_eq!(actual_message, expected_message);
+        assert_eq!(actual_range, expected_range);
     }
 }

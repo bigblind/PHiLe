@@ -38,17 +38,19 @@ pub struct InvalidTestCase {
     pub message: &'static str,
 }
 
-#[allow(non_upper_case_globals)]
-pub fn error_marker_range(marker: &str) -> Range {
-    lazy_static! {
-        static ref regex: Regex = Regex::new(r"^ *(\^_*\^) *$").unwrap();
+impl InvalidTestCase {
+    #[allow(non_upper_case_globals)]
+    pub fn error_range(&self) -> Range {
+        lazy_static! {
+            static ref regex: Regex = Regex::new(r"^ *(\^_*\^) *$").unwrap();
+        }
+
+        let m = regex.captures(self.marker).unwrap().get(1).unwrap();
+        let start_index = 1 + m.start();
+        let end_index = 1 + m.end() - 1;
+
+        oneline_range(0, start_index..end_index)
     }
-
-    let m = regex.captures(marker).unwrap().get(1).unwrap();
-    let start_index = 1 + m.start();
-    let end_index = 1 + m.end() - 1;
-
-    oneline_range(0, start_index..end_index)
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
