@@ -6,7 +6,6 @@
 // on 27/08/2017
 //
 
-#![cfg(test)]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,
@@ -35,20 +34,15 @@ extern crate itertools;
 extern crate regex;
 extern crate phile;
 
-use regex::Regex;
+mod common;
+
+use common::*;
 use phile::lexer::{ self, Token, TokenKind };
 use phile::ast::*;
 use phile::error::*;
 use phile::parser;
 use phile::util::{ grapheme_count, Location, Range };
 
-
-#[derive(Debug)]
-struct InvalidTestCase {
-    source:  &'static str,
-    marker:  &'static str,
-    message: &'static str,
-}
 
 fn lex_filter_ws_comment<S: AsRef<str>>(sources: &[S]) -> Vec<Token> {
     let mut tokens = lexer::lex(sources).unwrap();
@@ -75,27 +69,6 @@ fn parse_invalid(source: &str) -> (String, Range) {
         Err(Error::Syntax { message, range }) => (message, range),
         Err(err) => panic!("Parser returned a non-syntactic error: {}", err),
     }
-}
-
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-fn oneline_range(src_idx: usize, char_range: std::ops::Range<usize>) -> Range {
-    Range {
-        start: Location { src_idx, line: 1, column: char_range.start },
-        end:   Location { src_idx, line: 1, column: char_range.end   },
-    }
-}
-
-#[allow(non_upper_case_globals)]
-fn error_marker_range(marker: &str) -> Range {
-    lazy_static! {
-        static ref regex: Regex = Regex::new(r"^ *(\^_*\^) *$").unwrap();
-    }
-
-    let m = regex.captures(marker).unwrap().get(1).unwrap();
-    let start_index = 1 + m.start();
-    let end_index = 1 + m.end() - 1;
-
-    oneline_range(0, start_index..end_index)
 }
 
 fn test_invalid_cases(test_cases: &[InvalidTestCase]) {

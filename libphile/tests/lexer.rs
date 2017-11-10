@@ -6,7 +6,6 @@
 // on 31/07/2017
 //
 
-#![cfg(test)]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,

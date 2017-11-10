@@ -6,7 +6,6 @@
 // on 01/11/2017
 //
 
-#![cfg(test)]
 #![deny(missing_debug_implementations, missing_copy_implementations,
         trivial_casts, trivial_numeric_casts,
         unsafe_code,
@@ -28,20 +27,47 @@
                  mutex_integer, mut_mut, items_after_statements,
                  print_stdout, mem_forget, maybe_infinite_iter))]
 
+#[macro_use]
+extern crate lazy_static;
+extern crate regex;
 extern crate phile;
 
-use phile::error::Error;
-use phile::util::Range;
-use phile::{ lexer, parser, sqirgen };
-use phile::sqir::*;
+mod common;
 
+use common::*;
+use phile::error::{ Error, Result };
+use phile::util::Range;
+use phile::lexer::{ lex, TokenKind };
+use phile::parser::parse;
+use phile::sqir::*;
+use phile::sqirgen::generate_sqir;
+
+fn try_generate_sqir(source: &str) -> Result<Sqir> {
+    let sources = [source];
+    let mut tokens = lex(&sources).unwrap();
+
+    tokens.retain(|token| match token.kind {
+        TokenKind::Whitespace => false,
+        TokenKind::Comment => false,
+        _ => true,
+    });
+
+    let ast = parse(&tokens).unwrap();
+
+    generate_sqir(&ast)
+}
 
 fn sqir_for_valid_source(source: &str) -> Sqir {
-    let sources = [source];
-    let tokens = lexer::lex(&sources).unwrap();
-    let ast = parser::parse(&tokens).unwrap();
+    try_generate_sqir(source).unwrap()
+}
 
-    sqirgen::generate_sqir(&ast).unwrap()
+fn sema_error_for_invalid_source(source: &str) -> (String, Range) {
+    let error = try_generate_sqir(source).unwrap_err();
+
+    match error {
+        Error::Semantic { message, range } => (message, range),
+        _ => panic!("SqirGen returned a non-semantic error: {}", error),
+    }
 }
 
 #[test]
@@ -65,5 +91,48 @@ fn empty_source() {
             ),
             _ => {},
         }
+    }
+}
+
+#[test]
+fn duplicate_user_defined_type() {
+    let cases: &[_] = &[
+        InvalidTestCase {
+            source:  "struct Foo {} struct Foo {}",
+            marker:  "              ^____________^",
+            message: "Redefinition of 'Foo'",
+        },
+        InvalidTestCase {
+            source:  "class  Bar {} class  Bar {} ",
+            marker:  "              ^____________^",
+            message: "Redefinition of 'Bar'",
+        },
+        InvalidTestCase {
+            source:  "enum   Qux {} enum   Qux {}",
+            marker:  "              ^____________^",
+            message: "Redefinition of 'Qux'",
+        },
+        InvalidTestCase {
+            source:  "struct User {} class User {}",
+            marker:  "               ^____________^",
+            message: "Redefinition of 'User'",
+        },
+        InvalidTestCase {
+            source:  "enum Post {} class Post {}",
+            marker:  "             ^____________^",
+            message: "Redefinition of 'Post'",
+        },
+        InvalidTestCase {
+            source:  "struct Attachment {} enum Attachment {} ",
+            marker:  "                     ^_________________^",
+            message: "Redefinition of 'Attachment'",
+        },
+    ];
+
+    for case in cases {
+        let error_range = error_marker_range(case.marker);
+        let (message, range) = sema_error_for_invalid_source(case.source);
+        assert_eq!(message, case.message);
+        assert_eq!(range,   error_range);
     }
 }
