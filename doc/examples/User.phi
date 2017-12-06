@@ -1,6 +1,7 @@
 enum Sex {
     Female,
     Male,
+    Other,
 }
 
 class User {
